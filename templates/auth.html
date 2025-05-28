@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WMarket</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="telegram-web-app-bot-domain" content="https://3kzigz8otwxr.share.zrok.io/">
+    <link rel="stylesheet" href="/static/css/auth.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <img src="/static/img/testlogo.jpg">
+        </div>
+
+        <h1>Добро пожаловать на маркет</h1>
+        <br>
+        <button disabled class="tg-button" id="auth-button">Войти через Telegram</button>
+
+        <div class="footer">
+            <input id="agree-button" type="checkbox" onchange="document.getElementById('auth-button').disabled = !this.checked;">
+            <a onclick="toggleContent()">
+                Продолжая, вы соглашаетесь с нашими <u>Условиями и Политикой конфиденциальности</u>
+            </a>
+            <div id="overlay-block" class="overlay">
+                <p>
+                    1.1. В настоящем документе и вытекающих или связанных с ним отношениях Сторон применяются следующие термины и определения:<br>
+                    Персональные данные – предоставляемые субъектом персональных данных или его представителем данные, объем и состав которых указаны в п.Х.Х. Политики.<br>
+                    Администрация – ООО «Ромашка», ИНН ХХХ, ОГРН ХХХ, Адрес: ХХХХХ, в законном владении и/или управлении которого находится Сайт. 
+                    В предусмотренных настоящей Политикой случаях Администрация выступает в качестве оператора персональных данных.<br>
+                    Пользователь – лицо, использующее Сайт в целях заключения и/или исполнения Договоров.<br>
+                    Договор – пользовательское соглашение использование Сайта, договор купли-продажи, договор поставки, 
+                    договор перевозки и/или иное соглашение, предлагаемое к заключению и/или заключенное Пользователем на основании любой оферты, размещенной на Сайте.<br>
+                    Обработка персональных данных – действие (операция) или совокупность действий (операций) с персональными данными, перечисленные в п.Х.Х. Политики.
+                </p>
+                <p>
+                    1.2. В настоящем документе и вытекающих или связанных с ним отношениях Сторон применяются следующие термины и определения:<br>
+                    Персональные данные – предоставляемые субъектом персональных данных или его представителем данные, объем и состав которых указаны в п.Х.Х. Политики.<br>
+                    Администрация – ООО «Ромашка», ИНН ХХХ, ОГРН ХХХ, Адрес: ХХХХХ, в законном владении и/или управлении которого находится Сайт. 
+                    В предусмотренных настоящей Политикой случаях Администрация выступает в качестве оператора персональных данных.<br>
+                    Пользователь – лицо, использующее Сайт в целях заключения и/или исполнения Договоров.<br>
+                    Договор – пользовательское соглашение использование Сайта, договор купли-продажи, договор поставки, 
+                    договор перевозки и/или иное соглашение, предлагаемое к заключению и/или заключенное Пользователем на основании любой оферты, размещенной на Сайте.<br>
+                    Обработка персональных данных – действие (операция) или совокупность действий (операций) с персональными данными, перечисленные в п.Х.Х. Политики.
+                </p>
+            </div>
+        </div>
+    </div>
+    <script>
+        function toggleContent() {
+            event.preventDefault();
+            const content = document.getElementById('overlay-block');
+            if (content.style.display === "block") {
+            content.style.display = "none";
+            } else {
+            content.style.display = "block";
+            }
+        }
+    </script>
+    <script>
+        const authButton = document.getElementById('auth-button');
+
+        authButton.addEventListener('click', () => {
+            if (Telegram.WebApp.initDataUnsafe.user) {
+                sendDataToServer();
+            } else {
+                // window.open("https://t.me/test_tma8_bot?start=login", "_blank");
+                Telegram.WebApp.openTelegramLink("https://t.me/test_tma8_bot?startapp", "_blank");
+                // Telegram.WebApp.expand();
+                // Telegram.WebApp.requestWriteAccess(() => {
+                //     sendDataToServer();
+                // });
+            }
+        });
+
+        function sendDataToServer() {
+            const initData = Telegram.WebApp.initData;
+
+            const form = document.createElement('form');
+            form.method = "POST";
+            form.action = "/";
+
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = 'initData';
+            input.value = initData;
+
+            form.appendChild(input);
+            document.body.appendChild(form)
+            form.submit();
+        }
+    </script>
+</body>
+</html>
