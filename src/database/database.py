@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import DeclarativeBase
-from .config import settings
+from src.config import settings
 
 DATABASE_URL = settings.get_db_url()
 
@@ -23,6 +23,7 @@ class User(Base):
     last_name = Column(String)
     username = Column(String, unique=True)
     photo_url = Column(String)
+    token = Column(String, unique=True)
 
 
 class Category(Base):

@@ -58,38 +58,46 @@
             }
         }
     </script>
-    <script>
-        const authButton = document.getElementById('auth-button');
-
-        authButton.addEventListener('click', () => {
-            if (Telegram.WebApp.initDataUnsafe.user) {
-                sendDataToServer();
-            } else {
-                // window.open("https://t.me/test_tma8_bot?start=login", "_blank");
-                Telegram.WebApp.openTelegramLink("https://t.me/test_tma8_bot?startapp", "_blank");
-                // Telegram.WebApp.expand();
-                // Telegram.WebApp.requestWriteAccess(() => {
-                //     sendDataToServer();
-                // });
-            }
-        });
-
-        function sendDataToServer() {
-            const initData = Telegram.WebApp.initData;
-
-            const form = document.createElement('form');
-            form.method = "POST";
-            form.action = "/";
-
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = 'initData';
-            input.value = initData;
-
-            form.appendChild(input);
-            document.body.appendChild(form)
-            form.submit();
+    <script>        
+        function isDesktopDevice() {
+            return !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
+
+        window.onload = function() {
+            if (isDesktopDevice()) {
+                alert("Авторизация с любого браузера через ПК, в разработке 🏗️");
+            } else {
+                const authButton = document.getElementById('auth-button');
+
+                authButton.addEventListener('click', () => {
+                    if (Telegram.WebApp.initDataUnsafe.user) {
+                        Telegram.WebApp.expand();
+                        Telegram.WebApp.requestWriteAccess(() => {
+                            sendDataToServer();
+                        });
+                    } else {
+                        Telegram.WebApp.openTelegramLink("https://t.me/test_tma8_bot?startapp", "_blank");
+                    }
+                });
+
+                function sendDataToServer() {
+                    const initData = Telegram.WebApp.initData;
+
+                    const form = document.createElement('form');
+                    form.method = "POST";
+                    form.action = "/";
+
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = 'initData';
+                    input.value = initData;
+
+                    form.appendChild(input);
+                    document.body.appendChild(form)
+                    form.submit();
+                }
+            }
+        };
     </script>
 </body>
 </html>
