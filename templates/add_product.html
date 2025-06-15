@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block style %}
+<style>
+    .add-product-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+
+    .add-product-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-align: center;
+        color: var(--primary-color);
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .form-input, .form-select, .form-textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        font-size: 16px;
+    }
+
+    .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(63, 136, 248, 0.2);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 12px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+        opacity: 0.9;
+    }
+
+    .image-preview {
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        border-radius: 8px;
+        margin-top: 10px;
+        border: 1px dashed var(--border-color);
+        display: none;
+    }
+
+    .file-input-label {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        text-align: center;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-bottom: 15px;
+    }
+
+    .file-input-label:hover {
+        background-color: var(--hover-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main>
+    <div class="add-product-container">
+        <h1 class="add-product-title">Добавить объявление</h1>
+        <form id="add-product-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label" for="category">Категория</label>
+                <select class="form-select" id="category" name="category" required>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="product_name">Название товара</label>
+                <input class="form-input" type="text" id="product_name" name="product_name" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="product_price">Цена (руб.)</label>
+                <input class="form-input" type="number" id="product_price" name="product_price" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="product_description">Описание</label>
+                <textarea class="form-textarea" id="product_description" name="product_description" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Изображение товара</label>
+                <label for="product_image" class="file-input-label">
+                    Выберите изображение
+                </label>
+                <input type="file" id="product_image" name="product_image" accept="image/*" style="display: none;" required>
+                <img id="image-preview" class="image-preview" alt="Предпросмотр изображения">
+            </div>
+
+            <button type="submit" class="submit-btn">Опубликовать</button>
+        </form>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const imageInput = document.getElementById('product_image');
+        const imagePreview = document.getElementById('image-preview');
+
+        imageInput.addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    imagePreview.style.display = 'block';
+                    imagePreview.src = event.target.result;
+                };
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+
+        document.getElementById('add-product-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Публикация...';
+            
+            try {
+                const response = await fetch('/add_product', {
+                    method: 'POST',
+                    body: formData
+                });
+
+
+                const responseText = await response.text();
+                
+                try {
+                    const result = JSON.parse(responseText);
+                    
+                    if (!response.ok) {
+                        throw new Error(result.detail || result.message || 'Ошибка сервера');
+                    }
+                    
+                    window.location.href = '/store';
+                } catch (jsonError) {
+                    if (!response.ok) {
+                        throw new Error(responseText || 'Неизвестная ошибка сервера');
+                    }
+                    window.location.href = '/store';
+                }
+                
+            } catch (error) {
+                const errorMessage = error.message.replace(/<[^>]*>?/gm, '');
+                alert(`Ошибка: ${errorMessage}`);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Опубликовать';
+            }
+        });
+    });
+</script>
+{% endblock %}

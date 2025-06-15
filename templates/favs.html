@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block style %}<link rel="stylesheet" href="/static/css/favs.css">{% endblock %}
+
+{% block content %}
+    <header class="header">
+        <div class="page-title">Избранное</div>
+    </header>
+
+    <main class="main-content" id="mainContent">
+        {% for prod in products %}
+            <div class="ads-container">
+                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}">
+                    <img src="{{ prod[3] }}" class="ad-image">
+                    <div class="ad-details">
+                        <div class="ad-price">{{ prod[1] }} ₽</div>
+                        <div class="ad-favorite-del" data-id="{{ prod[4] }}">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        </div>
+                        <div class="ad-title">{{ prod[0] }}</div>
+                        <div class="ad-description">{{ prod[2] }}</div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        
+        <div class="empty-favorites" id="emptyFavorites" style="display: none;">
+            В избранном пока ничего нет<br>
+            Добавляйте товары, нажимая на 
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            в карточках
+        </div>
+    </main>
+{% endblock %}
+{% block scripts %}
+    <script src="/static/js/price_conv.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mainContent = document.getElementById('mainContent');
+            const emptyFavorites = document.getElementById('emptyFavorites');
+            
+            function checkEmptyFavorites() {
+                const favoriteItems = document.querySelectorAll('.ad-card');
+                if (favoriteItems.length === 0) {
+                    emptyFavorites.style.display = 'block';
+                } else {
+                    emptyFavorites.style.display = 'none';
+                }
+            }
+
+            document.querySelectorAll('.ad-favorite-del').forEach(fav => {
+                fav.addEventListener('click', function() {
+                    const form = document.createElement('form');
+                    form.method = "POST";
+                    form.action = "/del_fav";
+
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "fav_id";
+                    input.value = this.dataset.id;
+
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            });
+            
+            checkEmptyFavorites();
+        });
+    </script>
+{% endblock %}

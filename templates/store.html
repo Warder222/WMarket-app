@@ -1,9 +1,207 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Вы авторезированы</title>
-</head>
-<body>
-    <h1>Вы авторезированы :D</h1>
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block style %}
+<link rel="stylesheet" href="/static/css/store.css">
+<style>
+    .categories-panel {
+        position: fixed;
+        bottom: 60px;
+        left: 0;
+        right: 0;
+        background: var(--card-bg);
+        border-radius: 12px 12px 0 0;
+        padding: 16px;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .categories-panel.show {
+        transform: translateY(0);
+    }
+
+    .categories-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .categories-title {
+        font-weight: bold;
+        font-size: 18px;
+    }
+
+    .close-categories {
+        background: none;
+        border: none;
+        padding: 4px;
+    }
+
+    .category-item {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .category-item:last-child {
+        border-bottom: none;
+    }
+
+    .ads-container {
+        position: relative;  /* Это ключевое изменение */
+        display: block;     /* Изменено с contents на block */
+    }
+
+    .ad-new-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <header class="header">
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="Поиск объявлений">
+            <button class="categories-button" id="categoriesButton">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <button class="wallet-button">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"></path>
+                    <rect x="16" y="9" width="6" height="6" rx="1"></rect>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="categories-panel" id="categoriesPanel">
+        <div class="categories-header">
+            <div class="categories-title">Категории</div>
+            <button class="close-categories" id="closeCategories">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        {% for cat in categories %}
+            <div class="category-item">{{ cat }}</div>
+        {% endfor %}
+    </div>
+
+    <main class="main-content" id="mainContent">
+        {% for prod in products %}
+            <div class="ads-container">
+                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}">
+                    {% if (now - prod[5]).total_seconds() < 86400 %}
+                        <div class="ad-new-badge">Новое</div>
+                    {% endif %}
+                    <img src="/{{ prod[3] }}" class="ad-image">
+                    <div class="ad-details">
+                        <div class="ad-price">{{ prod[1] }} ₽</div>
+                        {% if prod[6] == True %}
+                            <div class="ad-favorite-del" data-id="{{ prod[4] }}">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                            </div>
+                        {% else %}
+                            <div class="ad-favorite" data-id="{{ prod[4] }}">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                            </div>
+                        {% endif %}
+                        <div class="ad-title">{{ prod[0] }}</div>
+                        <div class="ad-description">{{ prod[2] }}</div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </main>
+{% endblock %}
+
+{% block scripts %}
+    <script src="/static/js/price_conv.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.querySelector('.search-input');
+            const allAds = Array.from(document.querySelectorAll('.ad-card'));
+            const panel = document.getElementById('categoriesPanel');
+            const catBtn = document.getElementById('categoriesButton');
+            const closeBtn = document.getElementById('closeCategories');
+            
+            catBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                panel.classList.toggle('show');
+            });
+            
+            catBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                panel.classList.toggle('show');
+            });
+
+            closeBtn.addEventListener('click', () => {
+                panel.classList.remove('show');
+            });
+
+            document.querySelectorAll('.category-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const loader = document.createElement('div');
+                    loader.className = 'page-loader';
+                    loader.innerHTML = 'Загрузка...';
+                    document.body.appendChild(loader);
+                    
+                    window.location.href = `/store/${encodeURIComponent(this.textContent.trim())}`;
+                });
+            });//
+
+            document.body.addEventListener('click', (e) => {
+                const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+                if (favBtn) {
+                    e.preventDefault();
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'fav_id';
+                    input.value = favBtn.dataset.id;
+                    
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.trim().toLowerCase();
+                
+                allAds.forEach(ad => {
+                    const title = ad.dataset.title.toLowerCase();
+                    ad.style.display = title.includes(searchTerm) ? '' : 'none';
+                });
+            });
+        });
+    </script>
+{% endblock %}

@@ -25,7 +25,7 @@ def parse_init_data(init_data):
 
 
 async def encode_jwt(data: dict):
-    expire = datetime.now(timezone.utc) + timedelta(minutes=1)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
     data.update({"exp": expire})
     return jwt.encode(data, key=SECRET_KEY, algorithm=ALGORITHM)
 

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block style %}
+<style>
+    .profile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        position: sticky;
+        top: 0;
+        background-color: var(--bg-color);
+        z-index: 100;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .profile-title {
+        font-size: 18px;
+        font-weight: bold;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .header-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Основные стили для страницы */
+    body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    main {
+        flex: 1;
+        padding-bottom: 80px; /* Отступ для нижнего меню */
+    }
+
+    .page-title {
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    /* Контент профиля */
+    .profile-info {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--primary-color);
+    }
+
+    .username {
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .reputation-container,
+    .earned-container {
+        width: 100%;
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 10px;
+    }
+
+    .reputation-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .reputation-title {
+        font-weight: bold;
+    }
+
+    .reputation-value {
+        font-weight: bold;
+    }
+
+    .positive { color: #4CAF50; }
+    .negative { color: #F44336; }
+    .neutral { color: var(--text-color); }
+
+    .reviews-count {
+        margin-bottom: 15px;
+    }
+
+    .reputation-bar {
+        width: 100%;
+        height: 15px;
+        background-color: #F44336;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+        margin-top: 15px;
+    }
+
+    .reputation-fill {
+        height: 100%;
+        background-color: #4CAF50;
+        position: absolute;
+        left: 0;
+        top: 0;
+        transition: width 0.3s ease;
+    }
+
+    .reputation-labels {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--secondary-text);
+    }
+
+    .earned-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .earned-amount {
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main>
+    <div class="profile-header">
+        <div class="header-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+        </div>
+        <div class="profile-title">Профиль</div>
+        <div class="header-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+        </div>
+    </div>
+
+    <div class="profile-info">
+        <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
+        <div class="username">@{{ user_info[1] }}</div>
+
+        <div class="earned-container">
+            <div class="earned-title">Заработано</div>
+            <div class="earned-amount">24,500 ₽</div>
+        </div>
+
+        <div class="reputation-container">
+            <div class="reputation-header">
+                <div class="reputation-title">Репутация</div>
+                <div class="reputation-value 
+                    {% if reputation > 0 %}positive
+                    {% elif reputation < 0 %}negative
+                    {% else %}neutral{% endif %}">
+                    {% if reputation > 0 %}+{% endif %}{{ reputation }}
+                </div>
+            </div>
+            <div class="reviews-count">{{ positive_reviews + negative_reviews }} отзывов</div>
+            
+            <div class="reputation-bar">
+                <div class="reputation-fill" 
+                     style="width: {{ (positive_reviews / (positive_reviews + negative_reviews) * 100) if (positive_reviews + negative_reviews) > 0 else 50 }}%">
+                </div>
+            </div>
+            <div class="reputation-labels">
+                <span class="positive">{{ positive_reviews }}</span>
+                <span class="negative">{{ negative_reviews }}</span>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
 from sqlalchemy.orm import DeclarativeBase
 from src.config import settings
 
@@ -24,6 +24,7 @@ class User(Base):
     username = Column(String, unique=True)
     photo_url = Column(String)
     token = Column(String, unique=True)
+    created_at = Column(DateTime(timezone=True), default=func.now())
 
 
 class Category(Base):
@@ -38,9 +39,16 @@ class Product(Base):
 
     id = Column(Integer, autoincrement=True, primary_key=True)
     tg_id = Column(Integer, ForeignKey("users.tg_id"))
-    username = Column(String, ForeignKey("users.username"))
     category_name = Column(String, ForeignKey("categories.category_name"))
     product_name = Column(String)
     product_price = Column(Integer)
     product_description = Column(String)
     product_image_url = Column(String, unique=True)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class Fav(Base):
+    __tablename__ = "favs"
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    tg_id = Column(Integer, ForeignKey("users.tg_id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
