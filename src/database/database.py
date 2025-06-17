@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger
 from sqlalchemy.orm import DeclarativeBase
 from src.config import settings
 
@@ -38,8 +38,8 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, autoincrement=True, primary_key=True)
-    tg_id = Column(Integer, ForeignKey("users.tg_id"))
-    category_name = Column(String, ForeignKey("categories.category_name"))
+    tg_id = Column(Integer, ForeignKey("users.tg_id", ondelete="CASCADE"))
+    category_name = Column(String, ForeignKey("categories.category_name", ondelete="CASCADE"))
     product_name = Column(String)
     product_price = Column(Integer)
     product_description = Column(String)
@@ -50,5 +50,5 @@ class Product(Base):
 class Fav(Base):
     __tablename__ = "favs"
     id = Column(Integer, autoincrement=True, primary_key=True)
-    tg_id = Column(Integer, ForeignKey("users.tg_id"))
+    tg_id = Column(Integer, ForeignKey("users.tg_id", ondelete="CASCADE"))
     product_id = Column(Integer, ForeignKey("products.id"))

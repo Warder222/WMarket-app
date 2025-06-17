@@ -27,25 +27,39 @@ templates = Jinja2Templates(directory="templates")
 @wmarket_router.get("/")
 async def index(request: Request,
                 session_token=Cookie(default=None)):
-    if session_token:
-        users = await get_all_users()
-        payload = await decode_jwt(session_token)
-
-        if (payload.get("tg_id") in users
-                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            response = RedirectResponse(url="/store", status_code=303)
-            return response
+    # if session_token:
+    #     users = await get_all_users()
+    #     payload = await decode_jwt(session_token)
+    #
+    #     if (payload.get("tg_id") in users
+    #             and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+    #         response = RedirectResponse(url="/store", status_code=303)
+    #         return response
     context = {
         "request": request
     }
     return templates.TemplateResponse("auth.html", context=context)
 
 
-@wmarket_router.post("/")
-async def auth(request: Request, session_token=Cookie(default=None)):
+@wmarket_router.get("/register")
+async def register(request: Request):
+    context = {
+        "request": request
+    }
+    return templates.TemplateResponse("register.html", context=context)
+
+
+@wmarket_router.post("/{oper}")
+async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
     form_data = await request.form()
     init_data = form_data.get("initData")
     user_data = parse_init_data(init_data)
+
+    if oper == "auth":
+        users = await get_all_users()
+        if user_data.get("tg_id") not in users:
+            response = RedirectResponse(url="/register", status_code=303)
+            return response
 
     new_session_token = await encode_jwt({"tg_id": user_data.get("tg_id")})
     add_result = await add_user(user_data, new_session_token)
@@ -93,11 +107,13 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             categories = await get_all_categories()
             products = await get_all_products_from_category(category_name, payload.get("tg_id"))
+            now = datetime.now(timezone.utc)
 
             context = {
                 "request": request,
                 "categories": categories,
-                "products": products
+                "products": products,
+                "now": now
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -140,7 +156,7 @@ async def add_product(request: Request,
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
                 file_content = await product_image.read()
-                max_size = 5 * 1024 * 1024
+                max_size = 3 * 1024 * 1024
 
                 if len(file_content) > max_size:
                     raise HTTPException(status_code=413, detail="Размер файла не должен превышать 5 МБ)")
