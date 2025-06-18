@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block style %}
+    <link rel="stylesheet" href="/static/css/store.css">
+    <style>
+        .ad-container {
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .ad-image {
+            height: 50vh;
+            width: 100%;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+        }
+
+        .ad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            min-height: 48px; /* Для размещения большой кнопки */
+        }
+
+        .ad-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+            flex-grow: 1;
+            padding-right: 8px;
+        }
+
+        .ad-price {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 16px 0;
+        }
+
+        .ad-description {
+            font-size: 16px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+            white-space: pre-line;
+        }
+
+        /* Стили для кнопки избранного */
+        .ad-favorite, .ad-favorite-del {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+            top: 0.2vh;
+        }
+
+        /* Добавляем стиль для цвета звезды в неактивном состоянии */
+        .ad-favorite {
+            color: var(--text-color); /* Используем основной цвет текста */
+        }
+
+        /* Стиль для звезды в активном состоянии (в избранном) */
+        .ad-favorite-del {
+            color: var(--text-color); /* Используем основной цвет темы */
+        }
+
+        .ad-favorite svg, .ad-favorite-del svg {
+            width: 36px;
+            height: 36px;
+            transition: transform 0.2s ease;
+        }
+
+        .ad-favorite:active svg, .ad-favorite-del:active svg {
+            transform: scale(0.9);
+        }
+
+        .contact-btn {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 24px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="ad-container">
+        <img src="/{{ product_info[5] }}" class="ad-image" alt="{{ product_info[2] }}">
+
+        <div class="ad-header">
+            <h1 class="ad-title">{{ product_info[2] }}</h1>
+            {% if product_info[8] == True %}
+                <button class="ad-favorite-del" data-id="{{ product_info[0] }}">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                </button>
+            {% else %}
+                <button class="ad-favorite" data-id="{{ product_info[0] }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                </button>
+            {% endif %}
+        </div>
+
+        <div class="ad-price">{{ product_info[3] }} ₽</div>
+
+        <div class="ad-description">{{ product_info[4] }}</div>
+
+        <button class="contact-btn">Написать продавцу</button>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="/static/js/price_conv.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.addEventListener('click', (e) => {
+                const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+                if (favBtn) {
+                    e.preventDefault();
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'fav_id';
+                    input.value = favBtn.dataset.id;
+                    
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            });
+        });
+    </script>
+{% endblock %}

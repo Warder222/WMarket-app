@@ -54,12 +54,6 @@
     color: var(--primary-color);
 }
 
-.ad-favorite-del {
-    float: right;
-    position: relative;
-    bottom: 4vh;
-}
-
 .empty-favorites {
     grid-column: 1 / -1;
     text-align: center;

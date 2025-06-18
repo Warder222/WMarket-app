@@ -119,6 +119,27 @@ async def get_all_products_from_category(category_name, tg_id):
             return []
 
 
+async def get_product_info(product_id, tg_id):
+    async with async_session_maker() as db:
+        try:
+            q = select(Product).filter_by(id=product_id)
+            result = await db.execute(q)
+            product = result.scalar_one_or_none()
+            # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
+            # 8-is_fav
+            product_info = [product.id, product.tg_id, product.product_name, product.product_price,
+                            product.product_description, product.product_image_url, product.category_name,
+                            product.created_at]
+            all_favs = await get_all_user_favs(tg_id)
+            if product.id in all_favs:
+                product_info.append(True)
+            else:
+                product_info.append(False)
+            return product_info
+        except Exception as exc:
+            print(exc)
+
+
 async def add_new_product(product_data, tg_id):
     async with async_session_maker() as db:
         try:

@@ -1,6 +1,52 @@
 {% extends 'base.html' %}
 
-{% block style %}<link rel="stylesheet" href="/static/css/favs.css">{% endblock %}
+{% block style %}
+    <link rel="stylesheet" href="/static/css/favs.css">
+    <style>
+        .ads-container {
+            position: relative;
+            display: block;
+        }
+
+        .ad-card {
+            cursor: pointer; /* Добавляем курсор-указатель */
+        }
+
+        .ad-title {
+            font-size: 18px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 85%;
+            display: block;
+            position: relative;
+            bottom: 0.55vh;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.2em;
+        }
+
+        .ad-title::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 30%;
+            height: 1.2em;
+            background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
+            pointer-events: none;
+        }
+
+        .ad-favorite-del {
+            float: right;
+            position: relative;
+            bottom: 3.6vh;
+            z-index: 2; /* Поднимаем кнопку выше */
+            pointer-events: auto; /* Разрешаем события мыши */
+        }
+    </style>
+{% endblock %}
 
 {% block content %}
     <header class="header">
@@ -10,17 +56,17 @@
     <main class="main-content" id="mainContent">
         {% for prod in products %}
             <div class="ads-container">
-                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}">
-                    <img src="{{ prod[3] }}" class="ad-image">
+                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}" data-id="{{ prod[4] }}">
+                    <img src="/{{ prod[3] }}" class="ad-image">
                     <div class="ad-details">
-                        <div class="ad-price">{{ prod[1] }} ₽</div>
+                        <div class="ad-title">{{ prod[0] }}</div>
                         <div class="ad-favorite-del" data-id="{{ prod[4] }}">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
                         </div>
-                        <div class="ad-title">{{ prod[0] }}</div>
-                        <div class="ad-description">{{ prod[2] }}</div>
+                        <div class="ad-price">{{ prod[1] }} ₽</div>
+                        <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>
                     </div>
                 </div>
             </div>
@@ -36,6 +82,7 @@
         </div>
     </main>
 {% endblock %}
+
 {% block scripts %}
     <script src="/static/js/price_conv.js"></script>
     <script>
@@ -52,8 +99,10 @@
                 }
             }
 
+            // Обработчик для кнопки удаления из избранного
             document.querySelectorAll('.ad-favorite-del').forEach(fav => {
-                fav.addEventListener('click', function() {
+                fav.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Останавливаем всплытие события
                     const form = document.createElement('form');
                     form.method = "POST";
                     form.action = "/del_fav";
@@ -70,6 +119,22 @@
             });
             
             checkEmptyFavorites();
+
+            // Обработчик для клика по карточке объявления
+            document.querySelectorAll('.ad-card').forEach(card => {
+                card.addEventListener('click', function(e) {
+                    // Проверяем, был ли клик по кнопке избранного
+                    if (e.target.closest('.ad-favorite-del')) {
+                        return;
+                    }
+                    
+                    // Получаем ID объявления из data-атрибута карточки
+                    const adId = this.dataset.id;
+                    if (adId) {
+                        window.location.href = `/ads/${adId}`;
+                    }
+                });
+            });
         });
     </script>
 {% endblock %}

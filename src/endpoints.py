@@ -10,7 +10,7 @@ from src.config import settings
 from src.database.utils import (get_all_users, add_user,
                                 update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
-                                add_new_product)
+                                add_new_product, get_product_info)
 from src.utils import parse_init_data, encode_jwt, decode_jwt
 
 from datetime import datetime, timezone, timedelta
@@ -25,16 +25,7 @@ templates = Jinja2Templates(directory="templates")
 
 # auth__________________________________________________________________________________________________________________
 @wmarket_router.get("/")
-async def index(request: Request,
-                session_token=Cookie(default=None)):
-    # if session_token:
-    #     users = await get_all_users()
-    #     payload = await decode_jwt(session_token)
-    #
-    #     if (payload.get("tg_id") in users
-    #             and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-    #         response = RedirectResponse(url="/store", status_code=303)
-    #         return response
+async def index(request: Request):
     context = {
         "request": request
     }
@@ -49,13 +40,13 @@ async def register(request: Request):
     return templates.TemplateResponse("register.html", context=context)
 
 
-@wmarket_router.post("/{oper}")
+@wmarket_router.post("/auth/{oper}")
 async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
     form_data = await request.form()
     init_data = form_data.get("initData")
     user_data = parse_init_data(init_data)
 
-    if oper == "auth":
+    if oper == "login":
         users = await get_all_users()
         if user_data.get("tg_id") not in users:
             response = RedirectResponse(url="/register", status_code=303)
@@ -141,7 +132,7 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
 
 
 @wmarket_router.post("/add_product")
-async def add_product(request: Request,
+async def add_product_post(request: Request,
                       session_token=Cookie(default=None),
                       category: str = Form(),
                       product_name: str = Form(),
@@ -156,7 +147,7 @@ async def add_product(request: Request,
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
                 file_content = await product_image.read()
-                max_size = 3 * 1024 * 1024
+                max_size = 5 * 1024 * 1024
 
                 if len(file_content) > max_size:
                     raise HTTPException(status_code=413, detail="Размер файла не должен превышать 5 МБ)")
@@ -188,16 +179,25 @@ async def add_product(request: Request,
     return response
 
 
-@wmarket_router.get("/test_add")
-async def test_add():
-    product_data = {"category_name": "Техника и электроника",
-                    "product_name": "Samsung Galaxy S25 Ultra",
-                    "product_price": 90000,
-                    "product_description": "Абсолютно новая модель / Экран 6.9 (3120×1440) Dynamic AMOLED 2X 120 Гц / ПамятьВстроенная 512 ГБ, оперативная 12 ГБ / ФотоОсновная камера200 МП , 4 камеры",
-                    "product_image_url": "/static/img/samsung.jpg"}
-    test = await add_product(product_data, 1391622942)
-    # 1391622942, 1002424749
-    # Автомобили, Недвижимость, Мебель
+@wmarket_router.get('/ads/{product_id}')
+async def ads_view(product_id: int, request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
+            # 8-is_fav
+            product_info = await get_product_info(product_id, payload.get("tg_id"))
+            context = {
+                "request": request,
+                "product_info": product_info
+            }
+            return templates.TemplateResponse("ads.html", context=context)
+
+    response = RedirectResponse(url="/store", status_code=303)
+    return response
 
 
 # fav___________________________________________________________________________________________________________________
@@ -211,8 +211,8 @@ async def favs(request: Request, session_token=Cookie(default=None)):
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             all_favs = await get_all_user_favs(payload.get("tg_id"))
             all_products = await get_all_products(payload.get("tg_id"))
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id
-            products = [[prod[0], prod[1], prod[2], prod[3], prod[4]] for prod in all_products if prod[4] in all_favs]
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
+            products = [[prod[0], prod[1], prod[2], prod[3], prod[4], prod[5], prod[6]] for prod in all_products if prod[4] in all_favs]
 
             context = {
                 "request": request,

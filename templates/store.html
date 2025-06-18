@@ -53,8 +53,8 @@
     }
 
     .ads-container {
-        position: relative;  /* Это ключевое изменение */
-        display: block;     /* Изменено с contents на block */
+        position: relative;
+        display: block;
     }
 
     .ad-new-badge {
@@ -69,6 +69,32 @@
         font-weight: bold;
         z-index: 10;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .ad-title {
+        font-size: 18px;
+        white-space: nowrap;       /* Запрещаем перенос строк */
+        overflow: hidden;         /* Скрываем выходящий за границы текст */
+        text-overflow: ellipsis;  /* Добавляем многоточие в конце */
+        max-width: 170%;          /* Ограничиваем ширину */
+        display: block;           /* Делаем блочным элементом */
+        position: relative;
+        bottom: 0.55vh;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.2em;
+    }
+
+    .ad-title::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 30%;
+        height: 1.2em;
+        background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
+        pointer-events: none;
     }
 </style>
 {% endblock %}
@@ -200,6 +226,24 @@
                 allAds.forEach(ad => {
                     const title = ad.dataset.title.toLowerCase();
                     ad.style.display = title.includes(searchTerm) ? '' : 'none';
+                });
+            });
+
+            document.querySelectorAll('.ad-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Проверяем, был ли клик по кнопке избранного или её дочерним элементам
+                    const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
+                    
+                    // Если клик был не по кнопке избранного
+                    if (!isFavoriteClick) {
+                        // Получаем ID объявления из data-атрибута кнопки избранного
+                        const adId = card.querySelector('.ad-favorite, .ad-favorite-del')?.dataset.id;
+                        
+                        if (adId) {
+                            // Перенаправляем на страницу объявления
+                            window.location.href = `/ads/${adId}`;
+                        }
+                    }
                 });
             });
         });

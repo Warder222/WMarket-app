@@ -18,7 +18,7 @@ class Base(AsyncAttrs, DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    tg_id = Column(Integer, unique=True, primary_key=True)
+    tg_id = Column(BigInteger, unique=True, primary_key=True)
     first_name = Column(String)
     last_name = Column(String)
     username = Column(String, unique=True)
@@ -38,7 +38,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, autoincrement=True, primary_key=True)
-    tg_id = Column(Integer, ForeignKey("users.tg_id", ondelete="CASCADE"))
+    tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
     category_name = Column(String, ForeignKey("categories.category_name", ondelete="CASCADE"))
     product_name = Column(String)
     product_price = Column(Integer)
@@ -50,5 +50,5 @@ class Product(Base):
 class Fav(Base):
     __tablename__ = "favs"
     id = Column(Integer, autoincrement=True, primary_key=True)
-    tg_id = Column(Integer, ForeignKey("users.tg_id", ondelete="CASCADE"))
+    tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
     product_id = Column(Integer, ForeignKey("products.id"))

@@ -4,7 +4,6 @@
     <title>WMarket</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- <meta name="telegram-web-app-bot-domain" content="https://3kzigz8otwxr.share.zrok.io/"> -->
     <link rel="stylesheet" href="/static/css/auth.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -57,14 +56,6 @@
             }
         }
 
-        // function isDesktopDevice() {
-        //         return !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        //     }
-
-        // window.onload = function() {
-        //     if (isDesktopDevice()) {
-        //         alert("Авторизация с любого браузера через ПК, в разработке 🏗️");
-        //     } else {
         const authButton = document.getElementById('auth-button');
 
         authButton.addEventListener('click', () => {
@@ -83,7 +74,7 @@
 
             const form = document.createElement('form');
             form.method = "POST";
-            form.action = "/reg";
+            form.action = "/auth/reg";
 
             const input = document.createElement("input");
             input.type = "hidden";
@@ -94,8 +85,6 @@
             document.body.appendChild(form)
             form.submit();
         }
-        //     }
-        // };
     </script>
 </body>
 </html>

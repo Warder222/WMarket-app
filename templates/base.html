@@ -57,13 +57,72 @@
     </nav>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Элементы навигации
             const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+            const mainContent = document.querySelector('main');
             
+            // Создаем overlay для анимации перехода
             const transitionOverlay = document.createElement('div');
             transitionOverlay.className = 'page-transition';
             transitionOverlay.innerHTML = '<div class="loader">W</div>';
             document.body.appendChild(transitionOverlay);
+
+            // Функция выполнения навигации
+            function performNavigation(url) {
+                // 1. Показываем анимацию
+                transitionOverlay.classList.add('active');
+                if (mainContent) mainContent.classList.add('fade-out');
+                
+                // 2. Выполняем переход после короткой задержки
+                setTimeout(() => {
+                    window.location.href = url;
+                }, 300);
+            }
+
+            // Обработчик кликов по навигации
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    const href = this.getAttribute('href');
+                    
+                    // Игнорируем пустые ссылки
+                    if (!href || href === '#') {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    
+                    // Обновляем активный пункт меню
+                    navItems.forEach(navItem => navItem.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Выполняем навигацию
+                    performNavigation(href);
+                });
+            });
+
+            // Установка активного пункта меню при загрузке
+            function setActiveNavItem() {
+                const currentPath = window.location.pathname;
+                navItems.forEach(item => {
+                    item.classList.remove('active');
+                    const itemPath = item.getAttribute('href');
+                    
+                    // Проверяем соответствие текущего пути
+                    if (currentPath === itemPath) {
+                        item.classList.add('active');
+                    }
+                    // Специальная проверка для главной страницы
+                    else if (currentPath === '/' && itemPath === '{{ url_for("store") }}') {
+                        item.classList.add('active');
+                    }
+                });
+            }
             
+            // Инициализация
+            setActiveNavItem();
+
+            // Стили для анимации (можно вынести в CSS)
             const style = document.createElement('style');
             style.textContent = `
                 .page-transition {
@@ -99,22 +158,6 @@
                     50% { transform: scale(1.2); opacity: 0.7; }
                 }
                 
-                .nav-item {
-                    transition: all 0.3s ease;
-                }
-                
-                .nav-item.active {
-                    transform: translateY(-5px);
-                }
-                
-                .nav-icon svg {
-                    transition: all 0.3s ease;
-                }
-                
-                .nav-item.active .nav-icon svg {
-                    transform: scale(1.2);
-                }
-                
                 main {
                     transition: opacity 0.3s ease;
                 }
@@ -124,54 +167,6 @@
                 }
             `;
             document.head.appendChild(style);
-
-            async function navigateTo(url) {
-                transitionOverlay.classList.add('active');
-                document.querySelector('main').classList.add('fade-out');
-                
-                const loadPromise = new Promise(resolve => {
-                    setTimeout(resolve, 1500); // Имитация загрузки
-                });
-                
-                const navigationPromise = new Promise(resolve => {
-                    setTimeout(() => {
-                        window.location.href = url;
-                        resolve();
-                    }, 300); // Минимальное время для анимации
-                });
-                
-                await Promise.race([loadPromise, navigationPromise]);
-            }
-
-            navItems.forEach(item => {
-                item.addEventListener('click', function(e) {
-                    const href = this.getAttribute('href');
-                    
-                    if (href === '#' || this.classList.contains('active')) {
-                        e.preventDefault();
-                        return;
-                    }
-                    
-                    e.preventDefault();
-                    
-                    navItems.forEach(navItem => navItem.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    navigateTo(href);
-                });
-            });
-            
-            function setActiveNavItem() {
-                const path = window.location.pathname;
-                navItems.forEach(item => {
-                    item.classList.remove('active');
-                    const href = item.getAttribute('href');
-                    if (path === href || (path.includes('auth') && (href === '/' || href.includes('auth')))) {
-                        item.classList.add('active');
-                    }
-                });
-            }
-            setActiveNavItem();
         });
     </script>
     {% block scripts %}{% endblock %}
