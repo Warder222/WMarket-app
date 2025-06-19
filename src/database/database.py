@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger, Boolean
 from sqlalchemy.orm import DeclarativeBase
 from src.config import settings
 
@@ -25,6 +25,8 @@ class User(Base):
     photo_url = Column(String)
     token = Column(String, unique=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
+    plus_rep = Column(Integer, default=0)
+    minus_rep = Column(Integer, default=0)
 
 
 class Category(Base):
@@ -45,6 +47,7 @@ class Product(Base):
     product_description = Column(String)
     product_image_url = Column(String, unique=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
+    active = Column(Boolean, default=False)
 
 
 class Fav(Base):

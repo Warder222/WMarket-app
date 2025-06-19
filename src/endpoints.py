@@ -10,7 +10,8 @@ from src.config import settings
 from src.database.utils import (get_all_users, add_user,
                                 update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
-                                add_new_product, get_product_info)
+                                add_new_product, get_product_info, get_user_active_products,
+                                get_user_moderation_products)
 from src.utils import parse_init_data, encode_jwt, decode_jwt
 
 from datetime import datetime, timezone, timedelta
@@ -131,6 +132,28 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
     return response
 
 
+@wmarket_router.get("/ads_review")
+async def ads_review(request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+            moderation_products = await get_user_moderation_products(payload.get("tg_id"))
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
+            context = {
+                "request": request,
+                "active_products": active_products,
+                "moderation_products": moderation_products
+            }
+            return templates.TemplateResponse("ads_review.html", context=context)
+
+    response = RedirectResponse(url="/store", status_code=303)
+    return response
+
+
 @wmarket_router.post("/add_product")
 async def add_product_post(request: Request,
                       session_token=Cookie(default=None),
@@ -190,9 +213,19 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
             # 8-is_fav
             product_info = await get_product_info(product_id, payload.get("tg_id"))
+            user_info = await get_user_info(product_info[1])
+            positive_reviews = user_info[3]
+            negative_reviews = user_info[4]
+            reputation = positive_reviews - negative_reviews
+
             context = {
                 "request": request,
-                "product_info": product_info
+                "product_info": product_info,
+                "user_tg_id": payload.get("tg_id"),
+                "reputation": reputation,
+                "positive_reviews": positive_reviews,
+                "negative_reviews": negative_reviews,
+                "user_info": user_info
             }
             return templates.TemplateResponse("ads.html", context=context)
 
@@ -273,19 +306,22 @@ async def profile(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-
-            positive_reviews = 100
-            negative_reviews = 50
-            reputation = positive_reviews - negative_reviews
-
             user_info = await get_user_info(payload.get("tg_id"))
+            positive_reviews = user_info[3]
+            negative_reviews = user_info[4]
+            reputation = positive_reviews - negative_reviews
+            products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+            now = datetime.now(timezone.utc)
 
             context = {
                 "request": request,
                 "reputation": reputation,
                 "positive_reviews": positive_reviews,
                 "negative_reviews": negative_reviews,
-                "user_info": user_info
+                "user_info": user_info,
+                "user_tg_id": payload.get("tg_id"),
+                "user_products": products,
+                "now": now
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -293,33 +329,35 @@ async def profile(request: Request, session_token=Cookie(default=None)):
     return response
 
 
-# @wmarket_router.get("/profile/{username}")
-# async def another_profile(username: str, request: Request, session_token=Cookie(default=None)):
-#     if session_token:
-#         users = await get_all_users()
-#         payload = await decode_jwt(session_token)
-#
-#         if (payload.get("tg_id") in users
-#                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-#             user_info = await get_user_info(payload.get("tg_id"))
-#
-#             if username in user_info:
-#                 return RedirectResponse(url="/profile", status_code=303)
-#
-#             positive_reviews = 100
-#             negative_reviews = 50
-#             reputation = positive_reviews - negative_reviews
-#
-#             user_info = await get_user_info(payload.get("tg_id"))
-#
-#             context = {
-#                 "request": request,
-#                 "reputation": reputation,
-#                 "positive_reviews": positive_reviews,
-#                 "negative_reviews": negative_reviews,
-#                 "user_info": user_info
-#             }
-#             return templates.TemplateResponse("profile.html", context=context)
-#
-#     response = RedirectResponse(url="/", status_code=303)
-#     return response
+@wmarket_router.get("/profile/{seller_tg_id}")
+async def another_profile(seller_tg_id: int, request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            if seller_tg_id == payload.get("tg_id"):
+                response = RedirectResponse(url="/profile", status_code=303)
+                return response
+            user_info = await get_user_info(seller_tg_id)
+            positive_reviews = user_info[3]
+            negative_reviews = user_info[4]
+            reputation = positive_reviews - negative_reviews
+            products = await get_user_active_products(seller_tg_id, payload.get("tg_id"))
+            now = datetime.now(timezone.utc)
+            print(products)
+            context = {
+                "request": request,
+                "reputation": reputation,
+                "positive_reviews": positive_reviews,
+                "negative_reviews": negative_reviews,
+                "user_info": user_info,
+                "user_tg_id": payload.get("tg_id"),
+                "user_products": products,
+                "now": now
+            }
+            return templates.TemplateResponse("profile.html", context=context)
+
+    response = RedirectResponse(url="/", status_code=303)
+    return response

@@ -2,6 +2,7 @@
 
 {% block style %}
 <style>
+    /* Все стили остаются без изменений */
     .profile-header {
         display: flex;
         justify-content: space-between;
@@ -40,12 +41,6 @@
     main {
         flex: 1;
         padding-bottom: 80px; /* Отступ для нижнего меню */
-    }
-
-    .page-title {
-        font-size: 20px;
-        font-weight: bold;
-        text-align: center;
     }
 
     /* Контент профиля */
@@ -138,6 +133,132 @@
         font-weight: bold;
         color: var(--primary-color);
     }
+
+    /* Стили для раздела объявлений */
+    .ads-section {
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    .ads-section-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        padding-left: 5px;
+    }
+
+    .ads-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 16px;
+    }
+
+    .ad-card {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px var(--shadow-color);
+        cursor: pointer;
+        height: 300px;
+        position: relative;
+    }
+
+    .ad-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+    }
+
+    .ad-details {
+        padding: 12px;
+    }
+
+    .ad-price {
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: var(--primary-color);
+    }
+
+    .ad-description {
+        font-size: 12px;
+        color: #999;
+    }
+
+    .ad-new-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .ad-title {
+        font-size: 18px;
+        margin-bottom: 4px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .ad-title {
+        font-size: 18px;
+        white-space: nowrap;       /* Запрещаем перенос строк */
+        overflow: hidden;         /* Скрываем выходящий за границы текст */
+        text-overflow: ellipsis;  /* Добавляем многоточие в конце */
+        max-width: 170%;          /* Ограничиваем ширину */
+        display: block;           /* Делаем блочным элементом */
+        position: relative;
+        bottom: 0.55vh;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.2em;
+    }
+
+    .ad-title::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 30%;
+        height: 1.2em;
+        background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
+        pointer-events: none;
+    }
+
+    .ad-favorite, .ad-favorite-del {
+        float: right;
+        position: relative;
+        top: 20px;
+        z-index: 2;
+        pointer-events: auto;
+    }
+
+    .ad-favorite-del svg {
+        fill: currentColor;
+    }
+
+    .no-results {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+    }
+
+    @media (max-width: 400px) {
+        .ads-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        }
+    }
 </style>
 {% endblock %}
 
@@ -154,23 +275,25 @@
             </svg>
         </div>
         <div class="profile-title">Профиль</div>
+        {% if user_info[0] == user_tg_id %}
         <div class="header-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
         </div>
+        {% endif %}
     </div>
 
     <div class="profile-info">
         <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
-        <div class="username">@{{ user_info[1] }}</div>
-
+        <div class="username">{{ user_info[1] }}</div>
+        {% if user_info[0] == user_tg_id %}
         <div class="earned-container">
             <div class="earned-title">Заработано</div>
             <div class="earned-amount">24,500 ₽</div>
         </div>
-
+        {% endif %}
         <div class="reputation-container">
             <div class="reputation-header">
                 <div class="reputation-title">Репутация</div>
@@ -193,6 +316,95 @@
                 <span class="negative">{{ negative_reviews }}</span>
             </div>
         </div>
+
+        {% if user_info[0] != user_tg_id %}
+        <!-- Раздел с объявлениями -->
+        <div class="ads-section">
+            <div class="ads-section-title">Объявления</div>
+            <div class="ads-grid">
+                {% if user_products %}
+                    {% for prod in user_products %}
+                        <div class="ad-card">
+                            {% if (now - prod[5]).total_seconds() < 86400 %}
+                                <div class="ad-new-badge">Новое</div>
+                            {% endif %}
+                            <img src="/{{ prod[3] }}" class="ad-image">
+                            <div class="ad-details">
+                                <div class="ad-title">{{ prod[0] }}</div>
+                                {% if user_info[0] != user_tg_id %}
+                                    {% if prod[7] == True %}
+                                        <div class="ad-favorite-del" data-id="{{ prod[4] }}">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                        </div>
+                                    {% else %}
+                                        <div class="ad-favorite" data-id="{{ prod[4] }}">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                                <div class="ad-price">{{ prod[1] }} ₽</div>
+                                <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>
+                            </div>
+                            <!-- Скрытая ссылка для перехода -->
+                            <a href="/ads/{{ prod[4] }}" class="ad-link" style="display: none;"></a>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-results">Нет объявлений</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/price_conv.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Обработка кликов по избранному
+        document.body.addEventListener('click', (e) => {
+            const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+            if (favBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'fav_id';
+                input.value = favBtn.dataset.id;
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+        
+        // Обработка кликов по карточкам объявлений
+        document.querySelectorAll('.ad-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Проверяем, был ли клик по кнопке избранного или её дочерним элементам
+                const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
+                
+                // Если клик был не по кнопке избранного
+                if (!isFavoriteClick) {
+                    // Находим ссылку внутри карточки и переходим по ней
+                    const adLink = card.querySelector('.ad-link');
+                    if (adLink) {
+                        window.location.href = adLink.href;
+                    }
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

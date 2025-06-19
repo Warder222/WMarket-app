@@ -61,8 +61,8 @@ async def get_user_info(tg_id):
             q = select(User).filter_by(tg_id=tg_id)
             result = await db.execute(q)
             user = result.scalar_one_or_none()
-            # 0-tg_id / 1-username / 2-photo_url
-            user_info = [user.tg_id, user.username, user.photo_url]
+            # 0-tg_id / 1-username / 2-photo_url / 3-plus_rep / 4-minus_rep
+            user_info = [user.tg_id, user.first_name, user.photo_url, user.plus_rep, user.minus_rep]
             return user_info
         except Exception as exc:
             print(f"Error: {exc}")
@@ -86,7 +86,7 @@ async def get_all_categories():
 async def get_all_products(tg_id):
     async with async_session_maker() as db:
         try:
-            q = select(Product).order_by(desc(Product.created_at))
+            q = select(Product).filter_by(active=True).where(Product.tg_id != tg_id).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
@@ -104,7 +104,7 @@ async def get_all_products(tg_id):
 async def get_all_products_from_category(category_name, tg_id):
     async with async_session_maker() as db:
         try:
-            q = select(Product).filter_by(category_name=category_name).order_by(desc(Product.created_at))
+            q = select(Product).filter_by(category_name=category_name, active=True).where(Product.tg_id != tg_id).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
@@ -153,6 +153,43 @@ async def add_new_product(product_data, tg_id):
             await db.commit()
         except Exception as exc:
             print(exc)
+
+
+async def get_user_active_products(seller_id, tg_id):
+    async with async_session_maker() as db:
+        try:
+            q = select(Product).filter_by(tg_id=seller_id, active=True).order_by(desc(Product.created_at))
+            result = await db.execute(q)
+            products = result.scalars()
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
+            # 7-is_fav
+            all_products = [[prod.product_name, prod.product_price,
+                             prod.product_description, prod.product_image_url,
+                             prod.id, prod.created_at, prod.id] for prod in products]
+            all_favs = await get_all_user_favs(tg_id)
+            [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            return all_products
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
+
+
+async def get_user_moderation_products(tg_id):
+    async with async_session_maker() as db:
+        try:
+            q = select(Product).filter_by(tg_id=tg_id, active=False).order_by(desc(Product.created_at))
+            result = await db.execute(q)
+            products = result.scalars()
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
+            all_products = [[prod.product_name, prod.product_price,
+                             prod.product_description, prod.product_image_url,
+                             prod.id, prod.created_at, prod.id] for prod in products]
+            # all_favs = await get_all_user_favs(tg_id)
+            # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            return all_products
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
 
 
 # favs__________________________________________________________________________________________________________________

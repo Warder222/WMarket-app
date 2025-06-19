@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
 {% block style %}
-    <link rel="stylesheet" href="/static/css/store.css">
     <style>
         .ad-container {
             padding: 16px;
             padding-bottom: 80px;
+            position: relative;
         }
 
         .ad-image {
@@ -21,23 +21,59 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
-            min-height: 48px; /* Для размещения большой кнопки */
+            margin-bottom: 8px; /* Уменьшен отступ */
+            min-height: 48px;
         }
 
         .ad-title {
-            font-size: 24px;
+            font-size: 28px; /* Увеличен размер */
             font-weight: bold;
             margin: 0;
             flex-grow: 1;
             padding-right: 8px;
         }
 
+        .back-button {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+        }
+
+        .back-button svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
         .ad-price {
             font-size: 24px;
             font-weight: bold;
             color: var(--primary-color);
-            margin: 16px 0;
+            margin: 8px 0 16px 0; /* Поднято выше */
+        }
+
+        .ad-description-title {
+            font-size: 24px;
+            font-weight: 900;
+            margin: 10px 0 12px 0; /* Уменьшен отступ сверху */
+            text-align: left; /* Центрирование */
         }
 
         .ad-description {
@@ -45,10 +81,16 @@
             line-height: 1.5;
             margin-bottom: 24px;
             white-space: pre-line;
+            text-align: left; /* Центрирование */
         }
 
-        /* Стили для кнопки избранного */
-        .ad-favorite, .ad-favorite-del {
+        .ad-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .ad-favorite, .ad-favorite-del, .ad-report {
             background: none;
             border: none;
             padding: 0;
@@ -59,27 +101,27 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            position: relative;
-            top: 0.2vh;
         }
 
-        /* Добавляем стиль для цвета звезды в неактивном состоянии */
         .ad-favorite {
-            color: var(--text-color); /* Используем основной цвет текста */
+            color: var(--text-color);
         }
 
-        /* Стиль для звезды в активном состоянии (в избранном) */
         .ad-favorite-del {
-            color: var(--text-color); /* Используем основной цвет темы */
+            color: var(--text-color);
         }
 
-        .ad-favorite svg, .ad-favorite-del svg {
+        .ad-report {
+            color: var(--text-color);
+        }
+
+        .ad-favorite svg, .ad-favorite-del svg, .ad-report svg {
             width: 36px;
             height: 36px;
             transition: transform 0.2s ease;
         }
 
-        .ad-favorite:active svg, .ad-favorite-del:active svg {
+        .ad-favorite:active svg, .ad-favorite-del:active svg, .ad-report:active svg {
             transform: scale(0.9);
         }
 
@@ -93,37 +135,158 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 24px;
+            margin: 8px 0 16px 0; /* Поднято выше и уменьшен отступ снизу */
+        }
+
+        /* Стили для блока продавца */
+        .seller-info {
+            width: 100%;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .seller-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .seller-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--primary-color);
+        }
+
+        .seller-username {
+            font-weight: bold;
+            font-size: 16px;
+            flex-grow: 1;
+        }
+
+        .seller-reputation {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .reputation-value {
+            font-weight: bold;
+        }
+
+        .positive { color: #4CAF50; }
+        .negative { color: #F44336; }
+        .neutral { color: var(--text-color); }
+
+        .reviews-count {
+            color: var(--secondary-text);
+            font-size: 13px;
+        }
+
+        .reputation-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #F44336;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 8px;
+        }
+
+        .reputation-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .reputation-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--secondary-text);
         }
     </style>
 {% endblock %}
 
 {% block content %}
     <div class="ad-container">
+        <button class="back-button" onclick="window.history.back()">
+            <svg viewBox="0 0 24 24">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+            </svg>
+        </button>
+        
         <img src="/{{ product_info[5] }}" class="ad-image" alt="{{ product_info[2] }}">
 
         <div class="ad-header">
             <h1 class="ad-title">{{ product_info[2] }}</h1>
-            {% if product_info[8] == True %}
-                <button class="ad-favorite-del" data-id="{{ product_info[0] }}">
-                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                    </svg>
-                </button>
-            {% else %}
-                <button class="ad-favorite" data-id="{{ product_info[0] }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                    </svg>
-                </button>
+            {% if product_info[1] != user_tg_id %}
+                <div class="ad-actions">
+                    <button class="ad-report" data-id="{{ product_info[0] }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </button>
+                    {% if product_info[8] == True %}
+                        <button class="ad-favorite-del" data-id="{{ product_info[0] }}">
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        </button>
+                    {% else %}
+                        <button class="ad-favorite" data-id="{{ product_info[0] }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        </button>
+                    {% endif %}
+                </div>
             {% endif %}
         </div>
 
         <div class="ad-price">{{ product_info[3] }} ₽</div>
-
+        
+        {% if product_info[1] != user_tg_id %}
+            <div class="seller-info">
+                <div class="seller-header">
+                    <img src="{{ user_info[2] }}" alt="Аватар продавца" class="seller-avatar">
+                    <div class="seller-username">{{ user_info[1] }}</div>
+                    <div class="seller-reputation">
+                        <div class="reputation-value 
+                            {% if reputation > 0 %}positive
+                            {% elif reputation < 0 %}negative
+                            {% else %}neutral{% endif %}">
+                            {% if reputation > 0 %}+{% endif %}{{ reputation }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="reputation-bar">
+                    <div class="reputation-fill" 
+                         style="width: {{ (positive_reviews / (positive_reviews + negative_reviews) * 100) if (positive_reviews + negative_reviews) > 0 else 50 }}%">
+                    </div>
+                </div>
+                <div class="reputation-labels">
+                    <span class="positive">{{ positive_reviews }}</span>
+                    <span class="negative">{{ negative_reviews }}</span>
+                </div>
+            </div>
+            
+            <button class="contact-btn">Написать продавцу</button>
+        {% endif %}
+        
+        <h3 class="ad-description-title">Описание</h3>
         <div class="ad-description">{{ product_info[4] }}</div>
-
-        <button class="contact-btn">Написать продавцу</button>
     </div>
 {% endblock %}
 
@@ -148,7 +311,27 @@
                     document.body.appendChild(form);
                     form.submit();
                 }
+
+                const reportBtn = e.target.closest('.ad-report');
+                if (reportBtn) {
+                    e.preventDefault();
+                    // Здесь можно добавить логику для жалобы
+                    alert('Жалоба на объявление отправлена');
+                }
             });
+
+            const sellerInfo = document.querySelector('.seller-info');
+            if (sellerInfo) {
+                sellerInfo.addEventListener('click', (e) => {
+                    // Проверяем, что клик не был по дочерним элементам, которые имеют свои обработчики
+                    if (!e.target.closest('.ad-favorite, .ad-favorite-del, .ad-report, .contact-btn')) {
+                        window.location.href = `/profile/{{ product_info[1] }}`;
+                    }
+                });
+                
+                // Добавляем курсор-указатель для всего блока
+                sellerInfo.style.cursor = 'pointer';
+            };
         });
     </script>
 {% endblock %}
