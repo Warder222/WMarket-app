@@ -75,10 +75,13 @@
     .main-content {
         flex: 1;
         padding: 16px;
+        min-height: calc(100vh - 180px);
+    }
+
+    .ads-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
         gap: 16px;
-        min-height: calc(100vh - 180px); /* Чтобы контент занимал всю высоту */
     }
 
     .ad-card {
@@ -103,12 +106,6 @@
         color: #999;
         font-size: 18px;
         margin-top: 20px;
-    }
-
-    @media (max-width: 400px) {
-        .main-content {
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        }
     }
 
     /* Остальные стили остаются без изменений */
@@ -221,18 +218,20 @@
         <!-- Активные объявления -->
         <div class="tab-content" id="activeTab">
             {% if active_products %}
-                {% for prod in active_products %}
-                    <div class="ad-card" data-id="{{ prod[6] }}">
-                        <img src="/{{ prod[3] }}" class="ad-image">
-                        <div class="ad-details">
-                            <div class="ad-title">{{ prod[0] }}</div>
-                            <div class="ad-price">{{ prod[1] }} ₽</div>
-                            <div class="ad-description">
-                                <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
+                <div class="ads-grid">
+                    {% for prod in active_products %}
+                        <div class="ad-card" data-id="{{ prod[6] }}">
+                            <img src="/{{ prod[3] }}" class="ad-image">
+                            <div class="ad-details">
+                                <div class="ad-title">{{ prod[0] }}</div>
+                                <div class="ad-price">{{ prod[1] }} ₽</div>
+                                <div class="ad-description">
+                                    <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             {% else %}
                 <div class="no-ads-container">
                     <div class="no-ads">Нет активных объявлений</div>
@@ -243,19 +242,21 @@
         <!-- Объявления на проверке -->
         <div class="tab-content" id="moderationTab" style="display: none;">
             {% if moderation_products %}
-                {% for prod in moderation_products %}
-                    <div class="ad-card moderation" data-id="{{ prod[6] }}">
-                        <div class="moderation-badge">На проверке</div>
-                        <img src="/{{ prod[3] }}" class="ad-image">
-                        <div class="ad-details">
-                            <div class="ad-title">{{ prod[0] }}</div>
-                            <div class="ad-price">{{ prod[1] }} ₽</div>
-                            <div class="ad-description">
-                                <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
+                <div class="ads-grid">
+                    {% for prod in moderation_products %}
+                        <div class="ad-card moderation" data-id="{{ prod[6] }}">
+                            <div class="moderation-badge">На проверке</div>
+                            <img src="/{{ prod[3] }}" class="ad-image">
+                            <div class="ad-details">
+                                <div class="ad-title">{{ prod[0] }}</div>
+                                <div class="ad-price">{{ prod[1] }} ₽</div>
+                                <div class="ad-description">
+                                    <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                </div>
             {% else %}
                 <div class="no-ads-container">
                     <div class="no-ads">Нет объявлений на проверке</div>
@@ -295,7 +296,7 @@
                 });
                 
                 const tabId = tab.dataset.tab + 'Tab';
-                document.getElementById(tabId).style.display = 'grid';
+                document.getElementById(tabId).style.display = 'block';
             });
         });
 
@@ -310,7 +311,7 @@
             }
         }
 
-        document.querySelectorAll('.ad-card').forEach(card => {
+        document.querySelectorAll('.ad-card:not(.moderation)').forEach(card => {
             card.addEventListener('click', () => {
                 const adId = card.dataset.id;
                 window.location.href = `/ads/${adId}`;
@@ -318,35 +319,6 @@
         });
 
         window.addEventListener('resize', updateIndicator);
-
-        document.querySelectorAll('.ad-card.moderation').forEach(card => {
-            card.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            });
-
-            // Дополнительно отключаем все вложенные элементы
-            card.querySelectorAll('*').forEach(el => {
-                el.style.pointerEvents = 'none';
-            });
-        });
-
-        // Обработка клика по обычным объявлениям (активным)
-        document.querySelectorAll('.ad-card:not(.moderation)').forEach(card => {
-            card.addEventListener('click', () => {
-                const adId = card.dataset.id;
-                window.location.href = `/ads/${adId}`;
-            });
-        });
-
-        // Обработка клика по объявлениям - только для НЕ модерационных
-        document.querySelectorAll('.ad-card:not(.moderation)').forEach(card => {
-            card.addEventListener('click', () => {
-                const adId = card.dataset.id;
-                window.location.href = `/ads/${adId}`;
-            });
-        });
 
         // Для объявлений на модерации - полная блокировка
         document.querySelectorAll('.ad-card.moderation').forEach(card => {

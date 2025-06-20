@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block style %}
+<style>
+    .header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background-color: var(--bg-color);
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-container {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 10px 16px;
+        border-radius: 20px;
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        font-size: 14px;
+        outline: none;
+    }
+
+    .search-input::placeholder {
+        color: #999;
+    }
+
+    .chats-container {
+        padding: 16px;
+    }
+
+    .chat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+    }
+
+    .chat-info {
+        flex: 1;
+        margin-right: 12px;
+        overflow: hidden;
+    }
+
+    .chat-seller {
+        font-weight: bold;
+        margin-bottom: 4px;
+        color: var(--text-color);
+    }
+
+    .chat-product {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-price {
+        font-size: 16px;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+
+    .chat-image {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        object-fit: cover;
+    }
+
+    .no-chats {
+        text-align: center;
+        padding: 40px 20px;
+        color: #999;
+    }
+
+    .chat-time {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+    }
+
+    .chat-preview {
+        font-size: 14px;
+        color: #999;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <header class="header">
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="Поиск в чатах">
+        </div>
+    </header>
+
+    <main class="chats-container">
+        {% if chats %}
+            {% for chat in chats %}
+                <div class="chat-item" onclick="window.location.href='/chat/{{ chat.id }}'">
+                    <div class="chat-info">
+                        <div class="chat-seller">{{ chat.seller }}</div>
+                        <div class="chat-product">{{ chat.product }}</div>
+                        <div class="chat-price">{{ chat.price }} ₽</div>
+                        <div class="chat-preview">{{ chat.last_message }}</div>
+                        <div class="chat-time">{{ chat.time }}</div>
+                    </div>
+                    <img src="{{ chat.image }}" class="chat-image" alt="{{ chat.product }}">
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-chats">У вас пока нет чатов</div>
+        {% endif %}
+    </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.querySelector('.search-input');
+        const chatItems = Array.from(document.querySelectorAll('.chat-item'));
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim().toLowerCase();
+            
+            chatItems.forEach(chat => {
+                const seller = chat.querySelector('.chat-seller').textContent.toLowerCase();
+                const product = chat.querySelector('.chat-product').textContent.toLowerCase();
+                const matches = seller.includes(searchTerm) || product.includes(searchTerm);
+                chat.style.display = matches ? '' : 'none';
+            });
+        });
+    });
+</script>
+{% endblock %}

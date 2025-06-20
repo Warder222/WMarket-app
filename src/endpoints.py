@@ -198,7 +198,7 @@ async def add_product_post(request: Request,
             except Exception as e:
                 print(str(e))
 
-    response = RedirectResponse(url="/store", status_code=303)
+    response = RedirectResponse(url="/ads_review", status_code=303)
     return response
 
 
@@ -358,6 +358,72 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "now": now
             }
             return templates.TemplateResponse("profile.html", context=context)
+
+    response = RedirectResponse(url="/", status_code=303)
+    return response
+
+
+# chat__________________________________________________________________________________________________________________
+@wmarket_router.get("/chats")
+async def chats(request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            chats = [
+                {
+                    "id": 1523,
+                    "seller": "Ilya",
+                    "product": "Iphone 11",
+                    "price": 25000,
+                    "last_message": "Хорошо с 11:00 буду на месте",
+                    "time": "22:45",
+                    "image": "static/img/iphone11.jpg"
+                },
+                {
+                    "id": 1523,
+                    "seller": "Ilya",
+                    "product": "Iphone 12",
+                    "price": 35000,
+                    "last_message": "Хорошо с 11:00 буду на месте",
+                    "time": "22:45",
+                    "image": "static/img/iphone11.jpg"
+                },
+                {
+                    "id": 1523,
+                    "seller": "Veronika",
+                    "product": "Iphone 13",
+                    "price": 45000,
+                    "last_message": "Хорошо с 12:00 буду на месте",
+                    "time": "22:45",
+                    "image": "static/img/iphone11.jpg"
+                },
+                {
+                    "id": 1523,
+                    "seller": "Nikita",
+                    "product": "Iphone 14",
+                    "price": 65000,
+                    "last_message": "Хорошо с 15:00 буду на месте",
+                    "time": "22:45",
+                    "image": "static/img/iphone11.jpg"
+                },
+                {
+                    "id": 1523,
+                    "seller": "Ega",
+                    "product": "Iphone 15",
+                    "price": 85000,
+                    "last_message": "Хорошо с 18:00 буду на месте",
+                    "time": "22:45",
+                    "image": "static/img/iphone11.jpg"
+                }
+            ]
+            context = {
+                "request": request,
+                "chats": chats
+            }
+            return templates.TemplateResponse("chats.html", context=context)
 
     response = RedirectResponse(url="/", status_code=303)
     return response
