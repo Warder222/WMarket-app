@@ -1,6 +1,6 @@
-from .database import async_session_maker, User, Category, Product, Fav
+from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message
 from sqlalchemy.future import select
-from sqlalchemy import update, desc, asc
+from sqlalchemy import update, desc, asc, func, and_
 
 
 # auth&users_utils______________________________________________________________________________________________________
@@ -229,3 +229,207 @@ async def del_fav(tg_id, product_id):
             await db.commit()
         except Exception as exc:
             print(exc)
+
+
+# chats_________________________________________________________________________________________________________________
+async def create_chat(product_id: int, buyer_id: int):
+    async with async_session_maker() as db:
+        # Получаем информацию о продукте
+        product = await db.execute(select(Product).filter_by(id=product_id))
+        product = product.scalar_one_or_none()
+
+        if not product:
+            return None
+
+        # Проверяем, что пользователь не создает чат сам с собой
+        if product.tg_id == buyer_id:
+            return None
+
+        # Проверяем существование чата
+        existing_chat = await db.execute(
+            select(Chat)
+            .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+            .where(Chat.product_id == product_id)
+            .where(ChatParticipant.user_id.in_([product.tg_id, buyer_id]))
+            .group_by(Chat.id)
+            .having(func.count(ChatParticipant.user_id) == 2)
+        )
+        existing_chat = existing_chat.scalar_one_or_none()
+
+        if existing_chat:
+            return existing_chat.id
+
+        # Создаем новый чат
+        chat = Chat(product_id=product_id)
+        db.add(chat)
+        await db.flush()
+
+        # Добавляем участников
+        participants = [
+            ChatParticipant(chat_id=chat.id, user_id=product.tg_id),
+            ChatParticipant(chat_id=chat.id, user_id=buyer_id)
+        ]
+        db.add_all(participants)
+        await db.commit()
+        return chat.id
+
+
+# async def get_user_chats(user_id: int):
+#     async with async_session_maker() as db:
+#         result = await db.execute(
+#             select(Chat, Product, User, func.count(Message.id).filter(Message.is_read == False).label("unread_count"))
+#             .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
+#             .join(Product, Product.id == Chat.product_id)
+#             .join(User, User.tg_id == Product.tg_id)
+#             .outerjoin(Message, and_(Message.chat_id == Chat.id, Message.receiver_id == user_id))
+#             .where(ChatParticipant.user_id == user_id)
+#             .group_by(Chat.id, Product.id, User.id)
+#             .order_by(desc(Chat.created_at))
+#         )
+#
+#         chats = []
+#         for row in result:
+#             chat, product, user, unread_count = row
+#             # Получаем последнее сообщение
+#             last_msg = await db.execute(
+#                 select(Message)
+#                 .where(Message.chat_id == chat.id)
+#                 .order_by(desc(Message.created_at)))
+#             last_message = last_msg.scalar_one_or_none()
+#
+#             chats.append({
+#                 "id": chat.id,
+#                 "product_title": product.product_name,
+#                 "product_price": product.product_price,
+#                 "product_image": product.product_image_url,
+#                 "seller_username": user.username,
+#                 "last_message": last_message.content if last_message else "Чат начат",
+#                 "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
+#                 "unread_count": unread_count
+#             })
+#         return chats
+
+
+async def get_chat_messages(chat_id: int, user_id: int):
+    async with async_session_maker() as db:
+        # Помечаем сообщения как прочитанные
+        await db.execute(
+            update(Message)
+            .where(Message.chat_id == chat_id, Message.receiver_id == user_id, Message.is_read == False)
+            .values(is_read=True)
+        )
+        await db.commit()
+
+        # Получаем все сообщения
+        result = await db.execute(
+            select(Message)
+            .where(Message.chat_id == chat_id)
+            .order_by(asc(Message.created_at)))
+        messages = result.scalars().all()
+
+        # Получаем информацию о продукте и участниках
+        chat = await db.execute(select(Chat).filter_by(id=chat_id))
+        chat = chat.scalar_one_or_none()
+        product = await db.execute(select(Product).filter_by(id=chat.product_id))
+        product = product.scalar_one_or_none()
+
+        participants = await db.execute(
+            select(ChatParticipant.user_id)
+            .where(ChatParticipant.chat_id == chat_id))
+        participants = participants.scalars().all()
+
+        other_user_id = next((p for p in participants if p != user_id), None)
+        other_user = await db.execute(select(User).filter_by(tg_id=other_user_id))
+        other_user = other_user.scalar_one_or_none()
+
+        return {
+            "messages": messages,
+            "product": product,
+            "other_user": other_user
+        }
+
+
+async def send_message(chat_id: int, sender_id: int, content: str):
+    async with async_session_maker() as db:
+        # Получаем chat и определяем получателя
+        participants = await db.execute(
+            select(ChatParticipant.user_id)
+            .where(ChatParticipant.chat_id == chat_id))
+        participants = participants.scalars().all()
+        receiver_id = next((p for p in participants if p != sender_id), None)
+
+        if not receiver_id:
+            return None
+
+        message = Message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            receiver_id=receiver_id,
+            content=content
+        )
+        db.add(message)
+        await db.commit()
+        await db.refresh(message)
+        return message
+
+
+async def report_message(message_id: int):
+    async with async_session_maker() as db:
+        await db.execute(
+            update(Message)
+            .where(Message.id == message_id)
+            .values(reported=True))
+        await db.commit()
+        return True
+
+async def get_user_chats(user_id: int):
+    """Получить все чаты пользователя"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Chat)
+            .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
+            .where(ChatParticipant.user_id == user_id)
+            .order_by(Chat.created_at.desc())
+        )
+        return result.scalars().all()
+
+async def get_chat_participants(chat_id: int, exclude_user_id: int = None):
+    """Получить участников чата, исключая указанного пользователя"""
+    async with async_session_maker() as session:
+        query = select(ChatParticipant).where(ChatParticipant.chat_id == chat_id)
+        if exclude_user_id:
+            query = query.where(ChatParticipant.user_id != exclude_user_id)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+async def get_last_chat_message(chat_id: int):
+    """Получить последнее сообщение в чате"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Message)
+            .where(Message.chat_id == chat_id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+async def count_unread_messages(chat_id: int, user_id: int):
+    """Подсчитать непрочитанные сообщения для пользователя в чате"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(func.count(Message.id))
+            .where(Message.chat_id == chat_id)
+            .where(Message.receiver_id == user_id)  # Убедитесь, что тип соответствует BigInteger
+            .where(Message.is_read == False)
+        )
+        return result.scalar_one() or 0
+
+
+async def all_count_unread_messages(user_id):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(func.count(Message.id))
+            .where(Message.receiver_id == user_id)
+            .where(Message.is_read == False)
+        )
+        return result.scalar_one() or 0

@@ -28,12 +28,9 @@
         outline: none;
     }
 
-    .search-input::placeholder {
-        color: #999;
-    }
-
     .chats-container {
         padding: 16px;
+        padding-bottom: 80px;
     }
 
     .chat-item {
@@ -54,12 +51,11 @@
     .chat-seller {
         font-weight: bold;
         margin-bottom: 4px;
-        color: var(--text-color);
     }
 
     .chat-product {
         font-size: 14px;
-        color: var(--text-secondary);
+        color: var(--secondary-text);
         margin-bottom: 4px;
         white-space: nowrap;
         overflow: hidden;
@@ -98,34 +94,52 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
+    .unread-badge {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        margin-left: 8px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-    <header class="header">
-        <div class="search-container">
-            <input type="text" class="search-input" placeholder="Поиск в чатах">
-        </div>
-    </header>
+<header class="header">
+    <div class="search-container">
+        <input type="text" class="search-input" placeholder="Поиск в чатах">
+    </div>
+</header>
 
-    <main class="chats-container">
-        {% if chats %}
-            {% for chat in chats %}
-                <div class="chat-item" onclick="window.location.href='/chat/{{ chat.id }}'">
-                    <div class="chat-info">
-                        <div class="chat-seller">{{ chat.seller }}</div>
-                        <div class="chat-product">{{ chat.product }}</div>
-                        <div class="chat-price">{{ chat.price }} ₽</div>
-                        <div class="chat-preview">{{ chat.last_message }}</div>
-                        <div class="chat-time">{{ chat.time }}</div>
+<main class="chats-container">
+    {% if chats %}
+        {% for chat in chats %}
+            <div class="chat-item" data-chatid="{{ chat.id }}">
+                <div class="chat-info">
+                    <div style="display: flex; align-items: center;">
+                        <div class="chat-seller">{{ chat.seller_username }}</div>
+                        {% if chat.unread_count > 0 %}
+                            <div class="unread-badge">{{ chat.unread_count }}</div>
+                        {% endif %}
                     </div>
-                    <img src="{{ chat.image }}" class="chat-image" alt="{{ chat.product }}">
+                    <div class="chat-product">{{ chat.product_title }}</div>
+                    <div class="chat-price">{{ chat.product_price }} ₽</div>
+                    <div class="chat-preview">{{ chat.last_message }}</div>
+                    <div class="chat-time">{{ chat.last_message_time }}</div>
                 </div>
-            {% endfor %}
-        {% else %}
-            <div class="no-chats">У вас пока нет чатов</div>
-        {% endif %}
-    </main>
+                <img src="/{{ chat.product_image }}" class="chat-image" alt="{{ chat.product_title }}">
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-chats">У вас пока нет чатов</div>
+    {% endif %}
+</main>
 {% endblock %}
 
 {% block scripts %}
@@ -142,6 +156,25 @@
                 const product = chat.querySelector('.chat-product').textContent.toLowerCase();
                 const matches = seller.includes(searchTerm) || product.includes(searchTerm);
                 chat.style.display = matches ? '' : 'none';
+            });
+        });
+
+        document.querySelectorAll('.chat-item').forEach(item => {
+            item.addEventListener('click', async function(e) {
+                e.preventDefault(); // Предотвращаем переход по ссылке
+                
+                const chatId = this.dataset.chatid;
+                const unreadBadge = this.querySelector('.unread-badge');
+                
+                // 1. Мгновенно скрываем бейдж
+                if (unreadBadge) {
+                    unreadBadge.style.display = 'none';
+                }
+                
+
+                
+                // 3. Переходим в чат после успешного обновления
+                window.location.href = `/chat/${chatId}`;
             });
         });
     });

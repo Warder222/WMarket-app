@@ -6,10 +6,31 @@
     <title>WMarket</title>
     <link rel="stylesheet" href="/static/css/base.css">
     <script src="/static/js/init_tg_theme.js"></script>
+    <style>
+        .nav-unread-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .nav-item {
+            position: relative;
+        }
+    </style>
     {% block style %}{% endblock %}
 </head>
 <body>
     {% block content %}{% endblock %}
+    {% if not is_chat_page %}
     <nav class="bottom-nav">
         <a href="{{ url_for('store') }}" class="nav-item">
             <span class="nav-icon">
@@ -45,6 +66,9 @@
                 </svg>
             </span>
             <span>Чаты</span>
+            {% if all_undread_count_message > 0 %}
+                <span class="nav-unread-badge">{{ all_undread_count_message }}</span>
+            {% endif %}
         </a>
         <a href="{{ url_for('profile') }}" class="nav-item">
             <span class="nav-icon">
@@ -55,6 +79,7 @@
             <span>Профиль</span>
         </a>
     </nav>
+    {% endif %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Элементы навигации

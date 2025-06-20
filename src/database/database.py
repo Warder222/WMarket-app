@@ -55,3 +55,33 @@ class Fav(Base):
     id = Column(Integer, autoincrement=True, primary_key=True)
     tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
     product_id = Column(Integer, ForeignKey("products.id"))
+
+
+class Chat(Base):
+    __tablename__ = 'chats'
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.id', ondelete='CASCADE'))
+    created_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class ChatParticipant(Base):
+    __tablename__ = 'chat_participants'
+
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer, ForeignKey('chats.id', ondelete='CASCADE'))
+    user_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))
+    joined_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class Message(Base):
+    __tablename__ = 'messages'
+
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer, ForeignKey('chats.id'))
+    sender_id = Column(BigInteger, ForeignKey('users.tg_id'))  # Было Integer → стало BigInteger
+    receiver_id = Column(BigInteger, ForeignKey('users.tg_id'))  # Аналогично
+    content = Column(String)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    reported = Column(Boolean, default=False)

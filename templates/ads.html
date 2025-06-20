@@ -220,7 +220,7 @@
 
 {% block content %}
     <div class="ad-container">
-        <button class="back-button" onclick="window.history.back()">
+        <button class="back-button" onclick="goBackAndReload()">
             <svg viewBox="0 0 24 24">
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
             </svg>
@@ -282,7 +282,8 @@
                 </div>
             </div>
             
-            <button class="contact-btn">Написать продавцу</button>
+            <!-- В ads.html в блоке content, где есть проверка product_info[1] != user_tg_id -->
+            <button class="contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">Написать продавцу</button>
         {% endif %}
         
         <h3 class="ad-description-title">Описание</h3>
