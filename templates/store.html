@@ -296,18 +296,20 @@
                     <img src="/{{ prod[3] }}" class="ad-image">
                     <div class="ad-details">
                         <div class="ad-title">{{ prod[0] }}</div>
-                        {% if prod[6] == True %}
-                            <div class="ad-favorite-del" data-id="{{ prod[4] }}">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                </svg>
-                            </div>
-                        {% else %}
-                            <div class="ad-favorite" data-id="{{ prod[4] }}">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                </svg>
-                            </div>
+                        {% if prod[6] != user_tg_id %}
+                            {% if prod[7] == True %}
+                                <div class="ad-favorite-del" data-id="{{ prod[4] }}">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>
+                            {% else %}
+                                <div class="ad-favorite" data-id="{{ prod[4] }}">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>
+                            {% endif %}
                         {% endif %}
                         <div class="ad-price">{{ prod[1] }} ₽</div>
                         <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>

@@ -86,13 +86,13 @@ async def get_all_categories():
 async def get_all_products(tg_id):
     async with async_session_maker() as db:
         try:
-            q = select(Product).filter_by(active=True).where(Product.tg_id != tg_id).order_by(desc(Product.created_at))
+            q = select(Product).filter_by(active=True).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-tg_id / 7-is_fav
             all_products = [[prod.product_name, prod.product_price,
                              prod.product_description, prod.product_image_url,
-                             prod.id, prod.created_at] for prod in products]
+                             prod.id, prod.created_at, prod.tg_id] for prod in products]
             all_favs = await get_all_user_favs(tg_id)
             [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
             return all_products
@@ -104,13 +104,13 @@ async def get_all_products(tg_id):
 async def get_all_products_from_category(category_name, tg_id):
     async with async_session_maker() as db:
         try:
-            q = select(Product).filter_by(category_name=category_name, active=True).where(Product.tg_id != tg_id).order_by(desc(Product.created_at))
+            q = select(Product).filter_by(category_name=category_name, active=True).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-tg_id / 7-is_fav
             all_products = [[prod.product_name, prod.product_price,
                              prod.product_description, prod.product_image_url,
-                             prod.id, prod.created_at] for prod in products]
+                             prod.id, prod.created_at, prod.tg_id] for prod in products]
             all_favs = await get_all_user_favs(tg_id)
             [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
             return all_products
@@ -272,42 +272,6 @@ async def create_chat(product_id: int, buyer_id: int):
         db.add_all(participants)
         await db.commit()
         return chat.id
-
-
-# async def get_user_chats(user_id: int):
-#     async with async_session_maker() as db:
-#         result = await db.execute(
-#             select(Chat, Product, User, func.count(Message.id).filter(Message.is_read == False).label("unread_count"))
-#             .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
-#             .join(Product, Product.id == Chat.product_id)
-#             .join(User, User.tg_id == Product.tg_id)
-#             .outerjoin(Message, and_(Message.chat_id == Chat.id, Message.receiver_id == user_id))
-#             .where(ChatParticipant.user_id == user_id)
-#             .group_by(Chat.id, Product.id, User.id)
-#             .order_by(desc(Chat.created_at))
-#         )
-#
-#         chats = []
-#         for row in result:
-#             chat, product, user, unread_count = row
-#             # Получаем последнее сообщение
-#             last_msg = await db.execute(
-#                 select(Message)
-#                 .where(Message.chat_id == chat.id)
-#                 .order_by(desc(Message.created_at)))
-#             last_message = last_msg.scalar_one_or_none()
-#
-#             chats.append({
-#                 "id": chat.id,
-#                 "product_title": product.product_name,
-#                 "product_price": product.product_price,
-#                 "product_image": product.product_image_url,
-#                 "seller_username": user.username,
-#                 "last_message": last_message.content if last_message else "Чат начат",
-#                 "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
-#                 "unread_count": unread_count
-#             })
-#         return chats
 
 
 async def get_chat_messages(chat_id: int, user_id: int):

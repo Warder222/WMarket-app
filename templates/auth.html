@@ -1,13 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WMarket</title>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMarket</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-light: #ffffff;
+            --text-light: #000000;
+            --bg-dark: #121212;
+            --text-dark: #ffffff;
+            --w-color: #0077ff; /* Фиксированный синий цвет для W */
+            
+            /* Значения по умолчанию */
+            --bg-color: var(--bg-light);
+            --text-color: var(--text-light);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            display: flex;
+            align-items: center;
+            height: 60px;
+            gap: 10px;
+        }
+
+        .w-letter {
+            font-size: 50px;
+            font-weight: 800;
+            transform: translateY(-100vh);
+            animation: drop 1s forwards;
+            color: var(--w-color); /* Всегда синий цвет */
+            width: 40px;
+            text-align: center;
+        }
+
+        .full-name {
+            font-size: 50px;
+            font-weight: 800;
+            opacity: 0;
+            animation: appear 0.2s 0.5s forwards;
+            color: var(--text-color);
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes drop {
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes appear {
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Добро пожаловать</h1>
+    <div class="container">
+        <div class="w-letter">W</div>
+        <div class="full-name">Market</div>
+    </div>
+
+    <script>
+        // Функция для применения темы
+        function applyTheme(isDark) {
+            const root = document.documentElement;
+            if (isDark) {
+                root.style.setProperty('--bg-color', 'var(--bg-dark)');
+                root.style.setProperty('--text-color', 'var(--text-dark)');
+            } else {
+                root.style.setProperty('--bg-color', 'var(--bg-light)');
+                root.style.setProperty('--text-color', 'var(--text-light)');
+            }
+        }
+
+        // Функция для определения текущей темы
+        function detectTheme() {
+            // 1. Проверка Telegram WebApp
+            if (window.Telegram?.WebApp) {
+                const isDark = Telegram.WebApp.colorScheme === 'dark';
+                applyTheme(isDark);
+                return;
+            }
+
+            // 2. Проверка системных предпочтений
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            applyTheme(isDark);
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            detectTheme();
+            
+            // Слушатель для изменений в Telegram
+            if (window.Telegram?.WebApp) {
+                Telegram.WebApp.onEvent('themeChanged', detectTheme);
+            }
+
+            // Слушатель для системных изменений темы
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                applyTheme(e.matches);
+            });
+        });
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const authButton = document.getElementById('auth-button');
@@ -41,3 +151,4 @@
     </script>
 </body>
 </html>
+

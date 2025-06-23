@@ -84,7 +84,8 @@ async def store(request: Request, session_token=Cookie(default=None)):
                 "categories": categories,
                 "products": products,
                 "now": now,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "user_tg_id": payload.get("tg_id")
             }
             return templates.TemplateResponse("store.html", context=context)
 
