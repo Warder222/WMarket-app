@@ -1,4 +1,7 @@
-from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message
+from typing import Optional
+
+from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
+    Referral
 from sqlalchemy.future import select
 from sqlalchemy import update, desc, asc, func, and_
 
@@ -18,6 +21,40 @@ async def add_user(user_data, session_token):
             return True
         except Exception as exc:
             print(exc)
+            return False
+
+
+async def user_exists(tg_id: int) -> bool:
+    async with async_session_maker() as session:
+        result = await session.execute(select(func.count()).select_from(User).where(User.tg_id == tg_id))
+        count = result.scalar()
+        return count > 0
+
+
+async def record_referral(referrer_id: int, referred_id: int) -> bool:
+    async with async_session_maker() as session:
+        try:
+            existing_ref = await session.execute(
+                select(func.count()).select_from(Referral).where(
+                    (Referral.referrer_id == referrer_id) &
+                    (Referral.referred_id == referred_id)
+                )
+            )
+
+            if existing_ref.scalar() > 0:
+                return False
+
+            print(referrer_id, referred_id)
+            referral = Referral(
+                referrer_id=referrer_id,
+                referred_id=referred_id
+            )
+            session.add(referral)
+            await session.commit()
+            return True
+        except Exception as e:
+            await session.rollback()
+            print(f"Error recording referral: {e}")
             return False
 
 
@@ -74,6 +111,32 @@ async def get_all_categories():
     async with async_session_maker() as db:
         try:
             q = select(Category)
+            result = await db.execute(q)
+            categories = result.scalars()
+            all_categories = [cat.category_name for cat in categories]
+            return all_categories
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
+
+
+async def get_all_not_digit_categories():
+    async with async_session_maker() as db:
+        try:
+            q = select(Category).filter_by(digital=False)
+            result = await db.execute(q)
+            categories = result.scalars()
+            all_categories = [cat.category_name for cat in categories]
+            return all_categories
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
+
+
+async def get_all_digit_categories():
+    async with async_session_maker() as db:
+        try:
+            q = select(Category).filter_by(digital=True)
             result = await db.execute(q)
             categories = result.scalars()
             all_categories = [cat.category_name for cat in categories]
@@ -397,3 +460,58 @@ async def all_count_unread_messages(user_id):
             .where(Message.is_read == False)
         )
         return result.scalar_one() or 0
+
+
+async def report_chat(chat_id: int, reporter_id: int, reason: str):
+    async with async_session_maker() as db:
+        try:
+            report = ChatReport(
+                chat_id=chat_id,
+                reporter_id=reporter_id,
+                reason=reason
+            )
+            db.add(report)
+            await db.commit()
+            return True
+        except Exception as exc:
+            print(f"Error reporting chat: {exc}")
+            return False
+
+async def get_chat_reports(resolved: bool = False):
+    async with async_session_maker() as db:
+        try:
+            q = select(ChatReport).filter_by(resolved=resolved).order_by(asc(ChatReport.created_at))
+            result = await db.execute(q)
+            return result.scalars().all()
+        except Exception as exc:
+            print(f"Error getting chat reports: {exc}")
+            return []
+
+async def resolve_chat_report(report_id: int, admin_id: int):
+    async with async_session_maker() as db:
+        try:
+            q = update(ChatReport).where(ChatReport.id == report_id).values(
+                resolved=True,
+                admin_id=admin_id
+            )
+            await db.execute(q)
+            await db.commit()
+            return True
+        except Exception as exc:
+            print(f"Error resolving chat report: {exc}")
+            return False
+
+
+async def get_ref_count(tg_id):
+    async with async_session_maker() as db:
+        try:
+            refs = await db.execute(
+                select(func.count()).select_from(Referral).where(
+                    (Referral.referrer_id == tg_id)
+                )
+            )
+
+            return refs.scalars()
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []

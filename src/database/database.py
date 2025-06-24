@@ -34,6 +34,7 @@ class Category(Base):
 
     id = Column(Integer, autoincrement=True, primary_key=True)
     category_name = Column(String, unique=True)
+    digital = Column(Boolean, default=False)
 
 
 class Product(Base):
@@ -54,7 +55,7 @@ class Fav(Base):
     __tablename__ = "favs"
     id = Column(Integer, autoincrement=True, primary_key=True)
     tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(Integer, ForeignKey("products.id", ondelete='CASCADE'))
 
 
 class Chat(Base):
@@ -78,10 +79,31 @@ class Message(Base):
     __tablename__ = 'messages'
 
     id = Column(Integer, primary_key=True)
-    chat_id = Column(Integer, ForeignKey('chats.id'))
-    sender_id = Column(BigInteger, ForeignKey('users.tg_id'))  # Было Integer → стало BigInteger
-    receiver_id = Column(BigInteger, ForeignKey('users.tg_id'))  # Аналогично
+    chat_id = Column(Integer, ForeignKey('chats.id', ondelete='CASCADE'))
+    sender_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE')) # Было Integer → стало BigInteger
+    receiver_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))  # Аналогично
     content = Column(String)
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     reported = Column(Boolean, default=False)
+
+
+class ChatReport(Base):
+    __tablename__ = 'chat_reports'
+
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer, ForeignKey('chats.id', ondelete='CASCADE'))
+    reporter_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))
+    reason = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved = Column(Boolean, default=False)
+    admin_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='SET NULL'), nullable=True)
+
+
+class Referral(Base):
+    __tablename__ = 'referrals'
+
+    id = Column(Integer, primary_key=True)
+    referrer_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))
+    referred_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'), unique=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

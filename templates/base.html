@@ -7,6 +7,150 @@
     <link rel="stylesheet" href="/static/css/base.css">
     <script src="/static/js/init_tg_theme.js"></script>
     <style>
+        /* Сброс стандартных стилей и базовые настройки */
+        button, a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        /* Цветовые переменные для светлой темы */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --primary-color: #3f88f8;
+            --secondary-color: #f0f0f0;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --hover-color: #f5f5f5;
+        }
+
+        /* Цветовые переменные для темной темы */
+        .dark-theme {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --primary-color: #5d9df8;
+            --secondary-color: #1e1e1e;
+            --card-bg: #1e1e1e;
+            --border-color: #333333;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --hover-color: #2a2a2a;
+        }
+
+        /* Основные стили body */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 60px;
+            overscroll-behavior-y: contain;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Стили для индикатора обновления (pull-to-refresh) */
+        .ptr-element {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateY(-100%);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .ptr-element .w-loader {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            animation: pulse 0.8s ease-in-out infinite;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .ptr-element.active .w-loader {
+            opacity: 1;
+        }
+
+        /* Стили для глобального лоадера при загрузке страницы */
+        .global-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-color);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .global-loader.visible {
+            display: flex;
+        }
+
+        .global-loader.active {
+            opacity: 1;
+        }
+
+        .global-loader .w-loader {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary-color);
+            animation: pulse 0.8s ease-in-out infinite;
+        }
+
+        /* Стили для нижней навигации */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 8px 0;
+            background-color: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 12px;
+            gap: 4px;
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+        }
+
+        .nav-icon {
+            font-size: 20px;
+        }
+        
+        /* Стили для бейджа с непрочитанными сообщениями */
         .nav-unread-badge {
             position: absolute;
             top: -5px;
@@ -21,16 +165,69 @@
             justify-content: center;
             font-size: 12px;
         }
+
+        /* Анимация перехода между страницами */
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
         
-        .nav-item {
-            position: relative;
+        .page-transition.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .page-transition .loader {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary-color);
+            animation: pulse 0.8s ease-in-out infinite;
+        }
+        
+        /* Анимация пульсации для лоадера */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        /* Анимация исчезновения контента при переходе */
+        main {
+            transition: opacity 0.2s ease;
+        }
+        
+        main.fade-out {
+            opacity: 0;
         }
     </style>
     {% block style %}{% endblock %}
 </head>
 <body>
+    <!-- Глобальный лоадер, который показывается только при долгой загрузке -->
+    <div class="global-loader" id="globalLoader">
+        <div class="w-loader">W</div>
+    </div>
+
+    <!-- Индикатор pull-to-refresh -->
+    <div class="ptr-element">
+        <div class="w-loader"></div>
+    </div>
+
+    <!-- Основное содержимое страницы -->
     {% block content %}{% endblock %}
-    {% if not is_chat_page %}
+    
+    <!-- Нижняя навигация (не отображается на странице чатов, кроме админа) -->
+    {% if not is_chat_page or admin %}
     <nav class="bottom-nav">
         <a href="{{ url_for('store') }}" class="nav-item">
             <span class="nav-icon">
@@ -39,16 +236,16 @@
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                 </svg>
             </span>
-            <span>Главная</span>
         </a>
+        
         <a href="{{ url_for('favs') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                 </svg>
             </span>
-            <span>Избранное</span>
         </a>
+        
         <a href="{{ url_for('ads_review') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -57,141 +254,201 @@
                     <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
             </span>
-            <span>Добавить</span>
         </a>
+        
+        {% if admin %}
+        <a href="{{ url_for('admin_chat_reports') }}" class="nav-item">
+            <span class="nav-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+            </span>
+        </a>
+        {% endif %}
+        
         <a href="{{ url_for('chats') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                 </svg>
             </span>
-            <span>Чаты</span>
             {% if all_undread_count_message > 0 %}
                 <span class="nav-unread-badge">{{ all_undread_count_message }}</span>
             {% endif %}
         </a>
+        
         <a href="{{ url_for('profile') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M2 4 L7 20 L13 10 L19 20 L24 4"/>
                 </svg>
             </span>
-            <span>Профиль</span>
         </a>
     </nav>
     {% endif %}
+    
     <script>
+        // Ожидаем полной загрузки DOM
         document.addEventListener('DOMContentLoaded', function() {
-            // Элементы навигации
-            const navItems = document.querySelectorAll('.bottom-nav .nav-item');
-            const mainContent = document.querySelector('main');
+            const globalLoader = document.getElementById('globalLoader');
+            let loaderTimeout;
+            let pageLoaded = false;
             
-            // Создаем overlay для анимации перехода
+            // Функция для показа лоадера
+            function showLoader() {
+                if (!pageLoaded) {
+                    globalLoader.classList.add('visible');
+                    setTimeout(() => {
+                        globalLoader.classList.add('active');
+                    }, 10);
+                }
+            }
+            
+            // Функция для скрытия лоадера
+            function hideLoader() {
+                pageLoaded = true;
+                globalLoader.classList.remove('active');
+                setTimeout(() => {
+                    globalLoader.classList.remove('visible');
+                }, 300);
+            }
+            
+            // Устанавливаем таймер на 2 секунды для показа лоадера
+            loaderTimeout = setTimeout(showLoader, 2000);
+            
+            // Если страница загрузилась раньше 2 секунд - отменяем показ лоадера
+            window.addEventListener('load', function() {
+                clearTimeout(loaderTimeout);
+                hideLoader();
+            });
+            
+            // На случай, если страница загрузится очень быстро (до DOMContentLoaded)
+            if (document.readyState === 'complete') {
+                clearTimeout(loaderTimeout);
+                hideLoader();
+            }
+
+            // Инициализация Telegram WebApp
+            if (window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.enableClosingConfirmation();
+                Telegram.WebApp.expand();
+            }
+
+            // Элементы для pull-to-refresh
+            const ptrElement = document.querySelector('.ptr-element');
+            const wLoader = document.querySelector('.ptr-element .w-loader');
+            let startY = 0;
+            let isRefreshing = false;
+
+            // Обработчик начала касания
+            function handleTouchStart(e) {
+                if (window.scrollY === 0 && !isRefreshing) {
+                    startY = e.touches[0].clientY;
+                }
+            }
+
+            // Обработчик движения пальца
+            function handleTouchMove(e) {
+                if (isRefreshing || startY === 0) return;
+                
+                const currentY = e.touches[0].clientY;
+                const diff = currentY - startY;
+                
+                if (diff > 0) {
+                    e.preventDefault();
+                    
+                    if (diff > 30) {
+                        ptrElement.style.transform = `translateY(${Math.min(diff - 30, 30)}px)`;
+                        wLoader.style.opacity = Math.min(diff / 80, 1);
+                    }
+                    
+                    if (diff > 70) {
+                        startRefresh();
+                    }
+                }
+            }
+
+            // Обработчик окончания касания
+            function handleTouchEnd() {
+                if (!isRefreshing) {
+                    ptrElement.style.transform = 'translateY(-100%)';
+                    wLoader.style.opacity = 0;
+                }
+                startY = 0;
+            }
+
+            // Функция запуска обновления
+            function startRefresh() {
+                isRefreshing = true;
+                ptrElement.classList.add('active');
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 400);
+            }
+
+            // Добавляем обработчики событий
+            document.addEventListener('touchstart', handleTouchStart, { passive: true });
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+            // Система навигации между страницами
+            const navItems = document.querySelectorAll('.bottom-nav .nav-item');
             const transitionOverlay = document.createElement('div');
             transitionOverlay.className = 'page-transition';
             transitionOverlay.innerHTML = '<div class="loader">W</div>';
             document.body.appendChild(transitionOverlay);
 
-            // Функция выполнения навигации
-            function performNavigation(url) {
-                // 1. Показываем анимацию
-                transitionOverlay.classList.add('active');
-                if (mainContent) mainContent.classList.add('fade-out');
-                
-                // 2. Выполняем переход после короткой задержки
-                setTimeout(() => {
-                    window.location.href = url;
-                }, 300);
-            }
-
-            // Обработчик кликов по навигации
+            // Обработчик кликов по пунктам навигации
             navItems.forEach(item => {
                 item.addEventListener('click', function(e) {
                     const href = this.getAttribute('href');
-                    
-                    // Игнорируем пустые ссылки
-                    if (!href || href === '#') {
-                        e.preventDefault();
-                        return;
-                    }
+                    if (!href || href === '#') return e.preventDefault();
                     
                     e.preventDefault();
-                    
-                    // Обновляем активный пункт меню
                     navItems.forEach(navItem => navItem.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // Выполняем навигацию
-                    performNavigation(href);
+                    transitionOverlay.classList.add('active');
+                    setTimeout(() => {
+                        window.location.href = href;
+                    }, 150);
                 });
             });
 
-            // Установка активного пункта меню при загрузке
+            // Установка активного пункта меню
             function setActiveNavItem() {
                 const currentPath = window.location.pathname;
                 navItems.forEach(item => {
                     item.classList.remove('active');
                     const itemPath = item.getAttribute('href');
-                    
-                    // Проверяем соответствие текущего пути
-                    if (currentPath === itemPath) {
-                        item.classList.add('active');
-                    }
-                    // Специальная проверка для главной страницы
-                    else if (currentPath === '/' && itemPath === '{{ url_for("store") }}') {
+                    if (currentPath === itemPath || (currentPath === '/' && itemPath === '{{ url_for("store") }}')) {
                         item.classList.add('active');
                     }
                 });
             }
             
-            // Инициализация
             setActiveNavItem();
 
-            // Стили для анимации (можно вынести в CSS)
-            const style = document.createElement('style');
-            style.textContent = `
-                .page-transition {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: var(--bg-color);
-                    z-index: 1000;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    opacity: 0;
-                    pointer-events: none;
-                    transition: opacity 0.3s ease;
-                }
-                
-                .page-transition.active {
-                    opacity: 1;
-                    pointer-events: all;
-                }
-                
-                .loader {
-                    font-size: 48px;
-                    font-weight: bold;
-                    color: var(--primary-color);
-                    animation: pulse 1.5s infinite ease-in-out;
-                }
-                
-                @keyframes pulse {
-                    0%, 100% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.2); opacity: 0.7; }
-                }
-                
-                main {
-                    transition: opacity 0.3s ease;
-                }
-                
-                main.fade-out {
-                    opacity: 0;
-                }
-            `;
-            document.head.appendChild(style);
+            // Предзагрузка ресурсов
+            const resources = [
+                '/static/css/base.css',
+                '/static/js/init_tg_theme.js'
+            ];
+            
+            resources.forEach(resource => {
+                const link = document.createElement('link');
+                link.rel = 'preload';
+                link.as = resource.endsWith('.css') ? 'style' : 'script';
+                link.href = resource;
+                document.head.appendChild(link);
+            });
+
+            // Скрываем глобальный лоадер через 3 секунды на всякий случай
+            setTimeout(() => {
+                clearTimeout(loaderTimeout);
+                hideLoader();
+            }, 3000);
         });
     </script>
     {% block scripts %}{% endblock %}

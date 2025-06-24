@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ALGORITHM: str
     SECRET_KEY: str
 
+    ADMINS: str
+
     BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "static/uploads")
 

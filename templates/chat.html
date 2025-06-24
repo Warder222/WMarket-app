@@ -168,6 +168,86 @@
         color: var(--primary-color);
         font-weight: bold;
     }
+
+    .shield-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    margin-left: 12px;
+    }
+
+    .shield-button svg {
+        width: 24px;
+        height: 24px;
+        fill: var(--primary-color);
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: var(--bg-color);
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 400px;
+    }
+
+    .modal-content h3 {
+        margin-top: 0;
+        margin-bottom: 16px;
+    }
+
+    .modal-content textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        margin-bottom: 16px;
+        resize: vertical;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .cancel-button {
+        padding: 8px 16px;
+        background-color: var(--card-bg);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .submit-button {
+        padding: 8px 16px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .message-admin {
+        background-color: #fff3cd;
+        color: #000;
+        border-left: 4px solid #ffc107;
+        margin: 10px auto;
+        max-width: 80%;
+    }
 </style>
 {% endblock %}
 
@@ -180,6 +260,12 @@
             </svg>
         </button>
         <div class="chat-title">Чат с {{ other_user.first_name }}</div>
+        <!-- Добавленная кнопка щита -->
+        <button class="shield-button" id="reportChatButton">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+        </button>
     </div>
 
     <div class="product-info" onclick="window.location.href='/ads/{{ product.id }}'">
@@ -192,13 +278,15 @@
 
     <div class="chat-messages" id="chatMessages">
         {% for message in messages %}
-        <div class="message {% if message.sender_id == current_user.id %}message-sent{% else %}message-received{% endif %}">
-            <div class="message-content">{{ message.content }}</div>
+        <div class="message {% if message.sender_id == current_user.id %}message-sent{% elif message.sender_id == 0 %}message-admin{% else %}message-received{% endif %}">
+            <div class="message-content">
+                {% if message.sender_id == 0 %}
+                    <strong>Администратор:</strong><br>
+                {% endif %}
+                {{ message.content }}
+            </div>
             <div class="message-time">
                 {{ message.created_at.strftime('%H:%M') }}
-                {% if message.sender_id != current_user.id %}
-                <button class="report-button" data-message-id="{{ message.id }}">Пожаловаться</button>
-                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -211,6 +299,17 @@
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
         </button>
+    </div>
+
+    <div class="modal" id="reportChatModal" style="display: none;">
+        <div class="modal-content">
+            <h3>Пожаловаться на чат</h3>
+            <textarea id="reportReason" placeholder="Опишите причину жалобы..." rows="4"></textarea>
+            <div class="modal-actions">
+                <button class="cancel-button" id="cancelReport">Отмена</button>
+                <button class="submit-button" id="submitReport">Отправить</button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -260,6 +359,16 @@
             }
         };
 
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "new_message") {
+                // Для админа показываем все сообщения без ограничений
+                if (currentUserId === 0 || data.sender_id == currentUserId) {
+                    addMessageToUI(data, data.sender_id == currentUserId);
+                }
+            }
+        };
+
         // Отправка сообщения
         function sendMessage() {
             const content = messageInput.value.trim();
@@ -273,12 +382,15 @@
                 messageInput.value = '';
             }
         }
-
-        // Добавление сообщения в UI
+        
         function addMessageToUI(message, isSent) {
             const messageElement = document.createElement('div');
-            messageElement.className = `message ${isSent ? 'message-sent' : 'message-received'}`;
+            const isAdmin = message.sender_id === 0;
             
+            messageElement.className = `message ${
+                isAdmin ? 'message-admin' : 
+                isSent ? 'message-sent' : 'message-received'
+            }`;
             const time = new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
             messageElement.innerHTML = `
@@ -302,24 +414,50 @@
         });
 
         // Жалоба на сообщение
-        document.addEventListener('click', (e) => {
-            const reportBtn = e.target.closest('.report-button');
-            if (reportBtn) {
-                const messageId = reportBtn.dataset.messageId;
-                if (confirm('Отправить жалобу на это сообщение модератору?')) {
-                    fetch(`/report_message/${messageId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    }).then(response => {
-                        if (response.ok) {
-                            alert('Жалоба отправлена модератору');
-                        }
-                    });
+        const reportChatButton = document.getElementById('reportChatButton');
+        const reportChatModal = document.getElementById('reportChatModal');
+        const cancelReport = document.getElementById('cancelReport');
+        const submitReport = document.getElementById('submitReport');
+        const reportReason = document.getElementById('reportReason');
+
+        reportChatButton.addEventListener('click', () => {
+            reportChatModal.style.display = 'flex';
+        });
+
+        cancelReport.addEventListener('click', () => {
+            reportChatModal.style.display = 'none';
+            reportReason.value = '';
+        });
+
+        submitReport.addEventListener('click', async () => {
+            const reason = reportReason.value.trim();
+            if (!reason) {
+                alert('Пожалуйста, укажите причину жалобы');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/report_chat/${chatId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ reason })
+                });
+
+                if (response.ok) {
+                    alert('Жалоба отправлена администратору');
+                    reportChatModal.style.display = 'none';
+                    reportReason.value = '';
+                } else {
+                    alert('Ошибка при отправке жалобы');
                 }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при отправке жалобы');
             }
         });
+
     });
 </script>
 {% endblock %}

@@ -54,35 +54,6 @@
         white-space: nowrap;
     }
 
-    .categories-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background-color: var(--card-bg);
-        border-radius: 8px;
-        box-shadow: 0 4px 12px var(--shadow-color);
-        padding: 8px 0;
-        margin: 0 16px;
-        z-index: 101;
-        display: none;
-        max-height: 60vh;
-        overflow-y: auto;
-    }
-
-    .categories-dropdown.show {
-        display: block;
-    }
-
-    .category-item {
-        padding: 12px 16px;
-        cursor: pointer;
-    }
-
-    .category-item:hover {
-        background-color: var(--hover-color);
-    }
-
     .main-content {
         flex: 1;
         padding: 16px;
@@ -144,6 +115,7 @@
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         }
     }
+    
     .categories-panel {
         position: fixed;
         bottom: 60px;
@@ -225,11 +197,11 @@
 
     .ad-title {
         font-size: 18px;
-        white-space: nowrap;       /* Запрещаем перенос строк */
-        overflow: hidden;         /* Скрываем выходящий за границы текст */
-        text-overflow: ellipsis;  /* Добавляем многоточие в конце */
-        max-width: 170%;          /* Ограничиваем ширину */
-        display: block;           /* Делаем блочным элементом */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 170%;
+        display: block;
         position: relative;
         bottom: 0.55vh;
         display: -webkit-box;
@@ -247,6 +219,54 @@
         height: 1.2em;
         background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
         pointer-events: none;
+    }
+
+    /* Стили для группировки категорий */
+    .category-group {
+        margin-bottom: 12px;
+    }
+
+    .category-group-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        font-weight: bold;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .category-group-title svg {
+        transition: transform 0.3s ease;
+    }
+
+    .category-group-title.active svg {
+        transform: rotate(180deg);
+    }
+
+    .subcategories {
+        padding-left: 12px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+
+    .category-group.active .subcategories {
+        max-height: 1000px;
+    }
+
+    .subcategory-item {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color-light);
+        cursor: pointer;
+    }
+
+    .subcategory-item:hover {
+        background-color: var(--hover-color);
+    }
+
+    .subcategory-item:last-child {
+        border-bottom: none;
     }
 </style>
 {% endblock %}
@@ -281,15 +301,42 @@
                 </svg>
             </button>
         </div>
-        {% for cat in categories %}
-            <div class="category-item">{{ cat }}</div>
-        {% endfor %}
+        
+        <!-- Группа "Физический товар" -->
+        <div class="category-group" id="physicalGroup">
+            <div class="category-group-title">
+                Физические товары
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="subcategories">
+                {% for cat in cats %}
+                    <div class="subcategory-item">{{ cat }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Группа "Цифровой товар" -->
+        <div class="category-group" id="digitalGroup">
+            <div class="category-group-title">
+                Цифровые товары
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="subcategories">
+                {% for dig_cat in dig_cats %}
+                    <div class="subcategory-item">{{ dig_cat }}</div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 
     <main class="main-content" id="mainContent">
         {% for prod in products %}
             <div class="ads-container">
-                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}">
+                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}" data-id="{{ prod[4] }}">
                     {% if (now - prod[5]).total_seconds() < 86400 %}
                         <div class="ad-new-badge">Новое</div>
                     {% endif %}
@@ -344,7 +391,16 @@
                 panel.classList.remove('show');
             });
 
-            document.querySelectorAll('.category-item').forEach(item => {
+            // Обработчики для раскрывающихся категорий
+            document.querySelectorAll('.category-group-title').forEach(title => {
+                title.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    this.parentElement.classList.toggle('active');
+                });
+            });
+
+            // Обработчик клика по подкатегории
+            document.querySelectorAll('.subcategory-item').forEach(item => {
                 item.addEventListener('click', function() {
                     const loader = document.createElement('div');
                     loader.className = 'page-loader';
@@ -353,7 +409,7 @@
                     
                     window.location.href = `/store/${encodeURIComponent(this.textContent.trim())}`;
                 });
-            });//
+            });
 
             document.body.addEventListener('click', (e) => {
                 const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
@@ -385,18 +441,11 @@
 
             document.querySelectorAll('.ad-card').forEach(card => {
                 card.addEventListener('click', (e) => {
-                    // Проверяем, был ли клик по кнопке избранного или её дочерним элементам
                     const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
                     
-                    // Если клик был не по кнопке избранного
                     if (!isFavoriteClick) {
-                        // Получаем ID объявления из data-атрибута кнопки избранного
-                        const adId = card.querySelector('.ad-favorite, .ad-favorite-del')?.dataset.id;
-                        
-                        if (adId) {
-                            // Перенаправляем на страницу объявления
-                            window.location.href = `/ads/${adId}`;
-                        }
+                        const adId = card.dataset.id;
+                        window.location.href = `/ads/${adId}`;
                     }
                 });
             });

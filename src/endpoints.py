@@ -14,8 +14,10 @@ from src.database.utils import (get_all_users, add_user,
                                 add_new_product, get_product_info, get_user_active_products,
                                 get_user_moderation_products, create_chat, get_chat_messages, report_message,
                                 send_message, count_unread_messages, get_last_chat_message, get_chat_participants,
-                                get_user_chats, all_count_unread_messages)
-from src.utils import parse_init_data, encode_jwt, decode_jwt
+                                get_user_chats, all_count_unread_messages, get_all_digit_categories,
+                                get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
+                                user_exists, record_referral, get_ref_count)
+from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
     prefix="",
@@ -59,6 +61,12 @@ async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
     if not add_result:
         await update_token(session_token, new_session_token)
 
+    ref_code = user_data.get("ref_code")
+    if ref_code:
+        ref_code = int(ref_code)
+        if await user_exists(ref_code):
+            res = await record_referral(ref_code, user_data.get("tg_id"))
+
     response = RedirectResponse(url="/store", status_code=303)
     response.set_cookie(key="session_token", value=new_session_token, httponly=True, secure=True)
     return response
@@ -74,18 +82,21 @@ async def store(request: Request, session_token=Cookie(default=None)):
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
 
-            categories = await get_all_categories()
+            cats = await get_all_not_digit_categories()
+            dig_cats = await get_all_digit_categories()
             products = await get_all_products(payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
-                "categories": categories,
+                "cats": cats,
+                "dig_cats": dig_cats,
                 "products": products,
                 "now": now,
                 "all_undread_count_message": all_undread_count_message,
-                "user_tg_id": payload.get("tg_id")
+                "user_tg_id": payload.get("tg_id"),
+                "admin": admin_res
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -101,17 +112,20 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            categories = await get_all_categories()
+            cats = await get_all_not_digit_categories()
+            dig_cats = await get_all_digit_categories()
             products = await get_all_products_from_category(category_name, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
-                "categories": categories,
+                "cats": cats,
+                "dig_cats": dig_cats,
                 "products": products,
                 "now": now,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -129,10 +143,12 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             categories = await get_all_categories()
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
                 "categories": categories,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("add_product.html", context=context)
 
@@ -152,11 +168,13 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
             moderation_products = await get_user_moderation_products(payload.get("tg_id"))
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
                 "active_products": active_products,
                 "moderation_products": moderation_products,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("ads_review.html", context=context)
 
@@ -180,10 +198,10 @@ async def add_product_post(request: Request,
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
                 file_content = await product_image.read()
-                max_size = 5 * 1024 * 1024
-
-                if len(file_content) > max_size:
-                    raise HTTPException(status_code=413, detail="Размер файла не должен превышать 5 МБ)")
+                # max_size = 5 * 1024 * 1024
+                #
+                # if len(file_content) > max_size:
+                #     raise HTTPException(status_code=413, detail="Размер файла не должен превышать 5 МБ)")
 
                 if product_price <= 0:
                     raise HTTPException(status_code=400, detail="Цена должна быть положительной")
@@ -228,7 +246,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             negative_reviews = user_info[4]
             reputation = positive_reviews - negative_reviews
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
                 "product_info": product_info,
@@ -237,7 +255,8 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
                 "positive_reviews": positive_reviews,
                 "negative_reviews": negative_reviews,
                 "user_info": user_info,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("ads.html", context=context)
 
@@ -259,11 +278,12 @@ async def favs(request: Request, session_token=Cookie(default=None)):
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
             products = [[prod[0], prod[1], prod[2], prod[3], prod[4], prod[5], prod[6]] for prod in all_products if prod[4] in all_favs]
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
                 "products": products,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("favs.html", context=context)
 
@@ -327,6 +347,8 @@ async def profile(request: Request, session_token=Cookie(default=None)):
             products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
+            referrals_count = await get_ref_count(payload.get("tg_id"))
 
             context = {
                 "request": request,
@@ -337,7 +359,9 @@ async def profile(request: Request, session_token=Cookie(default=None)):
                 "user_tg_id": payload.get("tg_id"),
                 "user_products": products,
                 "now": now,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res,
+                "referrals_count": referrals_count
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -363,6 +387,7 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             products = await get_user_active_products(seller_tg_id, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
             context = {
                 "request": request,
                 "reputation": reputation,
@@ -372,7 +397,8 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "user_tg_id": payload.get("tg_id"),
                 "user_products": products,
                 "now": now,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -408,6 +434,8 @@ async def chats(request: Request, session_token=Cookie(default=None)):
                 # Получаем последнее сообщение в чате
                 last_message = await get_last_chat_message(chat.id)
 
+                admin_res = await is_admin(payload.get("tg_id"))
+
                 chats_list.append({
                     "id": chat.id,
                     "product_id": chat.product_id,
@@ -417,15 +445,18 @@ async def chats(request: Request, session_token=Cookie(default=None)):
                     "seller_username": other_user_info[1] if other_user_info else "Неизвестный",
                     "last_message": last_message.content if last_message else "Чат начат",
                     "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
-                    "unread_count": await count_unread_messages(chat.id, payload.get("tg_id"))
+                    "unread_count": await count_unread_messages(chat.id, payload.get("tg_id")),
+                    "admin": admin_res
                 })
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
 
             context = {
                 "request": request,
                 "chats": chats_list,
-                "all_undread_count_message": all_undread_count_message
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res
             }
             return templates.TemplateResponse("chats.html", context=context)
 
@@ -458,6 +489,8 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
     if not chat_data:
         return RedirectResponse(url="/chats", status_code=303)
 
+    all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+
     context = {
         "request": request,
         "chat_id": chat_id,
@@ -465,7 +498,8 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         "product": chat_data["product"],
         "other_user": chat_data["other_user"],
         "current_user": {"id": payload.get("tg_id")},
-        "is_chat_page": True  # Добавляем флаг
+        "is_chat_page": True,  # Добавляем флаг
+        "all_undread_count_message": all_undread_count_message
     }
     return templates.TemplateResponse("chat.html", context=context)
 
@@ -481,8 +515,7 @@ async def report_message_route(message_id: int, session_token=Cookie(default=Non
 
 @wmarket_router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    # УДАЛИТЬ эту строку → await websocket.accept()
-    await manager.connect(websocket, user_id)  # accept() уже внутри менеджера
+    await manager.connect(websocket, user_id)
     try:
         while True:
             data = await websocket.receive_text()
@@ -507,3 +540,89 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
         await websocket.close(code=1011)
+
+
+@wmarket_router.post("/report_chat/{chat_id}")
+async def report_chat_route(
+        chat_id: int,
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    reason = data.get("reason", "")
+
+    success = await report_chat(chat_id, payload.get("tg_id"), reason)
+    return {"status": "success" if success else "error"}
+
+
+@wmarket_router.get("/admin/chat_reports")
+async def admin_chat_reports(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return RedirectResponse(url="/", status_code=303)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        reports = await get_chat_reports(resolved=False)
+        all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+        context = {
+            "request": request,
+            "reports": reports,
+            "all_undread_count_message": all_undread_count_message,
+            "admin": admin_res
+        }
+        return templates.TemplateResponse("admin_chat_reports.html", context=context)
+
+
+@wmarket_router.get("/admin/chat/{chat_id}")
+async def admin_chat_view(
+        chat_id: int,
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return RedirectResponse(url="/", status_code=303)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        chat_data = await get_chat_messages(chat_id, None)
+        if not chat_data:
+            return RedirectResponse(url="/admin/chat_reports", status_code=303)
+
+        all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+
+        context = {
+            "request": request,
+            "chat_id": chat_id,
+            "messages": chat_data["messages"],
+            "product": chat_data["product"],
+            "other_user": chat_data["other_user"],
+            "current_user": {"id": 0, "is_admin": True},
+            "all_undread_count_message": all_undread_count_message,
+            "is_chat_page": True
+        }
+        return templates.TemplateResponse("chat.html", context=context)
+
+
+@wmarket_router.post("/admin/resolve_report/{report_id}")
+async def resolve_report_route(
+        report_id: int,
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        success = await resolve_chat_report(report_id, payload.get("tg_id"))
+        return {"status": "success" if success else "error"}

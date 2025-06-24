@@ -2,7 +2,6 @@
 
 {% block style %}
 <style>
-    /* Все стили остаются без изменений */
     .profile-header {
         display: flex;
         justify-content: space-between;
@@ -29,9 +28,66 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        cursor: pointer;
+        position: relative;
+        z-index: 101;
     }
 
-    /* Основные стили для страницы */
+    .referrals-count {
+        font-size: 14px;
+        color: var(--secondary-text);
+        margin-right: 10px;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+    }
+
+    /* Стили для выпадающего меню */
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: 200px;
+        z-index: 1000;
+        display: none;
+        overflow: hidden;
+    }
+
+    .dropdown-menu.show {
+        display: block;
+        animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background-color 0.2s;
+    }
+
+    .dropdown-item:hover {
+        background-color: var(--card-bg);
+    }
+
+    .dropdown-item svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    /* Остальные стили */
     body {
         display: flex;
         flex-direction: column;
@@ -40,10 +96,9 @@
 
     main {
         flex: 1;
-        padding-bottom: 80px; /* Отступ для нижнего меню */
+        padding-bottom: 80px;
     }
 
-    /* Контент профиля */
     .profile-info {
         padding: 20px;
         display: flex;
@@ -134,7 +189,6 @@
         color: var(--primary-color);
     }
 
-    /* Стили для раздела объявлений */
     .ads-section {
         width: 100%;
         margin-top: 20px;
@@ -200,22 +254,11 @@
 
     .ad-title {
         font-size: 18px;
-        margin-bottom: 4px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        text-overflow: ellipsis;
         white-space: nowrap;
         overflow: hidden;
-    }
-
-    .ad-title {
-        font-size: 18px;
-        white-space: nowrap;       /* Запрещаем перенос строк */
-        overflow: hidden;         /* Скрываем выходящий за границы текст */
-        text-overflow: ellipsis;  /* Добавляем многоточие в конце */
-        max-width: 170%;          /* Ограничиваем ширину */
-        display: block;           /* Делаем блочным элементом */
+        text-overflow: ellipsis;
+        max-width: 170%;
+        display: block;
         position: relative;
         bottom: 0.55vh;
         display: -webkit-box;
@@ -265,7 +308,7 @@
 {% block content %}
 <main>
     <div class="profile-header">
-        <div class="header-icon">
+        <div class="header-icon" id="menuButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="18" cy="5" r="3"></circle>
                 <circle cx="6" cy="12" r="3"></circle>
@@ -273,8 +316,22 @@
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
                 <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
             </svg>
+            <div class="dropdown-menu" id="dropdownMenu">
+                <div class="dropdown-item" id="shareReferral">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    Поделиться реферальной ссылкой
+                </div>
+            </div>
         </div>
         <div class="profile-title">Профиль</div>
+        {% if user_info[0] == user_tg_id %}
+        <div class="header-right">
+            <div class="referrals-count">{{ referrals_count }} реф.</div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="profile-info">
@@ -310,7 +367,6 @@
         </div>
 
         {% if user_info[0] != user_tg_id %}
-        <!-- Раздел с объявлениями -->
         <div class="ads-section">
             <div class="ads-section-title">Объявления</div>
             <div class="ads-grid">
@@ -341,7 +397,6 @@
                                 <div class="ad-price">{{ prod[1] }} ₽</div>
                                 <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>
                             </div>
-                            <!-- Скрытая ссылка для перехода -->
                             <a href="/ads/{{ prod[4] }}" class="ad-link" style="display: none;"></a>
                         </div>
                     {% endfor %}
@@ -358,9 +413,9 @@
 {% block scripts %}
 <script src="/static/js/price_conv.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
         // Обработка кликов по избранному
-        document.body.addEventListener('click', (e) => {
+        document.body.addEventListener('click', function(e) {
             const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
             if (favBtn) {
                 e.preventDefault();
@@ -382,20 +437,76 @@
         });
         
         // Обработка кликов по карточкам объявлений
-        document.querySelectorAll('.ad-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                // Проверяем, был ли клик по кнопке избранного или её дочерним элементам
+        document.querySelectorAll('.ad-card').forEach(function(card) {
+            card.addEventListener('click', function(e) {
                 const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
-                
-                // Если клик был не по кнопке избранного
                 if (!isFavoriteClick) {
-                    // Находим ссылку внутри карточки и переходим по ней
                     const adLink = card.querySelector('.ad-link');
                     if (adLink) {
                         window.location.href = adLink.href;
                     }
                 }
             });
+        });
+
+        // Обработка выпадающего меню
+        const menuButton = document.getElementById('menuButton');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+        const shareReferral = document.getElementById('shareReferral');
+
+        // Открытие/закрытие меню
+        menuButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('show');
+        });
+
+        // Закрытие меню при клике вне его
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.header-icon') && !e.target.closest('.dropdown-menu')) {
+                dropdownMenu.classList.remove('show');
+            }
+        });
+
+        // Обработка клика на "Поделиться реферальной ссылкой"
+        shareReferral.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdownMenu.classList.remove('show');
+            
+            // Формируем реферальную ссылку
+            const referralLink = `https://t.me/test_tma8_bot?startapp=ref_{{ user_info[0] }}`;
+            const message = `Присоединяйтесь к торговле на WMarket:\n\n${referralLink}`;
+            
+            // Проверяем, работает ли в Telegram WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                // В Telegram WebApp используем метод shareTelegram
+                if (window.Telegram.WebApp.shareTelegram) {
+                    window.Telegram.WebApp.shareTelegram({
+                        text: message,
+                        url: referralLink
+                    });
+                } else {
+                    // Если метод shareTelegram недоступен, используем sendData
+                    window.Telegram.WebApp.sendData(JSON.stringify({
+                        action: 'share_referral',
+                        text: message,
+                        url: referralLink
+                    }));
+                }
+            } else {
+                // В браузере - копируем в буфер обмена
+                try {
+                    navigator.clipboard.writeText(message).then(function() {
+                        const profileUrl = window.location.href;
+                        
+                        // Открываем Telegram с подготовленным сообщением
+                        window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, '_blank');
+                    }).catch(function() {
+                        prompt('Скопируйте реферальную ссылку:', message);
+                    });
+                } catch (e) {
+                    prompt('Скопируйте реферальную ссылку:', message);
+                }
+            }
         });
     });
 </script>

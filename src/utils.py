@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 import jwt
 from urllib.parse import parse_qs
 from src.config import settings
+from urllib.parse import parse_qs, unquote
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
@@ -12,7 +13,11 @@ def parse_init_data(init_data):
     parsed = parse_qs(init_data)
     if 'user' not in parsed:
         return None
-
+    try:
+        start_param = parsed.get("start_param", [None])[0][4:]
+    except TypeError as exc:
+        start_param = None
+        print(exc)
     user_json = parsed['user'][0]
     user_data = json.loads(user_json)
     return {
@@ -21,6 +26,7 @@ def parse_init_data(init_data):
         "last_name": user_data.get("last_name"),
         "username": user_data.get("username"),
         "photo_url": user_data.get("photo_url"),
+        "ref_code": start_param
     }
 
 
@@ -35,3 +41,10 @@ async def decode_jwt(token):
         return jwt.decode(token, key=SECRET_KEY, algorithms=ALGORITHM)
     except Exception as e:
         return {"sub": str(e)}
+
+
+async def is_admin(tg_id):
+    if str(tg_id) in [admin for admin in settings.ADMINS.split(",")]:
+        return True
+    else:
+        return False
