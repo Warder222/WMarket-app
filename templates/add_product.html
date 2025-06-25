@@ -113,7 +113,7 @@
 
             <div class="form-group">
                 <label class="form-label" for="product_price">Цена (руб.)</label>
-                <input class="form-input" type="number" id="product_price" name="product_price" min="0" required>
+                <input class="form-input" type="number" id="product_price" name="product_price" min="0" pattern="\d*" required>
             </div>
 
             <div class="form-group">
@@ -151,6 +151,11 @@
                 };
                 reader.readAsDataURL(e.target.files[0]);
             }
+        });
+
+        const priceInput = document.getElementById('product_price');
+        priceInput.addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
         });
 
         document.getElementById('add-product-form').addEventListener('submit', async function(e) {

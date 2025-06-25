@@ -19,7 +19,7 @@ from src.database.utils import (get_all_users, add_user,
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
                                 user_exists, record_referral, get_ref_count, get_chat_part_info,
                                 get_user_archived_products, delete_product_post, archive_product_post,
-                                restore_product_post)
+                                restore_product_post, update_product_post)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -289,6 +289,58 @@ async def add_product_post(request: Request,
     return response
 
 
+@wmarket_router.post("/edit_product")
+async def edit_product_post(
+        request: Request,
+        session_token=Cookie(default=None),
+        product_id: int = Form(),
+        title: str = Form(),
+        price: int = Form(),
+        category: str = Form(),
+        description: str = Form(),
+        image: UploadFile = File(None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            product = await get_product_info(product_id, payload.get("tg_id"))
+            if not product or product[1] != payload.get("tg_id"):
+                return JSONResponse({"status": "error", "message": "Недостаточно прав"}, status_code=403)
+
+            # Обновляем данные
+            update_data = {
+                "product_name": title,
+                "product_price": price,
+                "category_name": category,
+                "product_description": description,
+                "active": False  # Отправляем на модерацию
+            }
+
+            # Если загружено новое изображение
+            if image and image.filename:
+                file_content = await image.read()
+                file_ext = os.path.splitext(image.filename)[1]
+                if file_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
+                    raise HTTPException(status_code=400, detail="Неподдерживаемый формат изображения")
+
+                filename = f"{uuid.uuid4()}{file_ext}"
+                file_path = os.path.join(settings.UPLOAD_DIR, filename)
+
+                with open(file_path, "wb") as buffer:
+                    buffer.write(file_content)
+
+                update_data["product_image_url"] = f"static/uploads/{filename}"
+
+            update_res = await update_product_post(product_id, update_data)
+            if update_res:
+                return JSONResponse({"status": "success"})
+            else:
+                return JSONResponse({"status": "error", "message": "Ошибка обновления"}, status_code=500)
+    return JSONResponse({"status": "error", "message": "Неавторизованный запрос"}, status_code=401)
+
+
 @wmarket_router.get('/ads/{product_id}')
 async def ads_view(product_id: int, request: Request, session_token=Cookie(default=None)):
     if session_token:
@@ -300,6 +352,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
             # 8-is_fav
             product_info = await get_product_info(product_id, payload.get("tg_id"))
+            categories = await get_all_not_digit_categories()
             user_info = await get_user_info(product_info[1])
             positive_reviews = user_info[3]
             negative_reviews = user_info[4]
@@ -309,6 +362,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             context = {
                 "request": request,
                 "product_info": product_info,
+                "categories": categories,
                 "user_tg_id": payload.get("tg_id"),
                 "reputation": reputation,
                 "positive_reviews": positive_reviews,

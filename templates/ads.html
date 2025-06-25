@@ -21,12 +21,12 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 8px; /* Уменьшен отступ */
+            margin-bottom: 8px;
             min-height: 48px;
         }
 
         .ad-title {
-            font-size: 28px; /* Увеличен размер */
+            font-size: 28px;
             font-weight: bold;
             margin: 0;
             flex-grow: 1;
@@ -66,14 +66,14 @@
             font-size: 24px;
             font-weight: bold;
             color: var(--primary-color);
-            margin: 8px 0 16px 0; /* Поднято выше */
+            margin: 8px 0 16px 0;
         }
 
         .ad-description-title {
             font-size: 24px;
             font-weight: 900;
-            margin: 10px 0 12px 0; /* Уменьшен отступ сверху */
-            text-align: left; /* Центрирование */
+            margin: 10px 0 12px 0;
+            text-align: left;
         }
 
         .ad-description {
@@ -81,7 +81,7 @@
             line-height: 1.5;
             margin-bottom: 24px;
             white-space: pre-line;
-            text-align: left; /* Центрирование */
+            text-align: left;
         }
 
         .ad-actions {
@@ -90,7 +90,7 @@
             align-items: center;
         }
 
-        .ad-favorite, .ad-favorite-del, .ad-report {
+        .ad-favorite, .ad-favorite-del, .ad-report, .ad-edit {
             background: none;
             border: none;
             padding: 0;
@@ -115,13 +115,17 @@
             color: var(--text-color);
         }
 
-        .ad-favorite svg, .ad-favorite-del svg, .ad-report svg {
+        .ad-edit {
+            color: var(--text-color);
+        }
+
+        .ad-favorite svg, .ad-favorite-del svg, .ad-report svg, .ad-edit svg {
             width: 36px;
             height: 36px;
             transition: transform 0.2s ease;
         }
 
-        .ad-favorite:active svg, .ad-favorite-del:active svg, .ad-report:active svg {
+        .ad-favorite:active svg, .ad-favorite-del:active svg, .ad-report:active svg, .ad-edit:active svg {
             transform: scale(0.9);
         }
 
@@ -135,7 +139,7 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            margin: 8px 0 16px 0; /* Поднято выше и уменьшен отступ снизу */
+            margin: 8px 0 16px 0;
         }
 
         /* Стили для блока продавца */
@@ -215,6 +219,111 @@
             font-size: 11px;
             color: var(--secondary-text);
         }
+
+        /* Модальное окно для редактирования */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .modal-btn-cancel {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .modal-btn-save {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .file-input-label {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .file-input-label:hover {
+            background-color: var(--hover-color);
+        }
+
+        .edit-image-preview {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px dashed var(--border-color);
+            display: none;
+        }
     </style>
 {% endblock %}
 
@@ -230,8 +339,9 @@
 
         <div class="ad-header">
             <h1 class="ad-title">{{ product_info[2] }}</h1>
-            {% if product_info[1] != user_tg_id %}
-                <div class="ad-actions">
+            <div class="ad-actions">
+                {% if product_info[1] != user_tg_id %}
+                    <!-- Кнопки для чужого объявления -->
                     <button class="ad-report" data-id="{{ product_info[0] }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -250,8 +360,16 @@
                             </svg>
                         </button>
                     {% endif %}
-                </div>
-            {% endif %}
+                {% else %}
+                    <!-- Кнопка редактирования для своего объявления -->
+                    <button class="ad-edit" data-id="{{ product_info[0] }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                {% endif %}
+            </div>
         </div>
 
         <div class="ad-price">{{ product_info[3] }} ₽</div>
@@ -282,12 +400,59 @@
                 </div>
             </div>
             
-            <!-- В ads.html в блоке content, где есть проверка product_info[1] != user_tg_id -->
             <button class="contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">Написать продавцу</button>
         {% endif %}
         
         <h3 class="ad-description-title">Описание</h3>
         <div class="ad-description">{{ product_info[4] }}</div>
+    </div>
+
+    <!-- Модальное окно для редактирования объявления -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Редактировать объявление</div>
+            <form id="editForm" enctype="multipart/form-data">
+                <input type="hidden" name="product_id" value="{{ product_info[0] }}">
+                
+                <div class="form-group">
+                    <label for="editTitle">Название</label>
+                    <input type="text" id="editTitle" name="title" value="{{ product_info[2] }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editPrice">Цена (₽)</label>
+                    <input type="number" id="editPrice" name="price" value="{{ product_info[3] }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editCategory">Категория</label>
+                    <select id="editCategory" name="category" required>
+                        {% for category in categories %}
+                            <option value="{{ category }}" {% if category == product_info[6] %}selected{% endif %}>{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editDescription">Описание</label>
+                    <textarea id="editDescription" name="description" required>{{ product_info[4] }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editImage">Изображение</label>
+                    <label for="editImage" class="file-input-label">
+                        Выберите новое изображение (или оставьте старое)
+                    </label>
+                    <input type="file" id="editImage" name="image" accept="image/*" style="display: none;">
+                    <img id="edit-image-preview" class="edit-image-preview" src="/{{ product_info[5] }}" alt="Текущее изображение">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn modal-btn-cancel" onclick="closeEditModal()">Отмена</button>
+                    <button type="submit" class="modal-btn modal-btn-save">Сохранить изменения</button>
+                </div>
+            </form>
+        </div>
     </div>
 {% endblock %}
 
@@ -295,6 +460,34 @@
     <script src="/static/js/price_conv.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Обработка выбора изображения для редактирования
+            const editImageInput = document.getElementById('editImage');
+            const editImagePreview = document.getElementById('edit-image-preview');
+
+            if (editImageInput && editImagePreview) {
+                editImagePreview.style.display = 'block'; // Показываем текущее изображение
+                
+                editImageInput.addEventListener('change', function(e) {
+                    if (e.target.files && e.target.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            editImagePreview.style.display = 'block';
+                            editImagePreview.src = event.target.result;
+                        };
+                        reader.readAsDataURL(e.target.files[0]);
+                    }
+                });
+            }
+
+            // Обработка поля цены в форме редактирования
+            const editPriceInput = document.getElementById('editPrice');
+            if (editPriceInput) {
+                editPriceInput.addEventListener('input', function(e) {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                });
+            }
+
+            // Обработка кнопок избранного и жалоб
             document.body.addEventListener('click', (e) => {
                 const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
                 if (favBtn) {
@@ -316,23 +509,70 @@
                 const reportBtn = e.target.closest('.ad-report');
                 if (reportBtn) {
                     e.preventDefault();
-                    // Здесь можно добавить логику для жалобы
                     alert('Жалоба на объявление отправлена');
+                }
+
+                // Обработка кнопки редактирования
+                const editBtn = e.target.closest('.ad-edit');
+                if (editBtn) {
+                    e.preventDefault();
+                    openEditModal();
                 }
             });
 
+            // Переход в профиль продавца при клике на блок
             const sellerInfo = document.querySelector('.seller-info');
             if (sellerInfo) {
                 sellerInfo.addEventListener('click', (e) => {
-                    // Проверяем, что клик не был по дочерним элементам, которые имеют свои обработчики
                     if (!e.target.closest('.ad-favorite, .ad-favorite-del, .ad-report, .contact-btn')) {
                         window.location.href = `/profile/{{ product_info[1] }}`;
                     }
                 });
-                
-                // Добавляем курсор-указатель для всего блока
                 sellerInfo.style.cursor = 'pointer';
             };
+
+            // Обработка формы редактирования
+            const editForm = document.getElementById('editForm');
+            if (editForm) {
+                editForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(editForm);
+                    
+                    try {
+                        const response = await fetch('/edit_product', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === "success") {
+                            alert('Объявление успешно обновлено и отправлено на проверку!');
+                            window.location.reload();  // Перезагружаем страницу
+                        } else {
+                            alert(result.message || 'Ошибка при обновлении объявления');
+                        }
+                    } catch (error) {
+                        console.error('Ошибка:', error);
+                        alert('Произошла ошибка при отправке данных');
+                    }
+                });
+            }
         });
+
+        // Функции для работы с модальным окном
+        function openEditModal() {
+            const modal = document.getElementById('editModal');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
     </script>
 {% endblock %}

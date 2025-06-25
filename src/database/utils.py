@@ -258,7 +258,20 @@ async def archive_product_post(product_id: int):
             print(e)
             return False
 
-
+async def update_product_post(product_id: int, update_data):
+    async with async_session_maker() as db:
+        try:
+            print(f"Updating product {product_id} with data:", update_data)  # Логирование
+            await db.execute(
+                update(Product)
+                .where(Product.id == product_id)
+                .values(**update_data)
+            )
+            await db.commit()
+            return True
+        except Exception as e:
+            print("Update error:", e)  # Логирование ошибки
+            return False
 
 async def get_user_archived_products(tg_id):
     async with async_session_maker() as db:
