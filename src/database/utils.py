@@ -429,6 +429,23 @@ async def get_chat_participants(chat_id: int, exclude_user_id: int = None):
         result = await session.execute(query)
         return result.scalars().all()
 
+async def get_chat_part_info(chat_id: int):
+    async with async_session_maker() as session:
+        participants = await session.execute(
+            select(ChatParticipant.user_id)
+            .where(ChatParticipant.chat_id == chat_id)
+        )
+        participant_ids = [p[0] for p in participants.all()]
+
+        users_info = {}
+        for user_id in participant_ids:
+            user = await session.execute(select(User).where(User.tg_id == user_id))
+            user = user.scalar_one_or_none()
+            if user:
+                users_info[user_id] = user.first_name or user.username or f"User {user_id}"
+
+        return users_info
+
 async def get_last_chat_message(chat_id: int):
     """Получить последнее сообщение в чате"""
     async with async_session_maker() as session:
@@ -511,7 +528,7 @@ async def get_ref_count(tg_id):
                 )
             )
 
-            return refs.scalars()
+            return refs.scalar()
         except Exception as exc:
             print(f"Error: {exc}")
             return []

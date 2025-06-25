@@ -254,7 +254,7 @@
 {% block content %}
 <div class="chat-container">
     <div class="chat-header">
-        <button class="back-button" onclick="window.history.back()">
+        <button class="back-button" onclick="goBackAndReload()">
             <svg viewBox="0 0 24 24">
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
             </svg>
@@ -317,17 +317,7 @@
 {% block scripts %}
 <script>
     function goBackAndReload() {
-        // Возврат назад с проверкой наличия истории
-        if (window.history.length > 1) {
-            window.history.back();
-        } else {
-            window.location.href = '/'; // Если истории нет - на главную
-        }
-        
-        // Перезагрузка через 100мс (после завершения навигации)
-        setTimeout(() => {
-            window.location.reload(true); // true - жесткая перезагрузка (без кеша)
-        }, 100);
+        window.location.href = '/chats';
     }
     document.addEventListener('DOMContentLoaded', () => {
         const socket = new WebSocket(`wss://${window.location.host}/ws/{{ current_user.id }}`);
@@ -336,44 +326,95 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const chatMessages = document.getElementById('chatMessages');
+        const isAdmin = currentUserId === 0; // Проверка, является ли пользователь админом
 
+        // Для админа - получаем информацию об участниках чата
+        let participantsInfo = {};
+        if (isAdmin) {
+            fetch(`/chat_participants_info/${chatId}`)
+                .then(response => response.json())
+                .then(data => {
+                    participantsInfo = data;
+                    // Перерисовываем все сообщения с именами
+                    document.querySelectorAll('.message').forEach(el => el.remove());
+                    messages.forEach(msg => {
+                        const senderName = participantsInfo[msg.sender_id] || 'Неизвестный';
+                        addMessageToUI({
+                            ...msg,
+                            senderName: senderName + ': '
+                        }, msg.sender_id === currentUserId);
+                    });
+                });
+        }
+
+        // Отключаем функционал отправки для админа
+        if (isAdmin) {
+            messageInput.disabled = true;
+            messageInput.placeholder = "Режим просмотра (администратор)";
+            sendButton.disabled = true;
+            sendButton.style.opacity = "0.5";
+        }
+
+        // Сохраняем все сообщения для возможной перерисовки
+        let messages = [];
+        
+        // Обработка ошибок WebSocket
         socket.onerror = (event) => {
-            alert(`WebSocket Error: ${event}`);
-            // Более детальная информация
-            alert(`Error details:, ${event.type}, ${event.timeStamp}, ${event.target.url}`);
+            console.error('WebSocket Error:', event);
         };
 
-        // Подключение к чату
-        socket.onopen = () => {
-            socket.send(JSON.stringify({
-                type: "join_chat",
-                chat_id: chatId
-            }));
-        };
-
-        // Обработка входящих сообщений
-        socket.onmessage = (event) => {
+        // Обработчик входящих сообщений
+        socket.onmessage = async (event) => {
             const data = JSON.parse(event.data);
             if (data.type === "new_message") {
+                // Для админа добавляем имя отправителя
+                if (isAdmin) {
+                    const senderName = participantsInfo[data.sender_id] || 'Неизвестный';
+                    data.senderName = senderName + ': ';
+                }
+                
+                messages.push(data);
                 addMessageToUI(data, data.sender_id == currentUserId);
             }
-        };
-
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === "new_message") {
-                // Для админа показываем все сообщения без ограничений
-                if (currentUserId === 0 || data.sender_id == currentUserId) {
-                    addMessageToUI(data, data.sender_id == currentUserId);
+            // Обработка истории сообщений при подключении
+            else if (data.type === "chat_history") {
+                messages = data.messages;
+                if (isAdmin) {
+                    // Ждем загрузки информации об участниках
+                    const checkParticipants = setInterval(() => {
+                        if (Object.keys(participantsInfo).length > 0) {
+                            clearInterval(checkParticipants);
+                            messages.forEach(msg => {
+                                const senderName = participantsInfo[msg.sender_id] || 'Неизвестный';
+                                addMessageToUI({
+                                    ...msg,
+                                    senderName: senderName + ': '
+                                }, msg.sender_id === currentUserId);
+                            });
+                        }
+                    }, 100);
+                } else {
+                    messages.forEach(msg => {
+                        addMessageToUI(msg, msg.sender_id === currentUserId);
+                    });
                 }
             }
         };
 
-        // Отправка сообщения
+        // Инициализация соединения - запрос истории чата
+        socket.onopen = () => {
+            socket.send(JSON.stringify({
+                type: "get_history",
+                chat_id: chatId
+            }));
+        };
+
+        // Функция отправки сообщения (не используется админом)
         function sendMessage() {
+            if (isAdmin) return;
+            
             const content = messageInput.value.trim();
             if (content) {
-                console.log('Sending message:', content); // Добавьте это
                 socket.send(JSON.stringify({
                     type: "send_message",
                     chat_id: chatId,
@@ -383,21 +424,25 @@
             }
         }
         
+        // Функция добавления сообщения в интерфейс
         function addMessageToUI(message, isSent) {
             const messageElement = document.createElement('div');
-            const isAdmin = message.sender_id === 0;
+            const isAdminMessage = message.sender_id === 0;
             
             messageElement.className = `message ${
-                isAdmin ? 'message-admin' : 
+                isAdminMessage ? 'message-admin' : 
                 isSent ? 'message-sent' : 'message-received'
             }`;
+            
             const time = new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
             messageElement.innerHTML = `
-                <div class="message-content">${message.content}</div>
+                <div class="message-content">
+                    ${message.senderName || ''}
+                    ${message.content}
+                </div>
                 <div class="message-time">
                     ${time}
-                    ${!isSent ? `<button class="report-button" data-message-id="${message.id}">Пожаловаться</button>` : ''}
                 </div>
             `;
             

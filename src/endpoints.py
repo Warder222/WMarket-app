@@ -16,7 +16,7 @@ from src.database.utils import (get_all_users, add_user,
                                 send_message, count_unread_messages, get_last_chat_message, get_chat_participants,
                                 get_user_chats, all_count_unread_messages, get_all_digit_categories,
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
-                                user_exists, record_referral, get_ref_count)
+                                user_exists, record_referral, get_ref_count, get_chat_part_info)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -504,6 +504,12 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
     return templates.TemplateResponse("chat.html", context=context)
 
 
+@wmarket_router.get("/chat_participants_info/{chat_id}")
+async def get_chat_participants_info(chat_id: int):
+    users_info = await get_chat_part_info(chat_id)
+    return users_info
+
+
 @wmarket_router.post("/report_message/{message_id}")
 async def report_message_route(message_id: int, session_token=Cookie(default=None)):
     if not session_token:
@@ -521,7 +527,26 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             data = await websocket.receive_text()
             message_data = json.loads(data)
 
-            if message_data["type"] == "send_message":
+            if message_data["type"] == "get_history":
+                # Отправляем историю сообщений при подключении
+                chat_data = await get_chat_messages(message_data["chat_id"], int(user_id))
+                if chat_data:
+                    await websocket.send_text(json.dumps({
+                        "type": "chat_history",
+                        "messages": [
+                            {
+                                "chat_id": msg.chat_id,
+                                "sender_id": msg.sender_id,
+                                "receiver_id": msg.receiver_id,
+                                "content": msg.content,
+                                "created_at": msg.created_at.isoformat(),
+                                "id": msg.id
+                            }
+                            for msg in chat_data["messages"]
+                        ]
+                    }))
+
+            if message_data["type"] == "send_message" and user_id != "0":  # Админ не может отправлять
                 message = await send_message(
                     message_data["chat_id"],
                     int(user_id),
@@ -532,14 +557,27 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                         "type": "new_message",
                         "chat_id": message.chat_id,
                         "sender_id": message.sender_id,
+                        "receiver_id": message.receiver_id,
                         "content": message.content,
-                        "created_at": message.created_at.isoformat()
+                        "created_at": message.created_at.isoformat(),
+                        "id": message.id
                     }))
     except WebSocketDisconnect:
         manager.disconnect(user_id)
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
         await websocket.close(code=1011)
+
+
+@wmarket_router.get("/user_info/{user_id}")
+async def get_user_info_endpoint(user_id: int):
+    user_info = await get_user_info(user_id)
+    if user_info:
+        return {
+            "first_name": user_info[1],
+            "photo_url": user_info[2]
+        }
+    return {}
 
 
 @wmarket_router.post("/report_chat/{chat_id}")
