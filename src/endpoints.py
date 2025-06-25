@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from starlette.responses import JSONResponse
 
 from src.config import settings, manager
 from src.database.utils import (get_all_users, add_user,
@@ -16,7 +17,9 @@ from src.database.utils import (get_all_users, add_user,
                                 send_message, count_unread_messages, get_last_chat_message, get_chat_participants,
                                 get_user_chats, all_count_unread_messages, get_all_digit_categories,
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
-                                user_exists, record_referral, get_ref_count, get_chat_part_info)
+                                user_exists, record_referral, get_ref_count, get_chat_part_info,
+                                get_user_archived_products, delete_product_post, archive_product_post,
+                                restore_product_post)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -164,23 +167,87 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
-            moderation_products = await get_user_moderation_products(payload.get("tg_id"))
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
+            # Получаем параметр tab из URL (по умолчанию 'active')
+            tab = request.query_params.get('tab', 'active')
+
+            # Инициализируем все переменные как пустые списки
+            active_products = []
+            moderation_products = []
+            archived_products = []
+
+            # Загружаем только нужные данные в зависимости от выбранной вкладки
+            if tab == 'active':
+                active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+            elif tab == 'moderation':
+                moderation_products = await get_user_moderation_products(payload.get("tg_id"))
+            elif tab == 'archived':
+                archived_products = await get_user_archived_products(payload.get("tg_id"))
+
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+
             context = {
                 "request": request,
                 "active_products": active_products,
                 "moderation_products": moderation_products,
+                "archived_products": archived_products,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "current_tab": tab  # Добавляем текущую вкладку в контекст
             }
             return templates.TemplateResponse("ads_review.html", context=context)
 
     response = RedirectResponse(url="/store", status_code=303)
     return response
 
+
+@wmarket_router.post("/delete_product/{product_id}")
+async def delete_product(product_id: int, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            rest_product = await delete_product_post(product_id=product_id)
+            if rest_product:
+                return JSONResponse({"status": "success"})
+            else:
+                return JSONResponse({"status": "error"}, status_code=500)
+    response = RedirectResponse(url="/store", status_code=303)
+    return response
+
+@wmarket_router.post("/archive_product/{product_id}")
+async def archive_product(product_id: int, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            rest_product = await archive_product_post(product_id=product_id)
+            if rest_product:
+                return JSONResponse({"status": "success"})
+            else:
+                return JSONResponse({"status": "error"}, status_code=500)
+    response = RedirectResponse(url="/store", status_code=303)
+    return response
+
+@wmarket_router.post("/restore_product/{product_id}")
+async def restore_product(product_id: int, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            rest_product = await restore_product_post(product_id=product_id)
+            if rest_product:
+                return JSONResponse({"status": "success"})
+            else:
+                return JSONResponse({"status": "error"}, status_code=500)
+    response = RedirectResponse(url="/store", status_code=303)
+    return response
 
 @wmarket_router.post("/add_product")
 async def add_product_post(request: Request,
@@ -198,14 +265,6 @@ async def add_product_post(request: Request,
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
                 file_content = await product_image.read()
-                # max_size = 5 * 1024 * 1024
-                #
-                # if len(file_content) > max_size:
-                #     raise HTTPException(status_code=413, detail="Размер файла не должен превышать 5 МБ)")
-
-                if product_price <= 0:
-                    raise HTTPException(status_code=400, detail="Цена должна быть положительной")
-
                 file_ext = os.path.splitext(product_image.filename)[1]
                 if file_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
                     raise HTTPException(status_code=400, detail="Неподдерживаемый формат изображения")
@@ -226,7 +285,7 @@ async def add_product_post(request: Request,
             except Exception as e:
                 print(str(e))
 
-    response = RedirectResponse(url="/ads_review", status_code=303)
+    response = RedirectResponse(url="/ads_review?moderation=true", status_code=303)
     return response
 
 
@@ -508,6 +567,7 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
 async def get_chat_participants_info(chat_id: int):
     users_info = await get_chat_part_info(chat_id)
     return users_info
+
 
 
 @wmarket_router.post("/report_message/{message_id}")

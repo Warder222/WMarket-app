@@ -326,7 +326,10 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const chatMessages = document.getElementById('chatMessages');
-        const isAdmin = currentUserId === 0; // Проверка, является ли пользователь админом
+        const isAdmin = currentUserId === 0;
+
+        // Удаляем все сообщения, которые были загружены при рендеринге шаблона
+        chatMessages.innerHTML = '';
 
         // Для админа - получаем информацию об участниках чата
         let participantsInfo = {};
@@ -335,33 +338,16 @@
                 .then(response => response.json())
                 .then(data => {
                     participantsInfo = data;
-                    // Перерисовываем все сообщения с именами
-                    document.querySelectorAll('.message').forEach(el => el.remove());
-                    messages.forEach(msg => {
-                        const senderName = participantsInfo[msg.sender_id] || 'Неизвестный';
-                        addMessageToUI({
-                            ...msg,
-                            senderName: senderName + ': '
-                        }, msg.sender_id === currentUserId);
-                    });
                 });
         }
 
         // Отключаем функционал отправки для админа
         if (isAdmin) {
             messageInput.disabled = true;
-            messageInput.placeholder = "Режим просмотра (администратор)";
+            messageInput.placeholder = "Режим просмотра (админ)";
             sendButton.disabled = true;
             sendButton.style.opacity = "0.5";
         }
-
-        // Сохраняем все сообщения для возможной перерисовки
-        let messages = [];
-        
-        // Обработка ошибок WebSocket
-        socket.onerror = (event) => {
-            console.error('WebSocket Error:', event);
-        };
 
         // Обработчик входящих сообщений
         socket.onmessage = async (event) => {
@@ -373,31 +359,18 @@
                     data.senderName = senderName + ': ';
                 }
                 
-                messages.push(data);
                 addMessageToUI(data, data.sender_id == currentUserId);
             }
             // Обработка истории сообщений при подключении
             else if (data.type === "chat_history") {
-                messages = data.messages;
-                if (isAdmin) {
-                    // Ждем загрузки информации об участниках
-                    const checkParticipants = setInterval(() => {
-                        if (Object.keys(participantsInfo).length > 0) {
-                            clearInterval(checkParticipants);
-                            messages.forEach(msg => {
-                                const senderName = participantsInfo[msg.sender_id] || 'Неизвестный';
-                                addMessageToUI({
-                                    ...msg,
-                                    senderName: senderName + ': '
-                                }, msg.sender_id === currentUserId);
-                            });
-                        }
-                    }, 100);
-                } else {
-                    messages.forEach(msg => {
-                        addMessageToUI(msg, msg.sender_id === currentUserId);
-                    });
-                }
+                data.messages.forEach(msg => {
+                    // Для админа добавляем имя отправителя
+                    if (isAdmin) {
+                        const senderName = participantsInfo[msg.sender_id] || 'Неизвестный';
+                        msg.senderName = senderName + ': ';
+                    }
+                    addMessageToUI(msg, msg.sender_id === currentUserId);
+                });
             }
         };
 

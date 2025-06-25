@@ -3,7 +3,7 @@ from typing import Optional
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
     Referral
 from sqlalchemy.future import select
-from sqlalchemy import update, desc, asc, func, and_
+from sqlalchemy import update, desc, asc, func, and_, delete
 
 
 # auth&users_utils______________________________________________________________________________________________________
@@ -216,6 +216,62 @@ async def add_new_product(product_data, tg_id):
             await db.commit()
         except Exception as exc:
             print(exc)
+
+
+async def restore_product_post(product_id: int):
+    async with async_session_maker() as db:
+        try:
+            await db.execute(
+                update(Product)
+                .where(Product.id == product_id)
+                .values(active=True)
+            )
+            await db.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
+async def delete_product_post(product_id: int):
+    async with async_session_maker() as db:
+        try:
+            await db.execute(delete(Fav).where(Fav.product_id == product_id))
+            await db.execute(delete(Product).where(Product.id == product_id))
+            await db.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
+
+async def archive_product_post(product_id: int):
+    async with async_session_maker() as db:
+        try:
+            await db.execute(
+                update(Product)
+                .where(Product.id == product_id)
+                .values(active=None)
+            )
+            await db.commit()
+            return True
+        except Exception as e:
+            print(e)
+            return False
+
+
+
+async def get_user_archived_products(tg_id):
+    async with async_session_maker() as db:
+        try:
+            q = select(Product).filter_by(tg_id=tg_id, active=None).order_by(desc(Product.created_at))
+            result = await db.execute(q)
+            products = result.scalars()
+            return [[prod.product_name, prod.product_price,
+                     prod.product_description, prod.product_image_url,
+                     prod.id, prod.created_at, prod.id] for prod in products]
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
 
 
 async def get_user_active_products(seller_id, tg_id):
