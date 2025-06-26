@@ -8,14 +8,57 @@
         z-index: 100;
         background-color: var(--bg-color);
         padding: 12px 16px;
-        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
-    .reports-container {
+    .admin-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 16px;
+        text-align: center;
+    }
+
+    .tabs-header {
+        display: flex;
+        width: 100%;
+        border-bottom: 1px solid var(--border-color);
+        position: relative;
+    }
+
+    .tab {
+        flex: 1;
+        text-align: center;
+        padding: 16px 0;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        position: relative;
+        transition: all 0.3s ease;
+        text-decoration: none;
+    }
+
+    .tab.active {
+        color: var(--primary-color);
+    }
+
+    .tab-indicator {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        height: 3px;
+        width: 50%;
+        background-color: var(--primary-color);
+        transition: all 0.3s ease;
+    }
+
+    .content-container {
         padding: 16px;
     }
 
-    .report-item {
+    .report-item, .product-item {
         background-color: var(--card-bg);
         border-radius: 8px;
         padding: 16px;
@@ -23,19 +66,19 @@
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
-    .report-header {
+    .item-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 8px;
     }
 
-    .report-chat-id {
+    .item-id {
         font-weight: bold;
         color: var(--primary-color);
     }
 
-    .report-time {
+    .item-time {
         font-size: 12px;
         color: var(--secondary-text);
     }
@@ -48,13 +91,40 @@
         border-radius: 4px;
     }
 
-    .report-actions {
+    .product-info {
+        margin: 12px 0;
+        padding: 12px;
+        background-color: var(--bg-color);
+        border-radius: 4px;
+    }
+
+    .product-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .product-price {
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+
+    .product-description {
+        margin: 8px 0;
+    }
+
+    .product-image {
+        width: 30vh;
+        border-radius: 4px;
+        margin-top: 8px;
+    }
+
+    .item-actions {
         display: flex;
         justify-content: flex-end;
         gap: 8px;
     }
 
-    .view-chat-button {
+    .view-button {
         padding: 8px 16px;
         background-color: var(--primary-color);
         color: white;
@@ -65,7 +135,7 @@
         font-size: 14px;
     }
 
-    .resolve-button {
+    .approve-button {
         padding: 8px 16px;
         background-color: var(--success-color);
         color: white;
@@ -75,65 +145,261 @@
         font-size: 14px;
     }
 
-    .no-reports {
+    .reject-button {
+        padding: 8px 16px;
+        background-color: var(--error-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .no-items {
         text-align: center;
         padding: 40px 20px;
         color: var(--secondary-text);
     }
 
-    .admin-title {
-        font-size: 20px;
-        font-weight: bold;
+    .hidden {
+        display: none;
+    }
+
+    /* Стили для модального окна отклонения */
+    #reject-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    #reject-modal .modal-content {
+        background-color: var(--card-bg);
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 500px;
+    }
+
+    #reject-modal h3 {
+        margin-top: 0;
+    }
+
+    #reject-reason {
+        width: 100%;
+        min-height: 100px;
+        padding: 8px;
         margin-bottom: 16px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--border-color);
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+
+    #reject-modal .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    #reject-modal .modal-button {
+        padding: 8px 16px;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    #cancel-reject {
+        background-color: var(--secondary-text);
+    }
+
+    #confirm-reject {
+        background-color: var(--error-color);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <header class="header">
-    <div class="admin-title">Жалобы на чаты</div>
+    <div class="admin-title">Панель администратора</div>
+    <div class="tabs-header">
+        <div class="tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
+        <div class="tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
+        <div class="tab-indicator" id="tabIndicator"></div>
+    </div>
 </header>
 
-<main class="reports-container">
-    {% if reports %}
-        {% for report in reports %}
-        <div class="report-item">
-            <div class="report-header">
-                <div>
-                    <span class="report-chat-id">Чат #{{ report.chat_id }}</span>
-                    <span>от пользователя {{ report.reporter_id }}</span>
+<main class="content-container">
+    <!-- Секция жалоб на чаты -->
+    <div id="reportsTab" {% if active_tab != 'reports' %}class="hidden"{% endif %}>
+        {% if reports %}
+            {% for report in reports %}
+            <div class="report-item">
+                <div class="item-header">
+                    <div>
+                        <span class="item-id">Чат #{{ report.chat_id }}</span>
+                        <span>от пользователя {{ report.reporter_id }}</span>
+                    </div>
+                    <div class="item-time">{{ report.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
-                <div class="report-time">{{ report.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                
+                <div class="report-reason">
+                    {{ report.reason }}
+                </div>
+                
+                <div class="item-actions">
+                    <a href="/admin/chat/{{ report.chat_id }}" class="view-button">Перейти в чат</a>
+                    <button class="approve-button" data-action="resolve" data-id="{{ report.id }}">Решено</button>
+                </div>
             </div>
-            
-            <div class="report-reason">
-                {{ report.reason }}
+            {% endfor %}
+        {% else %}
+            <div class="no-items">Нет активных жалоб</div>
+        {% endif %}
+    </div>
+
+    <!-- Секция модерации объявлений -->
+    <div id="moderationTab" {% if active_tab != 'moderation' %}class="hidden"{% endif %}>
+        {% if moderation_products %}
+            {% for product in moderation_products %}
+            <div class="product-item" data-product-id="{{ product.id }}">
+                <div class="item-header">
+                    <div>
+                        <span class="item-id">Объявление #{{ product[4] }}</span>
+                        <span>от пользователя {{ product[7] }}</span>
+                    </div>
+                    <div class="item-time">{{ product[5].strftime('%d.%m.%Y %H:%M') }}</div>
+                </div>
+                
+                <div class="product-info">
+                    <div class="product-title">{{ product[0] }}</div>
+                    <div class="product-price">{{ product[1] }} ₽</div>
+                    <div class="product-category">Категория: {{ product[6] }}</div>
+                    <div class="product-description">{{ product[2] }}</div>
+                    {% if product[3] %}
+                        <img src="/{{ product[3] }}" alt="Изображение товара" class="product-image">
+                    {% endif %}
+                </div>
+                
+                <div class="item-actions">
+                    <button class="approve-button" data-action="approve" data-id="{{ product[4] }}">Одобрить</button>
+                    <button class="reject-button" data-action="reject" data-id="{{ product[4] }}">Отклонить</button>
+                </div>
             </div>
-            
-            <div class="report-actions">
-                <a href="/admin/chat/{{ report.chat_id }}" class="view-chat-button">Перейти в чат</a>
-                <button class="resolve-button" data-report-id="{{ report.id }}">Решено</button>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="no-reports">Нет активных жалоб</div>
-    {% endif %}
+            {% endfor %}
+        {% else %}
+            <div class="no-items">Нет объявлений на модерации</div>
+        {% endif %}
+    </div>
 </main>
+
+<!-- Модальное окно только для отклонения объявлений -->
+<div id="reject-modal">
+    <div class="modal-content">
+        <h3>Укажите причину отклонения</h3>
+        <textarea id="reject-reason" placeholder="Введите причину отклонения объявления..."></textarea>
+        <div class="modal-actions">
+            <button id="cancel-reject" class="modal-button">Отмена</button>
+            <button id="confirm-reject" class="modal-button">Отправить</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Обработка кнопки "Решить"
-        document.querySelectorAll('.resolve-button').forEach(button => {
-            button.addEventListener('click', async function() {
-                const reportId = this.dataset.reportId;
+        // Инициализация индикатора вкладок
+        const tabsHeader = document.querySelector('.tabs-header');
+        const tabs = document.querySelectorAll('.tab');
+        const tabIndicator = document.getElementById('tabIndicator');
+        
+        // Функция для активации вкладки
+        function activateTab(tabName) {
+            // Удаляем класс active у всех вкладок
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // Добавляем класс active только к текущей вкладке
+            const activeTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+            
+            // Обновляем индикатор
+            updateTabIndicator();
+            
+            // Показываем соответствующий контент
+            document.querySelectorAll('.content-container > div').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
+        }
+        
+        // Установка позиции индикатора для активной вкладки
+        function updateTabIndicator() {
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab) {
+                const tabWidth = 100 / tabs.length;
+                const tabIndex = Array.from(tabs).indexOf(activeTab);
+                tabIndicator.style.width = `${tabWidth}%`;
+                tabIndicator.style.left = `${tabIndex * tabWidth}%`;
+            }
+        }
+        
+        // Проверяем параметр URL при загрузке страницы
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            
+            if (tabParam && ['reports', 'moderation'].includes(tabParam)) {
+                activateTab(tabParam);
+            } else {
+                // По умолчанию активируем вкладку, которая была активна на сервере
+                const activeTab = document.querySelector('.tab.active');
+                if (activeTab) {
+                    activateTab(activeTab.dataset.tab);
+                } else {
+                    // Если ни одна вкладка не активна (на всякий случай)
+                    activateTab('reports');
+                }
+            }
+        }
+        
+        // Обработка кликов по вкладкам
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = tab.dataset.tab;
+                
+                // Обновляем URL без перезагрузки страницы
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', tabName);
+                window.history.pushState({}, '', url);
+                
+                // Активируем вкладку
+                activateTab(tabName);
+            });
+        });
+        
+        // Инициализация при загрузке
+        checkUrlParams();
+        
+        // Обработка кнопок действий (решить/одобрить/отклонить)
+        document.addEventListener('click', async function(event) {
+            if (event.target.matches('[data-action="resolve"], [data-action="approve"]')) {
+                const action = event.target.dataset.action;
+                const id = event.target.dataset.id;
+                const endpoint = action === 'resolve' 
+                    ? `/admin/resolve_report/${id}` 
+                    : `/admin/approve_product/${id}`;
                 
                 try {
-                    const response = await fetch(`/admin/resolve_report/${reportId}`, {
+                    const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -141,23 +407,58 @@
                     });
 
                     if (response.ok) {
-                        // Удаляем элемент из списка
-                        this.closest('.report-item').remove();
-                        
-                        // Если больше нет жалоб, показываем сообщение
-                        if (document.querySelectorAll('.report-item').length === 0) {
-                            document.querySelector('.reports-container').innerHTML = `
-                                <div class="no-reports">Нет активных жалоб</div>
-                            `;
-                        }
+                        // Обновляем страницу после успешного действия
+                        window.location.reload();
                     } else {
-                        alert('Ошибка при обработке жалобы');
+                        alert('Ошибка при обработке запроса');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при обработке жалобы');
+                    alert('Ошибка при обработке запроса');
                 }
-            });
+            }
+            
+            if (event.target.matches('[data-action="reject"]')) {
+                const productId = event.target.dataset.id;
+                document.getElementById('reject-modal').dataset.productId = productId;
+                document.getElementById('reject-modal').style.display = 'flex';
+            }
+        });
+
+        // Обработка модального окна отклонения
+        document.getElementById('cancel-reject').addEventListener('click', function() {
+            document.getElementById('reject-modal').style.display = 'none';
+            document.getElementById('reject-reason').value = '';
+        });
+
+        document.getElementById('confirm-reject').addEventListener('click', async function() {
+            const productId = document.getElementById('reject-modal').dataset.productId;
+            const reason = document.getElementById('reject-reason').value.trim();
+            
+            if (!reason) {
+                alert('Пожалуйста, укажите причину отклонения');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/reject_product/${productId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ reason })
+                });
+
+                if (response.ok) {
+                    // Обновляем страницу после успешного отклонения
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при отклонении объявления');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при отклонении объявления');
+            }
         });
     });
 </script>

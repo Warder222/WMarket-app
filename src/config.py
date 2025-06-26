@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     ADMINS: str
 
+    TG_BOT_TOKEN: str
+    BOT_USERNAME: str
+    MINI_APP_URL: str
+
     BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "static/uploads")
 

@@ -8,9 +8,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from starlette.responses import JSONResponse
 
+from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.utils import (get_all_users, add_user,
-                                update_token, get_all_categories, get_all_products,
+from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
                                 get_user_moderation_products, create_chat, get_chat_messages, report_message,
@@ -19,7 +19,7 @@ from src.database.utils import (get_all_users, add_user,
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
                                 user_exists, record_referral, get_ref_count, get_chat_part_info,
                                 get_user_archived_products, delete_product_post, archive_product_post,
-                                restore_product_post, update_product_post)
+                                restore_product_post, update_product_post, get_all_moderation_products)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -660,13 +660,19 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                         ]
                     }))
 
-            if message_data["type"] == "send_message" and user_id != "0":  # Админ не может отправлять
+            if message_data["type"] == "send_message" and user_id != "0":
                 message = await send_message(
                     message_data["chat_id"],
                     int(user_id),
                     message_data["content"]
                 )
                 if message:
+                    # Отправляем уведомление о новом сообщении
+                    await notify_new_message(
+                        message_data["chat_id"],
+                        int(user_id),
+                        message_data["content"]
+                    )
                     await manager.broadcast(json.dumps({
                         "type": "new_message",
                         "chat_id": message.chat_id,
@@ -724,11 +730,13 @@ async def admin_chat_reports(
     if admin_res:
         reports = await get_chat_reports(resolved=False)
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+        moderation_products = await get_all_moderation_products()
         context = {
             "request": request,
             "reports": reports,
             "all_undread_count_message": all_undread_count_message,
-            "admin": admin_res
+            "admin": admin_res,
+            "moderation_products": moderation_products
         }
         return templates.TemplateResponse("admin_chat_reports.html", context=context)
 
@@ -778,3 +786,152 @@ async def resolve_report_route(
     if admin_res:
         success = await resolve_chat_report(report_id, payload.get("tg_id"))
         return {"status": "success" if success else "error"}
+
+
+# bot___________________________________________________________________________________________________________________
+async def notify_new_message(chat_id: int, sender_id: int, content: str):
+    """
+    Отправляет уведомление о новом сообщении в чате
+    :param chat_id: ID чата
+    :param sender_id: ID отправителя сообщения
+    :param content: Текст сообщения
+    """
+    try:
+        # Получаем информацию о чате и участниках
+        chat_data = await get_chat_messages(chat_id, sender_id)
+        if not chat_data:
+            print(f"Chat data not found for chat_id: {chat_id}")
+            return
+
+        receiver_id = chat_data["other_user"].tg_id
+        product = chat_data["product"]
+        username = await get_user_info(sender_id)
+
+        # Формируем текст уведомления
+        message = (
+            f"💬 Новое сообщение от \n{username[1]} \n\n📢 Объявление:\n{product.product_name}"
+        )
+
+        # Отправляем уведомление получателю
+        await send_notification_to_user(receiver_id, message, product.id)
+        print(f"Notification sent to user {receiver_id} about new message in chat {chat_id}")
+
+    except Exception as e:
+        print(f"Error in notify_new_message: {e}", exc_info=True)
+
+
+async def notify_product_approved(product_id: int):
+    """
+    Отправляет уведомление о том, что объявление прошло модерацию
+    :param product_id: ID объявления
+    """
+    try:
+        # Получаем информацию о продукте
+        product = await get_product_info(product_id, None)
+        if not product:
+            print(f"Product not found: {product_id}")
+            return
+
+        seller_id = product[1]
+        user_info = await get_user_info(seller_id)
+        if not user_info:
+            print(f"User info not found for seller: {seller_id}")
+            return
+
+        # Формируем текст уведомления
+        message = (
+            f"✅ Ваше объявление прошло модерацию!\n\n"
+            f"📌 Название: {product[2]}\n"
+            f"⚙️ Категория: {product[6]}\n"
+            f"💰 Цена: {product[3]} ₽"
+        )
+
+        # Отправляем уведомление продавцу
+        await send_notification_to_user(seller_id, message)
+        print(f"Product approval notification sent to user {seller_id} for product {product_id}")
+
+    except Exception as e:
+        print(f"Error in notify_product_approved: {e}", exc_info=True)
+
+
+async def notify_product_rejected(product_id: int, reason: str = None):
+    """
+    Отправляет уведомление о том, что объявление не прошло модерацию
+    :param product_id: ID объявления
+    :param reason: Причина отказа (опционально)
+    """
+    try:
+        # Получаем информацию о продукте
+        product = await get_product_info(product_id, None)
+        if not product:
+            print(f"Product not found: {product_id}")
+            return
+
+        seller_id = product[1]
+        user_info = await get_user_info(seller_id)
+        if not user_info:
+            print(f"User info not found for seller: {seller_id}")
+            return
+
+        # Формируем текст уведомления
+        message = (
+            f"❌ Ваше объявление не прошло модерацию\n\n"
+            f"📌 Название: {product[2]}\n"
+            f"📝 Причина/пункт: {reason}\n\n"
+            f'Вы можете исправить его (<a href="https://telegra.ph/Osnovnye-punkty-i-prichiny-blokirovki-06-26">прочитав причину или пункт</a>)'
+            f" и повторно опубликовать."
+        )
+
+        # Отправляем уведомление продавцу
+        await send_notification_to_user(seller_id, message)
+        print(f"Product rejection notification sent to user {seller_id} for product {product_id}")
+
+    except Exception as e:
+        print(f"Error in notify_product_rejected: {e}", exc_info=True)
+
+
+@wmarket_router.post("/admin/approve_product/{product_id}")
+async def approve_product(product_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        # Обновляем статус продукта
+        update_data = {"active": True}
+        update_res = await update_product_post(product_id, update_data)
+
+        if update_res:
+            # Отправляем уведомление продавцу
+            await notify_product_approved(product_id)
+            return {"status": "success"}
+
+    return {"status": "error", "message": "Неавторизованный запрос"}
+
+
+@wmarket_router.post("/admin/reject_product/{product_id}")
+async def reject_product(
+        product_id: int,
+        request: Request,
+        session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        data = await request.json()
+        reason = data.get("reason", "")
+
+        # Обновляем статус продукта
+        update_data = {"active": False}
+        update_res = await update_product_post(product_id, update_data)
+
+        if update_res:
+            # Отправляем уведомление продавцу с причиной
+            await notify_product_rejected(product_id, reason)
+            await delete_product_post(product_id)
+            return {"status": "success"}
+
+    return {"status": "error", "message": "Неавторизованный запрос"}

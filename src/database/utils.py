@@ -312,10 +312,11 @@ async def get_user_moderation_products(tg_id):
             q = select(Product).filter_by(tg_id=tg_id, active=False).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at
+            # 6-cat_name / 7-tg_id
             all_products = [[prod.product_name, prod.product_price,
                              prod.product_description, prod.product_image_url,
-                             prod.id, prod.created_at, prod.id] for prod in products]
+                             prod.id, prod.created_at, prod.category_name, prod.tg_id] for prod in products]
             # all_favs = await get_all_user_favs(tg_id)
             # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
             return all_products
@@ -323,6 +324,24 @@ async def get_user_moderation_products(tg_id):
             print(f"Error: {exc}")
             return []
 
+
+async def get_all_moderation_products():
+    async with async_session_maker() as db:
+        try:
+            q = select(Product).filter_by(active=False).order_by(desc(Product.created_at))
+            result = await db.execute(q)
+            products = result.scalars()
+            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at
+            # 6-cat_name / 7-tg_id
+            all_products = [[prod.product_name, prod.product_price,
+                             prod.product_description, prod.product_image_url,
+                             prod.id, prod.created_at, prod.category_name, prod.tg_id] for prod in products]
+            # all_favs = await get_all_user_favs(tg_id)
+            # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            return all_products
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return []
 
 # favs__________________________________________________________________________________________________________________
 async def get_all_user_favs(tg_id):
@@ -601,3 +620,40 @@ async def get_ref_count(tg_id):
         except Exception as exc:
             print(f"Error: {exc}")
             return []
+
+
+async def get_last_product_id(tg_id: int):
+    """
+    Получает ID последнего добавленного продукта пользователя
+    :param tg_id: ID пользователя в Telegram
+    :return: ID продукта или None
+    """
+    async with async_session_maker() as db:
+        try:
+            result = await db.execute(
+                select(Product.id)
+                .where(Product.tg_id == tg_id)
+                .order_by(desc(Product.created_at))
+                .limit(1)
+            )
+            return result.scalar_one_or_none()
+        except Exception as exc:
+            print(f"Error getting last product ID: {exc}")
+            return None
+
+async def get_product_owner(product_id: int):
+    """
+    Получает владельца продукта по ID продукта
+    :param product_id: ID продукта
+    :return: ID пользователя в Telegram или None
+    """
+    async with async_session_maker() as db:
+        try:
+            result = await db.execute(
+                select(Product.tg_id)
+                .where(Product.id == product_id)
+            )
+            return result.scalar_one_or_none()
+        except Exception as exc:
+            print(f"Error getting product owner: {exc}")
+            return None
