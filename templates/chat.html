@@ -440,14 +440,24 @@
         const submitReport = document.getElementById('submitReport');
         const reportReason = document.getElementById('reportReason');
 
-        reportChatButton.addEventListener('click', () => {
-            reportChatModal.style.display = 'flex';
-        });
-
-        cancelReport.addEventListener('click', () => {
+        function closeReportModal() {
             reportChatModal.style.display = 'none';
             reportReason.value = '';
+            // Убедимся, что модальное окно действительно закрыто
+            setTimeout(() => {
+                messageInput.focus();
+                document.body.style.overflow = 'auto'; // Разблокируем прокрутку
+            }, 50);
+        }
+
+        reportChatButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Предотвращаем всплытие события
+            reportChatModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Блокируем прокрутку при открытом модальном окне
+            reportReason.focus();
         });
+
+        cancelReport.addEventListener('click', closeReportModal);
 
         submitReport.addEventListener('click', async () => {
             const reason = reportReason.value.trim();
@@ -466,9 +476,8 @@
                 });
 
                 if (response.ok) {
-                    alert('Жалоба отправлена администратору');
-                    reportChatModal.style.display = 'none';
-                    reportReason.value = '';
+                    alert('Жалоба отправлена администратору, обнови страницу');
+                    closeReportModal();
                 } else {
                     alert('Ошибка при отправке жалобы');
                 }
@@ -478,6 +487,15 @@
             }
         });
 
+        // Обработчик клика вне модального окна для закрытия
+        reportChatModal.addEventListener('click', (e) => {
+            if (e.target === reportChatModal) {
+                closeReportModal();
+            }
+        });
+
+        // Инициализация фокуса при загрузке
+        messageInput.focus();
     });
 </script>
 {% endblock %}
