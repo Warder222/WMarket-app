@@ -424,6 +424,54 @@ async def create_chat(product_id: int, buyer_id: int):
         await db.commit()
         return chat.id
 
+async def check_user_in_chat(chat_id: int, user_id: int) -> bool:
+    async with async_session_maker() as session:
+        was_participant = await session.execute(
+            select(func.count())
+            .select_from(ChatParticipant)
+            .where(
+                (ChatParticipant.chat_id == chat_id) &
+                (ChatParticipant.user_id == user_id)
+            )
+        )
+        if not was_participant.scalar():
+            return {"status": "error", "message": "Not a participant"}
+
+
+async def leave_chat_post(chat_id: int, user_id: int) -> bool:
+    """Пользователь покидает чат"""
+    async with async_session_maker() as session:
+        try:
+            # Удаляем пользователя из участников чата
+            await session.execute(
+                delete(ChatParticipant)
+                .where(
+                    (ChatParticipant.chat_id == chat_id) &
+                    (ChatParticipant.user_id == user_id)
+                )
+            )
+
+            # Проверяем, остались ли другие участники
+            remaining = await session.execute(
+                select(func.count())
+                .select_from(ChatParticipant)
+                .where(ChatParticipant.chat_id == chat_id)
+            )
+            remaining_count = remaining.scalar()
+
+            # Если участников не осталось, удаляем чат полностью
+            if remaining_count == 0:
+                await session.execute(delete(Message).where(Message.chat_id == chat_id))
+                await session.execute(delete(ChatReport).where(ChatReport.chat_id == chat_id))
+                await session.execute(delete(Chat).where(Chat.id == chat_id))
+
+            await session.commit()
+            return True
+        except Exception as e:
+            await session.rollback()
+            print(f"Error leaving chat: {e}")
+            return False
+
 
 async def get_chat_messages(chat_id: int, user_id: int):
     async with async_session_maker() as db:
@@ -498,7 +546,7 @@ async def report_message(message_id: int):
         return True
 
 async def get_user_chats(user_id: int):
-    """Получить все чаты пользователя"""
+    """Получить все активные чаты пользователя"""
     async with async_session_maker() as session:
         result = await session.execute(
             select(Chat)

@@ -19,7 +19,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
                                 user_exists, record_referral, get_ref_count, get_chat_part_info,
                                 get_user_archived_products, delete_product_post, archive_product_post,
-                                restore_product_post, update_product_post, get_all_moderation_products)
+                                restore_product_post, update_product_post, get_all_moderation_products,
+                                leave_chat_post, check_user_in_chat)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -615,6 +616,42 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         "all_undread_count_message": all_undread_count_message
     }
     return templates.TemplateResponse("chat.html", context=context)
+
+
+# @wmarket_router.post("/delete_chat/{chat_id}")
+# async def delete_chat(chat_id: int, session_token=Cookie(default=None)):
+#     if not session_token:
+#         return {"status": "error", "message": "Unauthorized"}
+#
+#     payload = await decode_jwt(session_token)
+#     users = await get_all_users()
+#
+#     if (payload.get("tg_id") in users
+#             and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+#
+#         # Проверяем, что пользователь является участником чата
+#         await delete_chat_post(chat_id)
+#
+#     return {"status": "error", "message": "Unauthorized"}
+
+
+@wmarket_router.post("/leave_chat/{chat_id}")
+async def leave_chat_route(chat_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    if not payload or "tg_id" not in payload:
+        return {"status": "error", "message": "Invalid token"}
+
+    # Проверяем, что пользователь действительно был участником чата
+    await check_user_in_chat(chat_id, payload["tg_id"])
+
+    success = await leave_chat_post(chat_id, payload["tg_id"])
+    if success:
+        return {"status": "success"}
+    else:
+        return {"status": "error", "message": "Failed to leave chat"}
 
 
 @wmarket_router.get("/chat_participants_info/{chat_id}")

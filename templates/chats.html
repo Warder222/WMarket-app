@@ -107,6 +107,66 @@
         font-size: 12px;
         margin-left: 8px;
     }
+
+    .chat-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .leave-chat-button {
+        background: none;
+        border: none;
+        color: var(--error-color);
+        cursor: pointer;
+        padding: 4px;
+        font-size: 14px;
+    }
+
+    .confirmation-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: var(--bg-color);
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 400px;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .cancel-button {
+        padding: 8px 16px;
+        background-color: var(--card-bg);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .confirm-button {
+        padding: 8px 16px;
+        background-color: var(--error-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -133,13 +193,45 @@
                     <div class="chat-preview">{{ chat.last_message }}</div>
                     <div class="chat-time">{{ chat.last_message_time }}</div>
                 </div>
-                <img src="/{{ chat.product_image }}" class="chat-image" alt="{{ chat.product_title }}">
+                <div class="chat-actions">
+                    <img src="/{{ chat.product_image }}" class="chat-image" alt="{{ chat.product_title }}">
+                    <button class="leave-chat-button" data-chatid="{{ chat.id }}">
+                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Основная часть корзины -->
+                            <rect x="4" y="6" width="12" height="11" rx="1" fill="#777"/>
+                            
+                            <!-- Верхняя часть (открытый край) -->
+                            <rect x="2" y="5" width="16" height="2" fill="#999"/>
+                            
+                            <!-- Ручка -->
+                            <rect x="8" y="2" width="4" height="2" fill="#bbb" rx="1"/>
+                            
+                            <!-- Горизонтальные линии (полоски на корзине) -->
+                            <rect x="5" y="8" width="10" height="1" fill="#555" rx="0.5"/>
+                            <rect x="5" y="11" width="10" height="1" fill="#555" rx="0.5"/>
+                            <rect x="5" y="14" width="10" height="1" fill="#555" rx="0.5"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         {% endfor %}
     {% else %}
         <div class="no-chats">У вас пока нет чатов</div>
     {% endif %}
 </main>
+
+<!-- Модальное окно подтверждения -->
+<div class="confirmation-modal" id="confirmationModal" style="display: none;">
+    <div class="modal-content">
+        <h3>Вы уверены, что хотите покинуть этот чат?</h3>
+        <br>
+        <p>Вы больше не будете получать сообщения от собеседника.</p>
+        <div class="modal-actions">
+            <button class="cancel-button" id="cancelLeave">Отмена</button>
+            <button class="confirm-button" id="confirmLeave">Покинуть</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -159,23 +251,73 @@
             });
         });
 
+        // Обработка клика по чату
         document.querySelectorAll('.chat-item').forEach(item => {
             item.addEventListener('click', async function(e) {
-                e.preventDefault(); // Предотвращаем переход по ссылке
+                // Проверяем, был ли клик по кнопке выхода
+                if (e.target.classList.contains('leave-chat-button')) {
+                    e.stopPropagation();
+                    return;
+                }
                 
                 const chatId = this.dataset.chatid;
                 const unreadBadge = this.querySelector('.unread-badge');
                 
-                // 1. Мгновенно скрываем бейдж
                 if (unreadBadge) {
                     unreadBadge.style.display = 'none';
                 }
                 
-
-                
-                // 3. Переходим в чат после успешного обновления
                 window.location.href = `/chat/${chatId}`;
             });
+        });
+
+        // Обработка выхода из чата
+        const confirmationModal = document.getElementById('confirmationModal');
+        const cancelLeave = document.getElementById('cancelLeave');
+        const confirmLeave = document.getElementById('confirmLeave');
+        let currentChatIdToLeave = null;
+
+        document.querySelectorAll('.leave-chat-button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                currentChatIdToLeave = this.dataset.chatid;
+                confirmationModal.style.display = 'flex';
+            });
+        });
+
+        cancelLeave.addEventListener('click', () => {
+            confirmationModal.style.display = 'none';
+            currentChatIdToLeave = null;
+        });
+
+        confirmLeave.addEventListener('click', async () => {
+            if (!currentChatIdToLeave) return;
+
+            try {
+                const response = await fetch(`/leave_chat/${currentChatIdToLeave}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Protection': '1'  // Защита от CSRF
+                    },
+                    credentials: 'include'  // Для передачи cookies
+                });
+
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    // Полностью перезагружаем страницу после успешного выхода
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Ошибка при выходе из чата');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка соединения');
+            } finally {
+                confirmationModal.style.display = 'none';
+                currentChatIdToLeave = null;
+            }
         });
     });
 </script>
