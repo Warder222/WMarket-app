@@ -285,7 +285,24 @@
         </a>
     </nav>
     {% endif %}
-    
+    <script>
+    // Сохранение позиции прокрутки перед обновлением страницы
+        window.addEventListener('beforeunload', function() {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        });
+
+        // Восстановление позиции прокрутки после загрузки страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ждём немного, чтобы контент успел загрузиться
+            setTimeout(function() {
+                const savedPosition = sessionStorage.getItem('scrollPosition');
+                if (savedPosition) {
+                    window.scrollTo(0, parseInt(savedPosition));
+                    sessionStorage.removeItem('scrollPosition');
+                }
+            }, 100);
+        });
+    </script>
     <script>
         // Ожидаем полной загрузки DOM
         document.addEventListener('DOMContentLoaded', function() {
