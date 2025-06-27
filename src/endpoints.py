@@ -1076,7 +1076,9 @@ async def check_user_block(request: Request, session_token=Cookie(default=None))
     payload = await decode_jwt(session_token)
     block = await check_user_block_post(payload.get("tg_id"))
 
-    if block:
+    unblock_time = block[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
+    current_time = datetime.now(timezone.utc)
+    if block and unblock_time > current_time:
         return {
             "is_blocked": True,
             "unblock_at": block[0].isoformat() if block[0] else None
