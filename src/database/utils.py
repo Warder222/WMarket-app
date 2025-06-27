@@ -518,9 +518,13 @@ async def get_chat_info_post(chat_id):
             .where(ChatParticipant.chat_id == chat_id)
         )
         user_ids = [p[0] for p in participants.all()]
+        user_one = await get_user_info(user_ids[0])
+        user_two = await get_user_info(user_ids[1])
         return {
             "user1_id": user_ids[0] if len(user_ids) > 0 else None,
-            "user2_id": user_ids[1] if len(user_ids) > 1 else None
+            "user2_id": user_ids[1] if len(user_ids) > 1 else None,
+            "user1_username": user_one[1] if len(user_ids) > 0 else None,
+            "user2_username": user_two[1] if len(user_ids) > 1 else None,
         }
 
 
@@ -753,16 +757,27 @@ async def block_user_post(user_id, report_id: int, admin_id, reason, unblock_at)
         # Преобразуем user_id в число
         user_id = int(user_id) if user_id else None
 
-        # Добавляем запись о блокировке
-        await session.execute(
-            insert(UserBlock).values(
-                user_id=user_id,
-                blocked_by=admin_id,
-                reason=reason,
-                unblock_at=unblock_at
+        result = await check_user_blocked_post(user_id)
+        if not result["is_blocked"]:
+            # Добавляем запись о блокировке
+            await session.execute(
+                insert(UserBlock).values(
+                    user_id=user_id,
+                    blocked_by=admin_id,
+                    reason=reason,
+                    unblock_at=unblock_at
+                )
             )
-        )
-
+        else:
+            await session.execute(
+                update(UserBlock)
+                .where(UserBlock.user_id == user_id)
+                .values(
+                    blocked_by=admin_id,
+                    reason=reason,
+                    unblock_at=unblock_at
+                )
+            )
         # Архивируем все объявления пользователя
         await session.execute(
             update(Product)

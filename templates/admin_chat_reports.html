@@ -380,8 +380,8 @@
             <label for="block-user">Выберите пользователя:</label>
             <select id="block-user" class="form-select">
                 <option value="">-- Выберите пользователя --</option>
-                <option value="user1">Пользователь 1 (ID: <span id="user1-id"></span>)</option>
-                <option value="user2">Пользователь 2 (ID: <span id="user2-id"></span>)</option>
+                <option value="user1"><span id="user1-username"></span> (ID=<span id="user1-id"></span>)</option>
+                <option value="user2"><span id="user2-username"></span> (ID=<span id="user2-id"></span>)</option>
             </select>
         </div>
         <div class="form-group">
@@ -571,6 +571,8 @@
                     .then(data => {
                         document.getElementById('user1-id').textContent = data.user1_id;
                         document.getElementById('user2-id').textContent = data.user2_id;
+                        document.getElementById('user1-username').textContent = data.user1_username;
+                        document.getElementById('user2-username').textContent = data.user2_username;
                         document.getElementById('block-user').dataset.chatId = chatId;
                         document.getElementById('block-user').dataset.reportId = reportId;
                         document.getElementById('block-modal').style.display = 'flex';

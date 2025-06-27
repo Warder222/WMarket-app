@@ -495,6 +495,21 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             if seller_tg_id == payload.get("tg_id"):
                 response = RedirectResponse(url="/profile", status_code=303)
                 return response
+
+            # Проверяем блокировку пользователя
+            block = await check_user_blocked_post(seller_tg_id)
+            is_blocked = block.get("is_blocked", False)
+            unblock_at = None
+
+            if is_blocked:
+                block_info = await check_user_block_post(seller_tg_id)
+                unblock_time = block_info[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
+                current_time = datetime.now(timezone.utc)
+                if block and unblock_time > current_time:
+                    unblock_at = block_info[0].strftime("%d.%m.%Y %H:%M")
+                else:
+                    is_blocked = False
+
             user_info = await get_user_info(seller_tg_id)
             positive_reviews = user_info[3]
             negative_reviews = user_info[4]
@@ -513,7 +528,9 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "user_products": products,
                 "now": now,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "is_blocked": is_blocked,
+                "unblock_at": unblock_at
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -604,6 +621,21 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
     if not chat_data:
         return RedirectResponse(url="/chats", status_code=303)
 
+    # Проверяем, заблокирован ли собеседник
+    other_user_id = chat_data["other_user"].tg_id
+    block = await check_user_blocked_post(other_user_id)
+    is_blocked = block.get("is_blocked", False)
+    unblock_at = None
+
+    if is_blocked:
+        block_info = await check_user_block_post(other_user_id)
+        unblock_time = block_info[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
+        current_time = datetime.now(timezone.utc)
+        if block and unblock_time > current_time:
+            unblock_at = block_info[0].strftime("%d.%m.%Y %H:%M")
+        else:
+            is_blocked = False
+
     all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
 
     context = {
@@ -613,27 +645,12 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         "product": chat_data["product"],
         "other_user": chat_data["other_user"],
         "current_user": {"id": payload.get("tg_id")},
-        "is_chat_page": True,  # Добавляем флаг
-        "all_undread_count_message": all_undread_count_message
+        "is_chat_page": True,
+        "all_undread_count_message": all_undread_count_message,
+        "is_blocked": is_blocked,
+        "unblock_at": unblock_at
     }
     return templates.TemplateResponse("chat.html", context=context)
-
-
-# @wmarket_router.post("/delete_chat/{chat_id}")
-# async def delete_chat(chat_id: int, session_token=Cookie(default=None)):
-#     if not session_token:
-#         return {"status": "error", "message": "Unauthorized"}
-#
-#     payload = await decode_jwt(session_token)
-#     users = await get_all_users()
-#
-#     if (payload.get("tg_id") in users
-#             and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-#
-#         # Проверяем, что пользователь является участником чата
-#         await delete_chat_post(chat_id)
-#
-#     return {"status": "error", "message": "Unauthorized"}
 
 
 @wmarket_router.post("/leave_chat/{chat_id}")
@@ -1048,7 +1065,8 @@ async def notify_user_blocked(user_id: int, duration: str, reason: str):
         f"⛔ Ваш аккаунт был заблокирован администратором.\n\n"
         f"⌛ Срок блокировки: {duration_text}\n"
         f"📝 Причина: {reason or 'не указана'}\n\n"
-        f"Если вы считаете, что это ошибка, свяжитесь с поддержкой."
+        f"Если Вы считаете, что это ошибка, свяжитесь с поддержкой - справа снизу "
+        f"@Wmarket_app (сообщение каналу) или @Wmarket_support"
     )
 
     await send_notification_to_user(user_id, message)
@@ -1060,9 +1078,10 @@ async def notify_reporter_about_block(report_id: int, blocked_user_id: int):
     if report:
         blocked_user = await get_user_info(blocked_user_id)
         message = (
-            f"✅ Ваша жалоба была рассмотрена\n\n"
-            f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил.\n"
-            f"Спасибо за помощь в поддержании порядка в сообществе!"
+
+            f"⚠️ Ваша жалоба была рассмотрена.\n\n"
+            f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил маркета.\n"
+            f"Спасибо за помощь в поддержании порядка на площадке! ❤️‍🔥"
         )
 
         await send_notification_to_user(report.reporter_id, message)
@@ -1076,13 +1095,15 @@ async def check_user_block(request: Request, session_token=Cookie(default=None))
     payload = await decode_jwt(session_token)
     block = await check_user_block_post(payload.get("tg_id"))
 
-    unblock_time = block[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
-    current_time = datetime.now(timezone.utc)
-    if block and unblock_time > current_time:
-        return {
-            "is_blocked": True,
-            "unblock_at": block[0].isoformat() if block[0] else None
-        }
+    print(block)
+    if block:
+        unblock_time = block[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
+        current_time = datetime.now(timezone.utc)
+        if block and unblock_time > current_time:
+            return {
+                "is_blocked": True,
+                "unblock_at": block[0].isoformat() if block[0] else None
+            }
     return {"is_blocked": False}
 
 

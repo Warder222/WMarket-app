@@ -252,6 +252,11 @@
 {% endblock %}
 
 {% block content %}
+{% if is_blocked %}
+<div style="background-color: #ffebee; color: #c62828; padding: 16px; text-align: center; border-radius: 8px; margin: 16px;">
+    ⚠️ Этот пользователь заблокирован до {{ unblock_at }}. Вы не можете отправлять сообщения.
+</div>
+{% endif %}
 <div class="chat-container">
     <div class="chat-header">
         <button class="back-button" onclick="goBackAndReload()">
@@ -317,6 +322,25 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        {% if is_blocked %}
+            // Отключаем все элементы ввода
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            
+            if (messageInput) {
+                messageInput.disabled = true;
+                messageInput.placeholder = "Пользователь заблокирован";
+            }
+            
+            if (sendButton) {
+                sendButton.disabled = true;
+                sendButton.style.opacity = "0.5";
+            }
+        {% endif %}
+    });
+</script>
 <script>
     function goBackAndReload() {
         window.location.href = '/chats';
