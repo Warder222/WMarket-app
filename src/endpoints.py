@@ -252,14 +252,17 @@ async def restore_product(product_id: int, session_token=Cookie(default=None)):
     response = RedirectResponse(url="/store", status_code=303)
     return response
 
+
 @wmarket_router.post("/add_product")
-async def add_product_post(request: Request,
-                      session_token=Cookie(default=None),
-                      category: str = Form(),
-                      product_name: str = Form(),
-                      product_price: int = Form(),
-                      product_description: str = Form(),
-                      product_image: UploadFile = File()):
+async def add_product_post(
+        request: Request,
+        session_token=Cookie(default=None),
+        category: str = Form(),
+        product_name: str = Form(),
+        product_price: int = Form(),
+        product_description: str = Form(),
+        product_image: UploadFile = File()
+):
     if session_token:
         users = await get_all_users()
         payload = await decode_jwt(session_token)
@@ -278,18 +281,33 @@ async def add_product_post(request: Request,
                 with open(file_path, "wb") as buffer:
                     buffer.write(file_content)
 
-                product_data = {"category_name": category,
-                                "product_name": product_name,
-                                "product_price": product_price,
-                                "product_description": product_description,
-                                "product_image_url": f"static/uploads/{filename}"}
+                product_data = {
+                    "category_name": category,
+                    "product_name": product_name,
+                    "product_price": product_price,
+                    "product_description": product_description,
+                    "product_image_url": f"static/uploads/{filename}"
+                }
 
                 await add_new_product(product_data, payload.get("tg_id"))
+
+                # Отправляем уведомление пользователю
+                await send_notification_to_user(
+                    payload.get("tg_id"),
+                    "✅ Ваше объявление отправлено на проверку\n\n"
+                    f"📌 Название: {product_name}\n"
+                    f"⚙️ Категория: {category}\n"
+                    f"💰 Цена: {product_price} ₽\n\n"
+                    "Обычно проверка занимает до 24 часов."
+                )
+
+                return JSONResponse({"status": "success", "redirect": "/ads_review?tab=moderation"})
+
             except Exception as e:
                 print(str(e))
+                raise HTTPException(status_code=500, detail="Ошибка при добавлении товара")
 
-    response = RedirectResponse(url="/ads_review?moderation=true", status_code=303)
-    return response
+    raise HTTPException(status_code=401, detail="Неавторизованный запрос")
 
 
 @wmarket_router.post("/edit_product")

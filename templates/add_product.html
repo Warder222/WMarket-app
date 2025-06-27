@@ -172,23 +172,14 @@
                     body: formData
                 });
 
-
-                const responseText = await response.text();
+                const result = await response.json();
                 
-                try {
-                    const result = JSON.parse(responseText);
-                    
-                    if (!response.ok) {
-                        throw new Error(result.detail || result.message || 'Ошибка сервера');
-                    }
-                    
-                    window.location.href = '/store';
-                } catch (jsonError) {
-                    if (!response.ok) {
-                        throw new Error(responseText || 'Неизвестная ошибка сервера');
-                    }
-                    window.location.href = '/store';
+                if (!response.ok) {
+                    throw new Error(result.detail || result.message || 'Ошибка сервера');
                 }
+                
+                // Перенаправляем на страницу объявлений на модерации
+                window.location.href = result.redirect || '/ads_review?tab=moderation';
                 
             } catch (error) {
                 const errorMessage = error.message.replace(/<[^>]*>?/gm, '');
