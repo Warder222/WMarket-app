@@ -341,12 +341,13 @@
             <h1 class="ad-title">{{ product_info[2] }}</h1>
             <div class="ad-actions">
                 {% if product_info[1] != user_tg_id %}
-                    <!-- Кнопки для чужого объявления -->
+                    {% if admin %}
                     <button class="ad-report" data-id="{{ product_info[0] }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                         </svg>
                     </button>
+                    {% endif %}
                     {% if product_info[8] == True %}
                         <button class="ad-favorite-del" data-id="{{ product_info[0] }}">
                             <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
@@ -509,7 +510,31 @@
                 const reportBtn = e.target.closest('.ad-report');
                 if (reportBtn) {
                     e.preventDefault();
-                    alert('Жалоба на объявление отправлена');
+                    const productId = reportBtn.dataset.id;
+                    
+                    // Показываем подтверждение
+                    if (confirm('Вы уверены, что хотите отправить это объявление на повторную проверку?')) {
+                        // Отправляем запрос на сервер
+                        fetch('/report_product', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ product_id: parseInt(productId) }) // Явно преобразуем в число
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert('Объявление отправлено на повторную проверку');
+                            } else {
+                                alert(data.message || 'Произошла ошибка при отправке жалобы.');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Произошла ошибка при отправке жалобы.');
+                        });
+                    }
                 }
 
                 // Обработка кнопки редактирования
@@ -572,6 +597,22 @@
             const modal = document.getElementById('editModal');
             if (modal) {
                 modal.style.display = 'none';
+            }
+        }
+
+        async function reportProduct(productId) {
+            try {
+                const response = await fetch('/report_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ product_id: productId })
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('Error:', error);
+                return { status: 'error' };
             }
         }
     </script>

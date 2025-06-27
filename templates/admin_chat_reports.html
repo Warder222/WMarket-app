@@ -295,6 +295,7 @@
         background-color: var(--bg-color);
         color: var(--text-color);
         border: 1px solid var(--border-color);
+        resize: none;
     }
 
     .filter-buttons button {
@@ -351,6 +352,11 @@
 
     .dropdown-item:hover {
         background-color: var(--bg-color);
+    }
+
+    /* Но это может повлиять на другие функциональности, поэтому лучше так: */
+    textarea::-webkit-resizer {
+        display: none; /* Скрывает индикатор изменения размера в WebKit-браузерах */
     }
 </style>
 {% endblock %}

@@ -282,7 +282,9 @@
             <div class="product-price">{{ product.product_price }} ₽</div>
         </div>
     </div>
-
+    <div style="background-color: var(--card-bg); color: var(--secondary-text); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; text-align: center; border-left: 3px solid var(--primary-color);">
+            Уважаемый пользователь, Маркет не несёт ответственности за предоплату/оплату напрямую между пользователями (самостоятельные переводы и сделки).
+        </div>
     <div class="chat-messages" id="chatMessages">
         {% for message in messages %}
         <div class="message {% if message.sender_id == current_user.id %}message-sent{% elif message.sender_id == 0 %}message-admin{% else %}message-received{% endif %}">

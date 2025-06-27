@@ -310,6 +310,48 @@ async def add_product_post(
     raise HTTPException(status_code=401, detail="Неавторизованный запрос")
 
 
+@wmarket_router.post("/report_product")
+async def report_product(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return {"status": "error", "message": "Unauthorized"}
+
+    data = await request.json()
+    product_id = data.get("product_id")
+
+    try:
+        # Явно преобразуем product_id в int
+        product_id_int = int(product_id)
+    except (TypeError, ValueError):
+        return {"status": "error", "message": "Invalid product ID"}
+
+    # Получаем информацию о продукте
+    product = await get_product_info(product_id_int, None)
+    if not product:
+        return {"status": "error", "message": "Product not found"}
+
+    # Отправляем объявление на повторную проверку
+    update_data = {"active": False}  # Отправляем на модерацию
+    update_res = await update_product_post(product_id_int, update_data)
+
+    if update_res:
+        # Отправляем уведомление владельцу
+        await send_notification_to_user(
+            product[1],  # tg_id владельца
+            f"⚠️ Ваше объявление '{product[2]}' было отправлено на повторную проверку администратором."
+        )
+        return {"status": "success"}
+
+    return {"status": "error", "message": "Failed to update product"}
+
+
 @wmarket_router.post("/edit_product")
 async def edit_product_post(
         request: Request,
