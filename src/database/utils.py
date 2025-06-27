@@ -790,3 +790,25 @@ async def block_user_post(user_id, report_id: int, admin_id, reason, unblock_at)
             await resolve_chat_report(int(report_id), admin_id)
 
         await session.commit()
+
+
+async def get_all_users_info():
+    async with async_session_maker() as session:
+        try:
+            users = await session.execute(select(User))
+            users = users.scalars().all()
+
+            users_info = []
+            for user in users:
+                is_blocked = await check_user_blocked_post(user.tg_id)
+                users_info.append({
+                    "tg_id": user.tg_id,
+                    "first_name": user.first_name,
+                    "username": user.username,
+                    "is_blocked": is_blocked.get("is_blocked", False)
+                })
+
+            return users_info
+        except Exception as e:
+            print(f"Error getting users info: {e}")
+            return []

@@ -282,6 +282,76 @@
         min-height: 80px;
         resize: vertical;
     }
+
+    .user-item {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-container input {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+    }
+
+    .filter-buttons button {
+        padding: 8px 16px;
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .filter-buttons button.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .dropdown {
+        position: relative;
+        display: inline-block;
+    }
+
+    .dropdown-toggle {
+        padding: 8px 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--primary-color);
+    }
+
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        background-color: var(--card-bg);
+        min-width: 160px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        z-index: 1;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .dropdown:hover .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-item {
+        width: 100%;
+        padding: 8px 16px;
+        text-align: left;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .dropdown-item:hover {
+        background-color: var(--bg-color);
+    }
 </style>
 {% endblock %}
 
@@ -291,6 +361,7 @@
     <div class="tabs-header">
         <div class="tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
         <div class="tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
+        <div class="tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
         <div class="tab-indicator" id="tabIndicator"></div>
     </div>
 </header>
@@ -322,6 +393,57 @@
             {% endfor %}
         {% else %}
             <div class="no-items">Нет активных жалоб</div>
+        {% endif %}
+    </div>
+
+    <div id="usersTab" {% if active_tab != 'users' %}class="hidden"{% endif %}>
+        <div class="search-container" style="margin-bottom: 16px;">
+            <input type="text" id="userSearch" placeholder="Поиск пользователей..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+        </div>
+        
+        <div class="filter-buttons" style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button class="filter-button active" data-filter="all">Все</button>
+            <button class="filter-button" data-filter="blocked">Заблокированные</button>
+            <button class="filter-button" data-filter="active">Активные</button>
+        </div>
+        
+        {% if users %}
+            {% for user in users %}
+            <div class="user-item" data-user-id="{{ user.tg_id }}" data-blocked="{{ user.is_blocked }}">
+                <div class="item-header">
+                    <div>
+                        <span class="item-id">ID: {{ user.tg_id }}</span>
+                        <span>{{ user.first_name }} {% if user.username %}(@{{ user.username }}){% endif %}</span>
+                    </div>
+                    <div class="item-actions">
+                        <div class="dropdown">
+                            <button class="dropdown-toggle">
+                                <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    <!-- Верхняя точка -->
+                                    <circle cx="10" cy="5" r="2" fill="black"/>
+                                    
+                                    <!-- Средняя точка -->
+                                    <circle cx="10" cy="10" r="2" fill="black"/>
+                                    
+                                    <!-- Нижняя точка -->
+                                    <circle cx="10" cy="15" r="2" fill="black"/>
+                                </svg>
+                            </button>
+                            <div class="dropdown-menu">
+                                {% if user.is_blocked %}
+                                    <button class="dropdown-item unblock-user" data-id="{{ user.tg_id }}">Разблокировать</button>
+                                {% else %}
+                                    <button class="dropdown-item block-user" data-id="{{ user.tg_id }}">Заблокировать</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <a href="/profile/{{ user.tg_id }}" class="view-button">Профиль</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-items">Нет пользователей</div>
         {% endif %}
     </div>
 
@@ -489,8 +611,9 @@
         document.addEventListener('click', async function(event) {
             if (event.target.matches('[data-action="resolve"]')) {
                 const id = parseInt(event.target.dataset.id);  // Преобразуем в число
-                const endpoint = `/admin/resolve_report/${id}`;
-                
+                const endpoint = action === 'resolve' 
+                    ? `/admin/resolve_report/${id}` 
+                    : `/admin/approve_product/${id}`;
                 try {
                     const response = await fetch(endpoint, {
                         method: 'POST',
@@ -623,6 +746,75 @@
             }
         });
 
+        document.addEventListener('click', async function(event) {
+            // Обработка блокировки/разблокировки
+            if (event.target.matches('.block-user')) {
+                const userId = event.target.dataset.id;
+                await blockUser(userId, true);
+            }
+            
+            if (event.target.matches('.unblock-user')) {
+                const userId = event.target.dataset.id;
+                await blockUser(userId, false);
+            }
+            
+            // Фильтрация пользователей
+            if (event.target.matches('.filter-button')) {
+                document.querySelectorAll('.filter-button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                const filter = event.target.dataset.filter;
+                filterUsers(filter);
+            }
+        });
+
+        // Поиск пользователей
+        document.getElementById('userSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.user-item').forEach(user => {
+                const text = user.textContent.toLowerCase();
+                user.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+
+        async function blockUser(userId, block) {
+            try {
+                const response = await fetch('/admin/block_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        block: block
+                    })
+                });
+                
+                if (response.ok) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function filterUsers(filter) {
+            document.querySelectorAll('.user-item').forEach(user => {
+                const isBlocked = user.dataset.blocked === 'True';
+                
+                if (filter === 'all') {
+                    user.style.display = 'block';
+                } else if (filter === 'blocked' && isBlocked) {
+                    user.style.display = 'block';
+                } else if (filter === 'active' && !isBlocked) {
+                    user.style.display = 'block';
+                } else {
+                    user.style.display = 'none';
+                }
+            });
+        }
     });
 </script>
 {% endblock %}

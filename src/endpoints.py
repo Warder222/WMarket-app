@@ -21,7 +21,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_user_archived_products, delete_product_post, archive_product_post,
                                 restore_product_post, update_product_post, get_all_moderation_products,
                                 leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
-                                notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post)
+                                notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
+                                get_all_users_info)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -786,12 +787,18 @@ async def admin_chat_reports(
         reports = await get_chat_reports(resolved=False)
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
         moderation_products = await get_all_moderation_products()
+
+        # Получаем список пользователей
+        users = await get_all_users_info()
+
         context = {
             "request": request,
             "reports": reports,
             "all_undread_count_message": all_undread_count_message,
             "admin": admin_res,
-            "moderation_products": moderation_products
+            "moderation_products": moderation_products,
+            "users": users,
+            "active_tab": request.query_params.get("tab", "reports")
         }
         return templates.TemplateResponse("admin_chat_reports.html", context=context)
 
@@ -1022,31 +1029,42 @@ async def block_user(
 
     data = await request.json()
     user_id = data.get("user_id")
+    block = data.get("block")  # Новый параметр для простой блокировки/разблокировки
     duration = data.get("duration")
     reason = data.get("reason", "")
     chat_id = data.get("chat_id")
-    report_id = int(data.get("report_id"))
+    report_id = data.get("report_id")
 
-    # Вычисляем срок блокировки
-    if duration == "1h":
-        unblock_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    elif duration == "1d":
-        unblock_at = datetime.now(timezone.utc) + timedelta(days=1)
-    elif duration == "7d":
-        unblock_at = datetime.now(timezone.utc) + timedelta(days=7)
-    elif duration == "30d":
-        unblock_at = datetime.now(timezone.utc) + timedelta(days=30)
-    elif duration == "365d":
-        unblock_at = datetime.now(timezone.utc) + timedelta(days=365)
-    else:  # permanent
-        unblock_at = None
+    # Определяем срок блокировки
+    if block is not None:
+        # Простая блокировка/разблокировка из списка пользователей
+        if block:
+            unblock_at = datetime.now(timezone.utc) + timedelta(days=30)  # Блокировка на 30 дней по умолчанию
+        else:
+            unblock_at = datetime.now(timezone.utc) - timedelta(days=1)  # Разблокировка
+    else:
+        # Старая логика из жалоб на чаты
+        if duration == "1h":
+            unblock_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        elif duration == "1d":
+            unblock_at = datetime.now(timezone.utc) + timedelta(days=1)
+        elif duration == "7d":
+            unblock_at = datetime.now(timezone.utc) + timedelta(days=7)
+        elif duration == "30d":
+            unblock_at = datetime.now(timezone.utc) + timedelta(days=30)
+        elif duration == "365d":
+            unblock_at = datetime.now(timezone.utc) + timedelta(days=365)
+        else:  # permanent
+            unblock_at = None
 
     # Сохраняем блокировку в базе данных
-    await block_user_post(user_id, int(report_id), payload.get("tg_id"), reason, unblock_at)
+    await block_user_post(user_id, report_id, payload.get("tg_id"), reason, unblock_at)
 
-    # Отправляем уведомления
-    await notify_user_blocked(user_id, duration, reason)
-    await notify_reporter_about_block(int(report_id), user_id)
+    # Отправляем уведомления (только для блокировки из жалоб)
+    if block is None or block:
+        await notify_user_blocked(user_id, duration or "30d", reason)
+        if report_id:
+            await notify_reporter_about_block(int(report_id), user_id)
 
     return {"status": "success"}
 
