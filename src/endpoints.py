@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
@@ -20,7 +20,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 user_exists, record_referral, get_ref_count, get_chat_part_info,
                                 get_user_archived_products, delete_product_post, archive_product_post,
                                 restore_product_post, update_product_post, get_all_moderation_products,
-                                leave_chat_post, check_user_in_chat)
+                                leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
+                                notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -811,7 +812,7 @@ async def admin_chat_view(
 
 @wmarket_router.post("/admin/resolve_report/{report_id}")
 async def resolve_report_route(
-        report_id: int,
+        report_id: int,  # FastAPI автоматически преобразует параметр в int
         request: Request,
         session_token=Cookie(default=None)
 ):
@@ -823,6 +824,7 @@ async def resolve_report_route(
     if admin_res:
         success = await resolve_chat_report(report_id, payload.get("tg_id"))
         return {"status": "success" if success else "error"}
+    return {"status": "error", "message": "Unauthorized"}
 
 
 # bot___________________________________________________________________________________________________________________
@@ -972,3 +974,126 @@ async def reject_product(
             return {"status": "success"}
 
     return {"status": "error", "message": "Неавторизованный запрос"}
+
+
+# ban___________________________________________________________________________________________________________________
+@wmarket_router.get("/admin/get_chat_info/{chat_id}")
+async def get_chat_info(chat_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if admin_res:
+        chat_info = await get_chat_info_post(chat_id)
+        return chat_info
+    return {"status": "error", "message": "Unauthorized"}
+
+
+@wmarket_router.post("/admin/block_user")
+async def block_user(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return {"status": "error", "message": "Unauthorized"}
+
+    data = await request.json()
+    user_id = data.get("user_id")
+    duration = data.get("duration")
+    reason = data.get("reason", "")
+    chat_id = data.get("chat_id")
+    report_id = int(data.get("report_id"))
+
+    # Вычисляем срок блокировки
+    if duration == "1h":
+        unblock_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    elif duration == "1d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=1)
+    elif duration == "7d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=7)
+    elif duration == "30d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=30)
+    elif duration == "365d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=365)
+    else:  # permanent
+        unblock_at = None
+
+    # Сохраняем блокировку в базе данных
+    await block_user_post(user_id, int(report_id), payload.get("tg_id"), reason, unblock_at)
+
+    # Отправляем уведомления
+    await notify_user_blocked(user_id, duration, reason)
+    await notify_reporter_about_block(int(report_id), user_id)
+
+    return {"status": "success"}
+
+
+async def notify_user_blocked(user_id: int, duration: str, reason: str):
+    duration_text = {
+        "1h": "1 час",
+        "1d": "1 день",
+        "7d": "7 дней",
+        "30d": "30 дней",
+        "365d": "1 год",
+        "permanent": "навсегда"
+    }.get(duration, duration)
+
+    message = (
+        f"⛔ Ваш аккаунт был заблокирован администратором.\n\n"
+        f"⌛ Срок блокировки: {duration_text}\n"
+        f"📝 Причина: {reason or 'не указана'}\n\n"
+        f"Если вы считаете, что это ошибка, свяжитесь с поддержкой."
+    )
+
+    await send_notification_to_user(user_id, message)
+
+
+async def notify_reporter_about_block(report_id: int, blocked_user_id: int):
+    report = await notify_reporter_about_block_post(int(report_id))
+
+    if report:
+        blocked_user = await get_user_info(blocked_user_id)
+        message = (
+            f"✅ Ваша жалоба была рассмотрена\n\n"
+            f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил.\n"
+            f"Спасибо за помощь в поддержании порядка в сообществе!"
+        )
+
+        await send_notification_to_user(report.reporter_id, message)
+
+
+@wmarket_router.get("/check_user_block")
+async def check_user_block(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"is_blocked": False}
+
+    payload = await decode_jwt(session_token)
+    block = await check_user_block_post(payload.get("tg_id"))
+
+    if block:
+        return {
+            "is_blocked": True,
+            "unblock_at": block[0].isoformat() if block[0] else None
+        }
+    return {"is_blocked": False}
+
+
+@wmarket_router.get("/blocked")
+async def blocked_page(request: Request, session_token=Cookie(default=None)):
+    context = {
+        "request": request,
+        "all_undread_count_message": 0,
+        "is_chat_page": True
+    }
+    return templates.TemplateResponse("blocked.html", context=context)
+
+
+@wmarket_router.get("/check_user_blocked/{user_id}")
+async def check_user_blocked(user_id: int):
+    await check_user_blocked_post(user_id)

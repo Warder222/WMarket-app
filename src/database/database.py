@@ -107,3 +107,14 @@ class Referral(Base):
     referrer_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))
     referred_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'), unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserBlock(Base):
+    __tablename__ = 'user_blocks'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))  # BigInteger
+    blocked_by = Column(BigInteger, ForeignKey('users.tg_id', ondelete='SET NULL'))  # BigInteger
+    reason = Column(String)
+    blocked_at = Column(DateTime(timezone=True), server_default=func.now())
+    unblock_at = Column(DateTime(timezone=True), nullable=True)

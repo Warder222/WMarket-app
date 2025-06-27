@@ -304,6 +304,33 @@
         });
     </script>
     <script>
+        // Добавляем в начало скрипта в base.html
+// Проверка блокировки пользователя
+        async function checkUserBlock() {
+            try {
+                const response = await fetch('/check_user_block');
+                const data = await response.json();
+                
+                if (data.is_blocked) {
+                    // Сохраняем дату разблокировки в localStorage
+                    if (data.unblock_at) {
+                        localStorage.setItem('unblockDate', data.unblock_at);
+                    } else {
+                        localStorage.removeItem('unblockDate');
+                    }
+                    
+                    // Перенаправляем на страницу блокировки
+                    if (!window.location.pathname.endsWith('/blocked')) {
+                        window.location.href = '/blocked';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking user block:', error);
+            }
+        }
+
+        // Вызываем при загрузке страницы
+        document.addEventListener('DOMContentLoaded', checkUserBlock);
         // Ожидаем полной загрузки DOM
         document.addEventListener('DOMContentLoaded', function() {
             const globalLoader = document.getElementById('globalLoader');

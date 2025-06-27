@@ -221,6 +221,67 @@
     #confirm-reject {
         background-color: var(--error-color);
     }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background-color: var(--card-bg);
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 500px;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .modal-button {
+        padding: 8px 16px;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-group select, 
+    .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
 </style>
 {% endblock %}
 
@@ -254,7 +315,8 @@
                 
                 <div class="item-actions">
                     <a href="/admin/chat/{{ report.chat_id }}" class="view-button">Перейти в чат</a>
-                    <button class="approve-button" data-action="resolve" data-id="{{ report.id }}">Решено</button>
+                    <button class="approve-button" data-action="resolve" data-id="{{ report.id | int }}">Решено</button>
+                    <button class="reject-button" data-action="block" data-id="{{ report.id | int }}">Заблокировать</button>
                 </div>
             </div>
             {% endfor %}
@@ -306,6 +368,40 @@
         <div class="modal-actions">
             <button id="cancel-reject" class="modal-button">Отмена</button>
             <button id="confirm-reject" class="modal-button">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Добавляем после существующего модального окна отклонения -->
+<div id="block-modal" class="modal">
+    <div class="modal-content">
+        <h3>Заблокировать пользователя</h3>
+        <div class="form-group">
+            <label for="block-user">Выберите пользователя:</label>
+            <select id="block-user" class="form-select">
+                <option value="">-- Выберите пользователя --</option>
+                <option value="user1">Пользователь 1 (ID: <span id="user1-id"></span>)</option>
+                <option value="user2">Пользователь 2 (ID: <span id="user2-id"></span>)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="block-duration">Срок блокировки:</label>
+            <select id="block-duration" class="form-select">
+                <option value="1h">1 час</option>
+                <option value="1d">1 день</option>
+                <option value="7d">7 дней</option>
+                <option value="30d">30 дней</option>
+                <option value="365d">1 год</option>
+                <option value="permanent">Навсегда</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="block-reason">Причина (опционально):</label>
+            <textarea id="block-reason" rows="3" placeholder="Укажите причину блокировки"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button id="cancel-block" class="modal-button">Отмена</button>
+            <button id="confirm-block" class="modal-button" style="background-color: var(--error-color);">Заблокировать</button>
         </div>
     </div>
 </div>
@@ -391,12 +487,9 @@
         
         // Обработка кнопок действий (решить/одобрить/отклонить)
         document.addEventListener('click', async function(event) {
-            if (event.target.matches('[data-action="resolve"], [data-action="approve"]')) {
-                const action = event.target.dataset.action;
-                const id = event.target.dataset.id;
-                const endpoint = action === 'resolve' 
-                    ? `/admin/resolve_report/${id}` 
-                    : `/admin/approve_product/${id}`;
+            if (event.target.matches('[data-action="resolve"]')) {
+                const id = parseInt(event.target.dataset.id);  // Преобразуем в число
+                const endpoint = `/admin/resolve_report/${id}`;
                 
                 try {
                     const response = await fetch(endpoint, {
@@ -460,6 +553,74 @@
                 alert('Ошибка при отклонении объявления');
             }
         });
+
+        const blockButtons = document.querySelectorAll('.block-button');
+        const blockModal = document.getElementById('block-modal');
+        const cancelBlock = document.getElementById('cancel-block');
+        const confirmBlock = document.getElementById('confirm-block');
+
+        // Обработчик для кнопки блокировки
+        document.addEventListener('click', (e) => {
+            if (e.target.matches('[data-action="block"]')) {
+                const reportId = e.target.dataset.id;
+                const chatId = e.target.closest('.report-item').querySelector('.item-id').textContent.replace('Чат #', '');
+                
+                // Загружаем информацию о чате
+                fetch(`/admin/get_chat_info/${chatId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('user1-id').textContent = data.user1_id;
+                        document.getElementById('user2-id').textContent = data.user2_id;
+                        document.getElementById('block-user').dataset.chatId = chatId;
+                        document.getElementById('block-user').dataset.reportId = reportId;
+                        document.getElementById('block-modal').style.display = 'flex';
+                    });
+            }
+        });
+
+        // Обработчики для модального окна блокировки
+        document.getElementById('cancel-block').addEventListener('click', () => {
+            document.getElementById('block-modal').style.display = 'none';
+        });
+
+        document.getElementById('confirm-block').addEventListener('click', async () => {
+            const userSelect = document.getElementById('block-user');
+            const userId = userSelect.value === 'user1' 
+                ? parseInt(document.getElementById('user1-id').textContent) // Преобразуем в число
+                : parseInt(document.getElementById('user2-id').textContent); // Преобразуем в число
+            const duration = document.getElementById('block-duration').value;
+            const reason = document.getElementById('block-reason').value;
+            const chatId = userSelect.dataset.chatId;
+            const reportId = userSelect.dataset.reportId;
+
+            try {
+                const response = await fetch('/admin/block_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        duration: duration,
+                        reason: reason,
+                        chat_id: chatId,
+                        report_id: reportId
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Пользователь успешно заблокирован');
+                    document.getElementById('block-modal').style.display = 'none';
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при блокировке пользователя');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при блокировке пользователя');
+            }
+        });
+
     });
 </script>
 {% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block style %}
+<style>
+    .blocked-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        padding: 20px;
+        text-align: center;
+    }
+    
+    .blocked-icon {
+        font-size: 72px;
+        color: var(--error-color);
+        margin-bottom: 20px;
+    }
+    
+    .blocked-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+    }
+    
+    .blocked-message {
+        margin-bottom: 24px;
+        color: var(--secondary-text);
+    }
+    
+    .blocked-until {
+        font-weight: bold;
+        color: var(--error-color);
+        margin-bottom: 32px;
+    }
+    
+    .blocked-contact {
+        font-size: 14px;
+        color: var(--secondary-text);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="blocked-container">
+    <div class="blocked-icon">🚫</div>
+    <div class="blocked-title">Ваш аккаунт заблокирован</div>
+    <div class="blocked-message">
+        Вы были заблокированы за нарушение правил сообщества.
+        <br>
+        Если вы считаете, что это ошибка, свяжитесь с поддержкой.
+    </div>
+    <div class="blocked-until" id="blockedUntil">
+        Блокировка действует до: загрузка...
+    </div>
+    <div class="blocked-contact">
+        Контакты поддержки: support@example.com
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Получаем дату разблокировки из localStorage
+    const unblockDate = localStorage.getItem('unblockDate');
+    const blockedUntil = document.getElementById('blockedUntil');
+    
+    if (unblockDate) {
+        const date = new Date(unblockDate);
+        blockedUntil.textContent = `Блокировка действует до: ${date.toLocaleString()}`;
+    } else {
+        blockedUntil.textContent = 'Блокировка действует: НАВСЕГДА';
+    }
+    
+    // Перенаправляем при попытке перейти на другие страницы
+    const navLinks = document.querySelectorAll('a[href]');
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = '/blocked';
+        });
+    });
+    
+    // Блокируем кнопку "назад"
+    window.history.pushState(null, null, window.location.href);
+    window.addEventListener('popstate', () => {
+        window.history.pushState(null, null, window.location.href);
+    });
+});
+</script>
+{% endblock %}

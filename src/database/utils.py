@@ -1,9 +1,9 @@
-from typing import Optional
+from datetime import datetime
 
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
-    Referral
+    Referral, UserBlock
 from sqlalchemy.future import select
-from sqlalchemy import update, desc, asc, func, and_, delete
+from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer
 
 
 # auth&users_utils______________________________________________________________________________________________________
@@ -511,6 +511,18 @@ async def get_chat_messages(chat_id: int, user_id: int):
             "other_user": other_user
         }
 
+async def get_chat_info_post(chat_id):
+    async with async_session_maker() as session:
+        participants = await session.execute(
+            select(ChatParticipant.user_id)
+            .where(ChatParticipant.chat_id == chat_id)
+        )
+        user_ids = [p[0] for p in participants.all()]
+        return {
+            "user1_id": user_ids[0] if len(user_ids) > 0 else None,
+            "user2_id": user_ids[1] if len(user_ids) > 1 else None
+        }
+
 
 async def send_message(chat_id: int, sender_id: int, content: str):
     async with async_session_maker() as db:
@@ -640,14 +652,16 @@ async def get_chat_reports(resolved: bool = False):
             print(f"Error getting chat reports: {exc}")
             return []
 
+
 async def resolve_chat_report(report_id: int, admin_id: int):
     async with async_session_maker() as db:
         try:
-            q = update(ChatReport).where(ChatReport.id == report_id).values(
-                resolved=True,
-                admin_id=admin_id
-            )
-            await db.execute(q)
+            # Явно указываем тип параметра
+            q = update(ChatReport) \
+                .where(ChatReport.id == int(report_id)) \
+                .values(resolved=True, admin_id=admin_id)
+            print(f"\n\nТип report_id({report_id}) = {type(report_id)}")
+            await db.execute(q, {'report_id': int(report_id)})
             await db.commit()
             return True
         except Exception as exc:
@@ -705,3 +719,59 @@ async def get_product_owner(product_id: int):
         except Exception as exc:
             print(f"Error getting product owner: {exc}")
             return None
+
+async def check_user_blocked_post(user_id: int):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(UserBlock.unblock_at).where(and_(UserBlock.user_id == user_id,or_(UserBlock.unblock_at.is_(None), UserBlock.unblock_at > datetime.utcnow())))
+        )
+        block = result.fetchone()
+        return {"is_blocked": block is not None}
+
+
+async def check_user_block_post(tg_id):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(UserBlock.unblock_at).where((UserBlock.user_id == tg_id) & ((UserBlock.unblock_at.is_(None)) |(UserBlock.unblock_at > datetime.utcnow())))
+        )
+        block = result.fetchone()
+        return block
+
+
+async def notify_reporter_about_block_post(report_id: int):
+    async with async_session_maker() as session:
+        report = await session.execute(
+            select(ChatReport)
+            .where(ChatReport.id == int(report_id))
+        )
+        report = report.scalar_one_or_none()
+        return report
+
+
+async def block_user_post(user_id, report_id: int, admin_id, reason, unblock_at):
+    async with async_session_maker() as session:
+        # Преобразуем user_id в число
+        user_id = int(user_id) if user_id else None
+
+        # Добавляем запись о блокировке
+        await session.execute(
+            insert(UserBlock).values(
+                user_id=user_id,
+                blocked_by=admin_id,
+                reason=reason,
+                unblock_at=unblock_at
+            )
+        )
+
+        # Архивируем все объявления пользователя
+        await session.execute(
+            update(Product)
+            .where(Product.tg_id == user_id)
+            .values(active=None)
+        )
+
+        # Помечаем отчет как решенный
+        if report_id:
+            await resolve_chat_report(int(report_id), admin_id)
+
+        await session.commit()
