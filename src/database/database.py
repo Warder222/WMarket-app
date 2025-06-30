@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger, Boolean, Float
 from sqlalchemy.orm import DeclarativeBase
 from src.config import settings
 
@@ -27,6 +27,9 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     plus_rep = Column(Integer, default=0)
     minus_rep = Column(Integer, default=0)
+    rub_balance = Column(Float, default=0.0)  # Добавляем
+    ton_balance = Column(Float, default=0.0)  # Добавляем
+    current_currency = Column(String, default='rub')  # Добавляем для хранения выбранной валюты
 
 
 class Category(Base):

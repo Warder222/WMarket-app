@@ -22,7 +22,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 restore_product_post, update_product_post, get_all_moderation_products,
                                 leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
-                                get_all_users_info)
+                                get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info)
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -1225,3 +1225,91 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
 
     response = RedirectResponse(url="/", status_code=303)
     return response
+
+
+@wmarket_router.get("/get_wallet_balance")
+async def get_wallet_balance(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    try:
+        payload = await decode_jwt(session_token)
+        user_data = await get_balance_user_info(payload.get('tg_id'))
+        if not user_data:
+            return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+
+        rub_balance = float(user_data[0]) if user_data[0] is not None else 0.0
+        ton_balance = float(user_data[1]) if user_data[1] is not None else 0.0
+        currency = user_data[2] if user_data[2] else 'rub'
+
+        return JSONResponse({
+            "status": "success",
+            "rub_balance": rub_balance,
+            "ton_balance": ton_balance,
+            "balance": rub_balance if currency == 'rub' else ton_balance,
+            "currency": currency
+        })
+    except Exception as e:
+        print(f"Error getting wallet balance: {e}")
+        return JSONResponse({"status": "error", "message": "Server error"}, status_code=500)
+
+@wmarket_router.post("/set_currency")
+async def set_currency(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    currency = data.get("currency")
+
+    if currency not in ['rub', 'ton']:
+        return JSONResponse({"status": "error", "message": "Invalid currency"}, status_code=400)
+
+    await set_current_currency(payload.get("tg_id"), currency)
+    return JSONResponse({"status": "success"})
+
+
+@wmarket_router.get("/get_currency")
+async def get_currency(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    currency = await get_current_currency(payload.get("tg_id"))
+
+    return JSONResponse({
+        "status": "success",
+        "currency": currency
+    })
+
+
+@wmarket_router.post("/deposit_ton")
+async def deposit_ton(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    amount = float(data.get("amount", 0))
+
+    if amount <= 0:
+        return JSONResponse({"status": "error", "message": "Invalid amount"}, status_code=400)
+
+    # Здесь будет логика проверки платежа в блокчейне
+    # Пока просто увеличиваем баланс
+    async with async_session_maker() as session:
+        try:
+            user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
+            user = user.scalar_one_or_none()
+            if user:
+                user.ton_balance += amount
+                await session.commit()
+                return JSONResponse({"status": "success", "new_balance": user.ton_balance})
+        except Exception as e:
+            print(f"Error updating TON balance: {e}")
+            return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
+
+    return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)

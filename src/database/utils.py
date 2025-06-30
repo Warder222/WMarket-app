@@ -98,12 +98,15 @@ async def get_user_info(tg_id):
             q = select(User).filter_by(tg_id=tg_id)
             result = await db.execute(q)
             user = result.scalar_one_or_none()
-            # 0-tg_id / 1-username / 2-photo_url / 3-plus_rep / 4-minus_rep
-            user_info = [user.tg_id, user.first_name, user.photo_url, user.plus_rep, user.minus_rep]
+            if not user:
+                return None
+            # 0-tg_id / 1-username / 2-photo_url / 3-plus_rep / 4-minus_rep / 5-rub_balance / 6-ton_balance
+            user_info = [user.tg_id, user.first_name, user.photo_url,
+                         user.plus_rep, user.minus_rep, user.rub_balance, user.ton_balance]
             return user_info
         except Exception as exc:
             print(f"Error: {exc}")
-            return []
+            return None
 
 
 # cats&products_utils_______________________________________________________________________________________________
@@ -813,3 +816,29 @@ async def get_all_users_info():
         except Exception as e:
             print(f"Error getting users info: {e}")
             return []
+
+
+async def get_current_currency(tg_id: int):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(User.current_currency).where(User.tg_id == tg_id))
+        currency = result.scalar_one_or_none()
+        return currency or 'rub'
+
+async def set_current_currency(tg_id: int, currency: str):
+    async with async_session_maker() as session:
+        await session.execute(
+            update(User)
+            .where(User.tg_id == tg_id)
+            .values(current_currency=currency)
+        )
+        await session.commit()
+
+async def get_balance_user_info(tg_id: int):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(User.rub_balance, User.ton_balance, User.current_currency)
+            .where(User.tg_id == tg_id)
+        )
+        user_data = result.fetchone()
+        return user_data

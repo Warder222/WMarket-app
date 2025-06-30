@@ -306,8 +306,8 @@
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <a href="/wallet" class="wallet-button">
-                Кошелёк
+            <a href="/wallet" class="wallet-button" id="walletButton">
+                <span id="walletBalance">0 ₽</span>
             </a>
         </div>
     </header>
@@ -389,154 +389,192 @@
 {% endblock %}
 
 {% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Инициализация TonConnectUI
-            const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-                manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
-                buttonRootId: 'ton-connect',
-                language: 'ru',
-                uiPreferences: {
-                    theme: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
-                        ? TON_CONNECT_UI.THEME.DARK 
-                        : TON_CONNECT_UI.THEME.LIGHT
-                }
-            });
-
-            tonConnectUI.uiOptions = {
-                twaReturnUrl: 'https://t.me/test_tma8_bot?startapp',
-                actionsConfiguration: {
-                    modals: 'never'
-                }
-            };
-
-            // Отслеживание изменения темы
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                tonConnectUI.uiPreferences = {
-                    theme: e.matches ? TON_CONNECT_UI.THEME.DARK : TON_CONNECT_UI.THEME.LIGHT
-                };
-            });
-
-            // Обработчик для кнопки TonConnect
-            document.getElementById('ton-connect').addEventListener('click', async (e) => {
-                if (e.target.tagName === 'BUTTON') {
-                    try {
-                        // Проверяем, подключен ли уже кошелек
-                        const connectedWallets = await tonConnectUI.getConnectedWallets();
-                        if (connectedWallets.length > 0) {
-                            // Кошелек уже подключен - ничего не делаем
-                            console.log('Кошелек уже подключен:', connectedWallets[0]);
-                            return;
-                        }
-                        
-                        // Если кошелек не подключен - открываем модальное окно подключения
-                        const connectedWallet = await tonConnectUI.connectWallet();
-                        console.log(connectedWallet);
-                    } catch (error) {
-                        console.log(`Error connecting to wallet: ${error}`);
-                    }
-                }
-            });
-
-            // Сохраняем состояние подключения в localStorage
-            tonConnectUI.connectionStateChange((state) => {
-                if (state) {
-                    localStorage.setItem('tonWalletConnected', 'true');
-                } else {
-                    localStorage.removeItem('tonWalletConnected');
-                }
-            });
-
-            // Проверяем состояние подключения при загрузке
-            (async () => {
-                const connectedWallets = await tonConnectUI.getConnectedWallets();
-                if (connectedWallets.length > 0) {
-                    localStorage.setItem('tonWalletConnected', 'true');
-                }
-            })();
-        });
-    </script>
-    <script src="/static/js/price_conv.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const searchInput = document.querySelector('.search-input');
-            const allAds = Array.from(document.querySelectorAll('.ad-card'));
-            const panel = document.getElementById('categoriesPanel');
-            const catBtn = document.getElementById('categoriesButton');
-            const closeBtn = document.getElementById('closeCategories');
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Функция для форматирования баланса
+        function formatBalance(balance, currency) {
+            if (balance === 0.0) {
+                return `0 ${currency === 'rub' ? '₽' : 'TON'}`;
+            }
             
-            catBtn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                panel.classList.toggle('show');
-            });
-            
-            catBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                panel.classList.toggle('show');
-            });
+            // Округляем до 2 знаков, убираем лишние нули
+            const formatted = parseFloat(balance.toFixed(2));
+            return `${formatted} ${currency === 'rub' ? '₽' : 'TON'}`;
+        }
 
-            closeBtn.addEventListener('click', () => {
-                panel.classList.remove('show');
-            });
-
-            // Обработчики для раскрывающихся категорий
-            document.querySelectorAll('.category-group-title').forEach(title => {
-                title.addEventListener('click', function() {
-                    this.classList.toggle('active');
-                    this.parentElement.classList.toggle('active');
-                });
-            });
-
-            // Обработчик клика по подкатегории
-            document.querySelectorAll('.subcategory-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const loader = document.createElement('div');
-                    loader.className = 'page-loader';
-                    loader.innerHTML = 'Загрузка...';
-                    document.body.appendChild(loader);
-                    
-                    window.location.href = `/store/${encodeURIComponent(this.textContent.trim())}`;
-                });
-            });
-
-            document.body.addEventListener('click', (e) => {
-                const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
-                if (favBtn) {
-                    e.preventDefault();
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
-                    
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'fav_id';
-                    input.value = favBtn.dataset.id;
-                    
-                    form.appendChild(input);
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            });
-            
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.trim().toLowerCase();
+        // Функция для обновления отображения баланса
+        async function updateWalletBalance() {
+            try {
+                const response = await fetch('/get_wallet_balance');
+                if (!response.ok) throw new Error('Failed to fetch balance');
                 
-                allAds.forEach(ad => {
-                    const title = ad.dataset.title.toLowerCase();
-                    ad.style.display = title.includes(searchTerm) ? '' : 'none';
-                });
-            });
+                const data = await response.json();
+                const walletBalance = document.getElementById('walletBalance');
+                
+                if (data.status === 'success') {
+                    walletBalance.textContent = formatBalance(data.balance, data.currency);
+                }
+            } catch (error) {
+                console.error('Error updating wallet balance:', error);
+            }
+        }
 
-            document.querySelectorAll('.ad-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
-                    
-                    if (!isFavoriteClick) {
-                        const adId = card.dataset.id;
-                        window.location.href = `/ads/${adId}`;
+        // Обновляем баланс при загрузке
+        await updateWalletBalance();
+        
+        // Обновляем баланс при возвращении на страницу
+        window.addEventListener('focus', updateWalletBalance);
+    });
+</script>
+<script src="https://unpkg.com/@tonconnect/ui@2.0.1/dist/tonconnect-ui.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Инициализация TonConnectUI
+        const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
+            buttonRootId: 'ton-connect',
+            language: 'ru',
+            uiPreferences: {
+                theme: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
+                    ? TON_CONNECT_UI.THEME.DARK 
+                    : TON_CONNECT_UI.THEME.LIGHT
+            }
+        });
+
+        tonConnectUI.uiOptions = {
+            twaReturnUrl: 'https://t.me/test_tma8_bot?startapp',
+            actionsConfiguration: {
+                modals: 'never'
+            }
+        };
+
+        // Отслеживание изменения темы
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            tonConnectUI.uiPreferences = {
+                theme: e.matches ? TON_CONNECT_UI.THEME.DARK : TON_CONNECT_UI.THEME.LIGHT
+            };
+        });
+
+        // Обработчик для кнопки TonConnect
+        document.getElementById('ton-connect').addEventListener('click', async (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                try {
+                    // Проверяем, подключен ли уже кошелек
+                    const connectedWallets = await tonConnectUI.getConnectedWallets();
+                    if (connectedWallets.length > 0) {
+                        // Кошелек уже подключен - ничего не делаем
+                        console.log('Кошелек уже подключен:', connectedWallets[0]);
+                        return;
                     }
-                });
+                    
+                    // Если кошелек не подключен - открываем модальное окно подключения
+                    const connectedWallet = await tonConnectUI.connectWallet();
+                    console.log(connectedWallet);
+                } catch (error) {
+                    console.log(`Error connecting to wallet: ${error}`);
+                }
+            }
+        });
+
+        // Сохраняем состояние подключения в localStorage
+        tonConnectUI.connectionStateChange((state) => {
+            if (state) {
+                localStorage.setItem('tonWalletConnected', 'true');
+            } else {
+                localStorage.removeItem('tonWalletConnected');
+            }
+        });
+
+        // Проверяем состояние подключения при загрузке
+        (async () => {
+            const connectedWallets = await tonConnectUI.getConnectedWallets();
+            if (connectedWallets.length > 0) {
+                localStorage.setItem('tonWalletConnected', 'true');
+            }
+        })();
+    });
+</script>
+<script src="/static/js/price_conv.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.querySelector('.search-input');
+        const allAds = Array.from(document.querySelectorAll('.ad-card'));
+        const panel = document.getElementById('categoriesPanel');
+        const catBtn = document.getElementById('categoriesButton');
+        const closeBtn = document.getElementById('closeCategories');
+        
+        catBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            panel.classList.toggle('show');
+        });
+        
+        catBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            panel.classList.toggle('show');
+        });
+
+        closeBtn.addEventListener('click', () => {
+            panel.classList.remove('show');
+        });
+
+        // Обработчики для раскрывающихся категорий
+        document.querySelectorAll('.category-group-title').forEach(title => {
+            title.addEventListener('click', function() {
+                this.classList.toggle('active');
+                this.parentElement.classList.toggle('active');
             });
         });
-    </script>
+
+        // Обработчик клика по подкатегории
+        document.querySelectorAll('.subcategory-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const loader = document.createElement('div');
+                loader.className = 'page-loader';
+                loader.innerHTML = 'Загрузка...';
+                document.body.appendChild(loader);
+                
+                window.location.href = `/store/${encodeURIComponent(this.textContent.trim())}`;
+            });
+        });
+
+        document.body.addEventListener('click', (e) => {
+            const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+            if (favBtn) {
+                e.preventDefault();
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'fav_id';
+                input.value = favBtn.dataset.id;
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim().toLowerCase();
+            
+            allAds.forEach(ad => {
+                const title = ad.dataset.title.toLowerCase();
+                ad.style.display = title.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        document.querySelectorAll('.ad-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
+                
+                if (!isFavoriteClick) {
+                    const adId = card.dataset.id;
+                    window.location.href = `/ads/${adId}`;
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

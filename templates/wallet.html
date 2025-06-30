@@ -211,7 +211,7 @@
 {% block content %}
 <div class="wallet-container">
     <div class="wallet-header">
-        <button class="back-button" onclick="window.history.back()">
+        <button class="back-button" onclick="window.location.href='/store'">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 12H5"></path>
                 <path d="M12 19l-7-7 7-7"></path>
@@ -224,7 +224,7 @@
         <div class="balance-header">
             <div class="balance-title">Рублёвый счёт</div>
         </div>
-        <div class="balance-amount">0 ₽</div>
+        <div class="balance-amount" id="rubBalanceAmount">0 ₽</div>
         
         <div class="balance-actions">
             <button class="balance-button" id="depositRubButton">
@@ -248,7 +248,7 @@
         <div class="balance-header">
             <div class="balance-title">TON счёт</div>
         </div>
-        <div class="balance-amount">0 TON</div>
+        <div class="balance-amount" id="tonBalanceAmount">0 TON</div>
         
         <div class="balance-actions">
             <button class="balance-button" id="depositTonButton">
@@ -277,15 +277,6 @@
 
     <div id="rubHistory">
         <div class="history-empty">Нет операций</div>
-
-        <!-- <div class="history-item">
-            <div class="history-item-info">
-                <div class="history-item-title">Пополнение счёта</div>
-                <div class="history-item-date">12.06.2023, 14:30</div>
-            </div>
-            <div class="history-item-amount positive">+100 000 ₽</div>
-        </div> -->
-
     </div>
 
     <div id="tonHistory" style="display: none;">
@@ -306,7 +297,44 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Функция для форматирования баланса
+        function formatBalance(balance, isRub) {
+            if (balance === 0) {
+                return isRub ? '0 ₽' : '0 TON';
+            }
+            
+            // Округляем до 2 знаков, убираем лишние нули
+            const formatted = parseFloat(balance.toFixed(2));
+            return isRub ? `${formatted} ₽` : `${formatted} TON`;
+        }
+
+        // Функция для обновления всех балансов
+        async function updateAllBalances() {
+            try {
+                const response = await fetch('/get_wallet_balance');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // Обновляем отображение в кошельке
+                        document.getElementById('rubBalanceAmount').textContent = 
+                            formatBalance(data.rub_balance, true);
+                        document.getElementById('tonBalanceAmount').textContent = 
+                            formatBalance(data.ton_balance, false);
+                        
+                        // Обновляем текущий баланс в зависимости от выбранной валюты
+                        document.getElementById('walletBalance').textContent = 
+                            currentCurrency === 'rub' 
+                                ? formatBalance(data.rub_balance, true)
+                                : formatBalance(data.ton_balance, false);
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating balances:', error);
+            }
+        }
+
         // Инициализация TonConnectUI
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
             manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
@@ -318,13 +346,6 @@
                     : TON_CONNECT_UI.THEME.LIGHT
             }
         });
-
-        tonConnectUI.uiOptions = {
-            twaReturnUrl: 'https://t.me/test_tma8_bot?startapp',
-            actionsConfiguration: {
-                modals: 'never'
-            }
-        };
 
         // Переключение между рублями и TON
         const currencySwitchButton = document.getElementById('currencySwitchButton');
@@ -338,8 +359,29 @@
         
         let currentCurrency = 'rub';
 
-        currencySwitchButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Останавливаем всплытие события
+        // Загружаем текущую валюту из базы данных
+        try {
+            const response = await fetch('/get_currency');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.currency === 'ton') {
+                    // Имитируем клик по кнопке переключения валюты
+                    currentCurrency = 'ton';
+                    rubBalanceCard.style.display = 'none';
+                    tonBalanceCard.style.display = 'block';
+                    rubHistoryTitle.style.display = 'none';
+                    tonHistoryTitle.style.display = 'block';
+                    rubHistory.style.display = 'none';
+                    tonHistory.style.display = 'block';
+                    tonConnectButton.style.display = 'flex';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading currency preference:', error);
+        }
+
+        currencySwitchButton.addEventListener('click', async (e) => {
+            e.stopPropagation();
             
             if (currentCurrency === 'rub') {
                 // Переключаемся на TON
@@ -362,6 +404,18 @@
                 tonConnectButton.style.display = 'none';
                 currentCurrency = 'rub';
             }
+            
+            // Сохраняем выбор валюты
+            await fetch('/set_currency', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ currency: currentCurrency })
+            });
+
+            // Обновляем балансы
+            await updateAllBalances();
         });
 
         // Обработчики кнопок
@@ -402,13 +456,8 @@
             }
         });
 
-        // Загрузка данных (заглушка)
-        function loadData() {
-            // Здесь будет запрос к API для получения баланса и истории
-            console.log('Loading wallet data...');
-        }
-
-        loadData();
+        // Обновляем балансы при загрузке
+        await updateAllBalances();
     });
 </script>
 {% endblock %}
