@@ -1198,3 +1198,30 @@ async def blocked_page(request: Request, session_token=Cookie(default=None)):
 @wmarket_router.get("/check_user_blocked/{user_id}")
 async def check_user_blocked(user_id: int):
     await check_user_blocked_post(user_id)
+
+
+@wmarket_router.get("/wallet")
+async def wallet_page(request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
+
+            # Здесь можно добавить логику для получения баланса пользователя
+            balance = 0  # Заглушка, нужно реализовать получение баланса
+
+            context = {
+                "request": request,
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res,
+                "balance": balance,
+                "is_chat_page": True
+            }
+            return templates.TemplateResponse("wallet.html", context=context)
+
+    response = RedirectResponse(url="/", status_code=303)
+    return response

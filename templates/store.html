@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
 
 {% block style %}
+<script src="https://unpkg.com/@tonconnect/ui@2.0.1/dist/tonconnect-ui.min.js"></script>
 <style>
+    a {
+        text-decoration: none;
+    }
     .header {
         position: sticky;
         top: 0;
@@ -18,6 +22,7 @@
     }
 
     .search-input {
+        width: 12.5vh;
         flex: 1;
         padding: 10px 16px;
         border-radius: 20px;
@@ -268,6 +273,25 @@
     .subcategory-item:last-child {
         border-bottom: none;
     }
+
+     .wallet-button {
+        padding: 10px 16px;
+        border-radius: 20px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .wallet-button svg {
+        width: 18px;
+        height: 18px;
+    }
 </style>
 {% endblock %}
 
@@ -282,12 +306,9 @@
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-            <button class="wallet-button">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"></path>
-                    <rect x="16" y="9" width="6" height="6" rx="1"></rect>
-                </svg>
-            </button>
+            <a href="/wallet" class="wallet-button">
+                Кошелёк
+            </a>
         </div>
     </header>
 
@@ -368,6 +389,73 @@
 {% endblock %}
 
 {% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Инициализация TonConnectUI
+            const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+                manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
+                buttonRootId: 'ton-connect',
+                language: 'ru',
+                uiPreferences: {
+                    theme: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
+                        ? TON_CONNECT_UI.THEME.DARK 
+                        : TON_CONNECT_UI.THEME.LIGHT
+                }
+            });
+
+            tonConnectUI.uiOptions = {
+                twaReturnUrl: 'https://t.me/test_tma8_bot?startapp',
+                actionsConfiguration: {
+                    modals: 'never'
+                }
+            };
+
+            // Отслеживание изменения темы
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+                tonConnectUI.uiPreferences = {
+                    theme: e.matches ? TON_CONNECT_UI.THEME.DARK : TON_CONNECT_UI.THEME.LIGHT
+                };
+            });
+
+            // Обработчик для кнопки TonConnect
+            document.getElementById('ton-connect').addEventListener('click', async (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    try {
+                        // Проверяем, подключен ли уже кошелек
+                        const connectedWallets = await tonConnectUI.getConnectedWallets();
+                        if (connectedWallets.length > 0) {
+                            // Кошелек уже подключен - ничего не делаем
+                            console.log('Кошелек уже подключен:', connectedWallets[0]);
+                            return;
+                        }
+                        
+                        // Если кошелек не подключен - открываем модальное окно подключения
+                        const connectedWallet = await tonConnectUI.connectWallet();
+                        console.log(connectedWallet);
+                    } catch (error) {
+                        console.log(`Error connecting to wallet: ${error}`);
+                    }
+                }
+            });
+
+            // Сохраняем состояние подключения в localStorage
+            tonConnectUI.connectionStateChange((state) => {
+                if (state) {
+                    localStorage.setItem('tonWalletConnected', 'true');
+                } else {
+                    localStorage.removeItem('tonWalletConnected');
+                }
+            });
+
+            // Проверяем состояние подключения при загрузке
+            (async () => {
+                const connectedWallets = await tonConnectUI.getConnectedWallets();
+                if (connectedWallets.length > 0) {
+                    localStorage.setItem('tonWalletConnected', 'true');
+                }
+            })();
+        });
+    </script>
     <script src="/static/js/price_conv.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {

@@ -18,8 +18,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Явно укажите методы
     allow_headers=["*"],
+    expose_headers=["Access-Control-Allow-Origin"]  # Добавьте это
 )
 
 socket_manager = SocketManager(app=app)
