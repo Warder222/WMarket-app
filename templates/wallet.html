@@ -205,6 +205,116 @@
         cursor: pointer !important;
         white-space: nowrap !important;
     }
+
+    /* Модальное окно для отправки TON */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .modal-content {
+        background-color: var(--bg-color);
+        padding: 24px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        transform: translateY(20px);
+        transition: transform 0.3s;
+    }
+
+    .modal-overlay.active .modal-content {
+        transform: translateY(0);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .modal-title {
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-color);
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        font-size: 16px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .form-button {
+        flex: 1;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        border: none;
+    }
+
+    .form-button.primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .form-button.secondary {
+        background-color: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+    }
+
+    .error-message {
+        color: #F44336;
+        font-size: 14px;
+        margin-top: 8px;
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -268,9 +378,7 @@
         </div>
     </div>
 
-    <button class="ton-connect-button" id="tonConnectButton" style="display: none;">
-        <div id="ton-connect"></div>
-    </button>
+    <div id="ton-connect" style="display: none;"></div>
 
     <h2 class="history-title" id="rubHistoryTitle">История операций (рубли)</h2>
     <h2 class="history-title" id="tonHistoryTitle" style="display: none;">История операций (TON)</h2>
@@ -293,11 +401,37 @@
         </button>
     </div>
 </div>
+
+<!-- Модальное окно для отправки TON -->
+<div class="modal-overlay" id="sendTonModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Отправить TON</h3>
+            <button class="modal-close" id="closeSendTonModal">&times;</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Сумма (TON)</label>
+            <input type="number" class="form-input" id="tonAmount" placeholder="0.0" step="0.01" min="0.01">
+            <div class="error-message" id="amountError">Введите корректную сумму</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">На кошелёк</label>
+            <input type="text" class="form-input" id="tonAddress" value="UQAPGwt3Ky2eQpGYSB9PbQ2PBNtTBoA4sJahv-ZjHX1LwUup" readonly>
+        </div>
+        <div class="form-actions">
+            <button class="form-button secondary" id="cancelSendTon">Отмена</button>
+            <button class="form-button primary" id="confirmSendTon">Отправить</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
+        // Адрес получателя (замените на свой)
+        const RECIPIENT_ADDRESS = 'UQAPGwt3Ky2eQpGYSB9PbQ2PBNtTBoA4sJahv-ZjHX1LwUup';
+        
         // Функция для форматирования баланса
         function formatBalance(balance, isRub) {
             if (balance === 0) {
@@ -322,12 +456,6 @@
                             formatBalance(data.rub_balance, true);
                         document.getElementById('tonBalanceAmount').textContent = 
                             formatBalance(data.ton_balance, false);
-                        
-                        // Обновляем текущий баланс в зависимости от выбранной валюты
-                        document.getElementById('walletBalance').textContent = 
-                            currentCurrency === 'rub' 
-                                ? formatBalance(data.rub_balance, true)
-                                : formatBalance(data.ton_balance, false);
                     }
                 }
             } catch (error) {
@@ -337,7 +465,7 @@
 
         // Инициализация TonConnectUI
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
+            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/3e1bad75ce13e7398a7502088eca2777a37d57eb/tonconnect-manifest.json',
             buttonRootId: 'ton-connect',
             language: 'ru',
             uiPreferences: {
@@ -347,7 +475,7 @@
             }
         });
 
-        // Переключение между рублями и TON
+        // Элементы DOM
         const currencySwitchButton = document.getElementById('currencySwitchButton');
         const rubBalanceCard = document.getElementById('rubBalanceCard');
         const tonBalanceCard = document.getElementById('tonBalanceCard');
@@ -355,9 +483,46 @@
         const tonHistoryTitle = document.getElementById('tonHistoryTitle');
         const rubHistory = document.getElementById('rubHistory');
         const tonHistory = document.getElementById('tonHistory');
-        const tonConnectButton = document.getElementById('tonConnectButton');
+        const tonConnectContainer = document.getElementById('ton-connect');
         
+        // Текущая валюта (по умолчанию рубли)
         let currentCurrency = 'rub';
+
+        // Функция для переключения валюты
+        async function switchCurrency(newCurrency) {
+            currentCurrency = newCurrency;
+            
+            if (currentCurrency === 'rub') {
+                rubBalanceCard.style.display = 'block';
+                tonBalanceCard.style.display = 'none';
+                rubHistoryTitle.style.display = 'block';
+                tonHistoryTitle.style.display = 'none';
+                rubHistory.style.display = 'block';
+                tonHistory.style.display = 'none';
+                tonConnectContainer.style.display = 'none';
+            } else {
+                rubBalanceCard.style.display = 'none';
+                tonBalanceCard.style.display = 'block';
+                rubHistoryTitle.style.display = 'none';
+                tonHistoryTitle.style.display = 'block';
+                rubHistory.style.display = 'none';
+                tonHistory.style.display = 'block';
+                tonConnectContainer.style.display = 'block';
+            }
+            
+            // Сохраняем выбор валюты
+            try {
+                await fetch('/set_currency', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ currency: currentCurrency })
+                });
+            } catch (error) {
+                console.error('Error saving currency preference:', error);
+            }
+        }
 
         // Загружаем текущую валюту из базы данных
         try {
@@ -365,57 +530,20 @@
             if (response.ok) {
                 const data = await response.json();
                 if (data.currency === 'ton') {
-                    // Имитируем клик по кнопке переключения валюты
-                    currentCurrency = 'ton';
-                    rubBalanceCard.style.display = 'none';
-                    tonBalanceCard.style.display = 'block';
-                    rubHistoryTitle.style.display = 'none';
-                    tonHistoryTitle.style.display = 'block';
-                    rubHistory.style.display = 'none';
-                    tonHistory.style.display = 'block';
-                    tonConnectButton.style.display = 'flex';
+                    await switchCurrency('ton');
+                } else {
+                    await switchCurrency('rub');
                 }
             }
         } catch (error) {
             console.error('Error loading currency preference:', error);
+            await switchCurrency('rub');
         }
 
+        // Обработчик кнопки переключения валюты
         currencySwitchButton.addEventListener('click', async (e) => {
             e.stopPropagation();
-            
-            if (currentCurrency === 'rub') {
-                // Переключаемся на TON
-                rubBalanceCard.style.display = 'none';
-                tonBalanceCard.style.display = 'block';
-                rubHistoryTitle.style.display = 'none';
-                tonHistoryTitle.style.display = 'block';
-                rubHistory.style.display = 'none';
-                tonHistory.style.display = 'block';
-                tonConnectButton.style.display = 'flex';
-                currentCurrency = 'ton';
-            } else {
-                // Переключаемся на рубли
-                rubBalanceCard.style.display = 'block';
-                tonBalanceCard.style.display = 'none';
-                rubHistoryTitle.style.display = 'block';
-                tonHistoryTitle.style.display = 'none';
-                rubHistory.style.display = 'block';
-                tonHistory.style.display = 'none';
-                tonConnectButton.style.display = 'none';
-                currentCurrency = 'rub';
-            }
-            
-            // Сохраняем выбор валюты
-            await fetch('/set_currency', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ currency: currentCurrency })
-            });
-
-            // Обновляем балансы
-            await updateAllBalances();
+            await switchCurrency(currentCurrency === 'rub' ? 'ton' : 'rub');
         });
 
         // Обработчики кнопок
@@ -427,32 +555,83 @@
             alert('Функция вывода с рублёвого счёта будет реализована позже');
         });
 
-        document.getElementById('depositTonButton').addEventListener('click', () => {
-            alert('Функция пополнения TON счёта будет реализована позже');
-        });
-
         document.getElementById('withdrawTonButton').addEventListener('click', () => {
             alert('Функция вывода с TON счёта будет реализована позже');
         });
 
-        // Обработчик для кнопки TonConnect
-        document.getElementById('ton-connect').addEventListener('click', async (e) => {
-            if (e.target.tagName === 'BUTTON') {
-                try {
-                    // Проверяем, подключен ли уже кошелек
-                    const connectedWallets = await tonConnectUI.getConnectedWallets();
-                    if (connectedWallets.length > 0) {
-                        // Кошелек уже подключен - ничего не делаем
-                        console.log('Кошелек уже подключен:', connectedWallets[0]);
-                        return;
-                    }
-                    
-                    // Если кошелек не подключен - открываем модальное окно подключения
-                    const connectedWallet = await tonConnectUI.connectWallet();
-                    console.log(connectedWallet);
-                } catch (error) {
-                    console.log(`Error connecting to wallet: ${error}`);
+        // Модальное окно для отправки TON
+        const sendTonModal = document.getElementById('sendTonModal');
+        const closeSendTonModal = document.getElementById('closeSendTonModal');
+        const cancelSendTon = document.getElementById('cancelSendTon');
+        const confirmSendTon = document.getElementById('confirmSendTon');
+        const tonAmountInput = document.getElementById('tonAmount');
+        const amountError = document.getElementById('amountError');
+
+        // Открытие модального окна
+        document.getElementById('depositTonButton').addEventListener('click', () => {
+            sendTonModal.classList.add('active');
+        });
+
+        // Закрытие модального окна
+        function closeModal() {
+            sendTonModal.classList.remove('active');
+            tonAmountInput.value = '';
+            amountError.style.display = 'none';
+        }
+
+        closeSendTonModal.addEventListener('click', closeModal);
+        cancelSendTon.addEventListener('click', closeModal);
+
+        // Отправка TON
+        confirmSendTon.addEventListener('click', async () => {
+            const amount = parseFloat(tonAmountInput.value);
+            
+            // Валидация
+            if (isNaN(amount)) {
+                amountError.textContent = 'Введите сумму';
+                amountError.style.display = 'block';
+                return;
+            }
+            
+            if (amount <= 0) {
+                amountError.textContent = 'Сумма должна быть больше 0';
+                amountError.style.display = 'block';
+                return;
+            }
+            
+            amountError.style.display = 'none';
+            
+            try {
+                // Проверяем подключение кошелька (новый способ)
+                if (!tonConnectUI.wallet) {
+                    alert('Пожалуйста, подключите кошелек TON');
+                    return;
                 }
+                
+                // Создаем транзакцию
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 минут
+                    messages: [
+                        {
+                            address: RECIPIENT_ADDRESS,
+                            amount: (amount * 1000000000).toString(), // Конвертируем в наноTON
+                        }
+                    ]
+                };
+                
+                // Отправляем транзакцию
+                const result = await tonConnectUI.sendTransaction(transaction);
+                
+                if (result) {
+                    alert(`Успешно отправлено ${amount} TON!`);
+                    closeModal();
+                    await updateAllBalances();
+                } else {
+                    alert('Ошибка при отправке транзакции');
+                }
+            } catch (error) {
+                console.error('Error sending TON:', error);
+                alert(`Ошибка: ${error.message}`);
             }
         });
 
