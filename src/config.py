@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     BOT_USERNAME: str
     MINI_APP_URL: str
 
-    # WALLET_ADDRESS: str
+    TONAPI_KEY: str
+    WALLET_ADDRESS: str
 
     BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "static/uploads")

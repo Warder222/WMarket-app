@@ -6,10 +6,12 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
+from src.database.database import async_session_maker, User
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -22,7 +24,9 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 restore_product_post, update_product_post, get_all_moderation_products,
                                 leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
-                                get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info)
+                                get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
+                                add_ton_balance)
+from src.tonapi import TonapiClient
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -1219,7 +1223,8 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "balance": balance,
-                "is_chat_page": True
+                "is_chat_page": True,
+                "tg_id": payload.get("tg_id")
             }
             return templates.TemplateResponse("wallet.html", context=context)
 
@@ -1283,10 +1288,13 @@ async def get_currency(request: Request, session_token=Cookie(default=None)):
     })
 
 
+tonapi = TonapiClient(api_key=settings.TONAPI_KEY)
+
+
 @wmarket_router.post("/deposit_ton")
 async def deposit_ton(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -1294,22 +1302,83 @@ async def deposit_ton(
     payload = await decode_jwt(session_token)
     data = await request.json()
     amount = float(data.get("amount", 0))
+    tx_hash = data.get("tx_hash")
+
+    if not tx_hash:
+        return JSONResponse(
+            {"status": "error", "message": "Transaction hash is required"},
+            status_code=400
+        )
 
     if amount <= 0:
         return JSONResponse({"status": "error", "message": "Invalid amount"}, status_code=400)
 
-    # Здесь будет логика проверки платежа в блокчейне
-    # Пока просто увеличиваем баланс
     async with async_session_maker() as session:
         try:
+            # Get user info
             user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
             user = user.scalar_one_or_none()
-            if user:
-                user.ton_balance += amount
-                await session.commit()
-                return JSONResponse({"status": "success", "new_balance": user.ton_balance})
-        except Exception as e:
-            print(f"Error updating TON balance: {e}")
-            return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
+            if not user:
+                return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
 
-    return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+            # Check transaction via tonapi
+            tx_info = await tonapi._make_request(
+                "GET",
+                f"v2/blockchain/accounts/{settings.WALLET_ADDRESS}/transactions",
+                params={
+                    "limit": 10,
+                    "sort_order": "desc"
+                }
+            )
+            print(f"info {tx_info}")
+            # if not tx_info or 'transactions' not in tx_info:
+            #     return JSONResponse(
+            #         {
+            #             "status": "pending",
+            #             "message": "Transaction not yet confirmed. Your balance will update automatically."
+            #         },
+            #         status_code=202
+            #     )
+
+            # Find matching transaction
+            tx_found = False
+            for tx in tx_info['transactions']:
+                # Check if this is the transaction we're looking for
+                if tx.get('hash') == tx_hash:
+                    # Verify amount
+                    tx_amount = float(tx.get('transaction', {}).get('total', 0)) / 1000000000
+                    if abs(tx_amount - amount) <= 0.01:  # Allow small rounding differences
+                        tx_found = True
+                        break
+
+            if not tx_found:
+                return JSONResponse(
+                    {
+                        "status": "pending",
+                        "message": "Transaction not yet confirmed. Your balance will update automatically."
+                    },
+                    status_code=202
+                )
+
+            # Update balance
+            user.ton_balance += amount
+            await session.commit()
+
+            # Send notification
+            await send_notification_to_user(
+                payload.get("tg_id"),
+                f"💰 На ваш счёт WMarket поступили средства: {amount} TON"
+            )
+
+            return JSONResponse({
+                "status": "success",
+                "new_balance": user.ton_balance
+            })
+
+        except Exception as e:
+            print(f"Error processing TON deposit: {e}")
+            await session.rollback()
+            return JSONResponse(
+                {"status": "error", "message": "Transaction processing error"},
+                status_code=500
+            )

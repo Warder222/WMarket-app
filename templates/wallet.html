@@ -586,7 +586,7 @@
         confirmSendTon.addEventListener('click', async () => {
             const amount = parseFloat(tonAmountInput.value);
             
-            // Валидация
+            // Validation
             if (isNaN(amount)) {
                 amountError.textContent = 'Введите сумму';
                 amountError.style.display = 'block';
@@ -602,36 +602,74 @@
             amountError.style.display = 'none';
             
             try {
-                // Проверяем подключение кошелька (новый способ)
+                // Check wallet connection
                 if (!tonConnectUI.wallet) {
                     alert('Пожалуйста, подключите кошелек TON');
                     return;
                 }
                 
-                // Создаем транзакцию
+                // Create transaction
                 const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 минут
+                    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
                     messages: [
                         {
                             address: RECIPIENT_ADDRESS,
-                            amount: (amount * 1000000000).toString(), // Конвертируем в наноTON
+                            amount: (amount * 1000000000).toString() // Convert to nanoTON
                         }
                     ]
                 };
                 
-                // Отправляем транзакцию
+                // Send transaction
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
                 if (result) {
-                    alert(`Успешно отправлено ${amount} TON!`);
-                    closeModal();
-                    await updateAllBalances();
-                } else {
-                    alert('Ошибка при отправке транзакции');
+                    // Show loading state
+                    confirmSendTon.disabled = true;
+                    confirmSendTon.textContent = 'Проверка транзакции...';
+                    
+                    // Send to backend for verification
+                    const depositResponse = await fetch('/deposit_ton', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            amount: amount,
+                            tx_hash: result.boc
+                        })
+                    });
+
+                    const depositData = await depositResponse.json();
+                    
+                    if (depositResponse.status === 202) {
+                        // Transaction pending
+                        alert('Транзакция отправлена! Баланс будет обновлён автоматически после подтверждения.');
+                        closeModal();
+                        
+                        // Poll for balance updates
+                        const checkBalance = async () => {
+                            await updateAllBalances();
+                            setTimeout(checkBalance, 30000); // Check every 30 seconds
+                        };
+                        setTimeout(checkBalance, 30000);
+                        
+                    } else if (depositData.status === 'success') {
+                        alert(`Успешно! ${amount} TON зачислены на ваш баланс.`);
+                        closeModal();
+                        await updateAllBalances();
+                    } else {
+                        alert('Ошибка: ' + (depositData.message || 'Неизвестная ошибка'));
+                    }
                 }
             } catch (error) {
                 console.error('Error sending TON:', error);
                 alert(`Ошибка: ${error.message}`);
+            } finally {
+                // Reset button state
+                if (confirmSendTon) {
+                    confirmSendTon.disabled = false;
+                    confirmSendTon.textContent = 'Отправить';
+                }
             }
         });
 

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from starlette.responses import JSONResponse
+
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
     Referral, UserBlock
 from sqlalchemy.future import select
@@ -842,3 +844,20 @@ async def get_balance_user_info(tg_id: int):
         )
         user_data = result.fetchone()
         return user_data
+
+async def add_ton_balance(tg_id, amount):
+    async with async_session_maker() as session:
+        try:
+            user = await session.execute(select(User).where(User.tg_id == tg_id))
+            user = user.scalar_one_or_none()
+            if user:
+                user.ton_balance += amount
+                await session.commit()
+
+                return JSONResponse({
+                    "status": "success",
+                    "new_balance": user.ton_balance
+                })
+        except Exception as e:
+            print(f"Error updating TON balance: {e}")
+            return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
