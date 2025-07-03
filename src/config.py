@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     TONAPI_KEY: str
     WALLET_ADDRESS: str
+    WALLET_CHECK_ADDRESS: str
 
     BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "static/uploads")

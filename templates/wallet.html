@@ -465,7 +465,7 @@
 
         // Инициализация TonConnectUI
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/3e1bad75ce13e7398a7502088eca2777a37d57eb/tonconnect-manifest.json',
+            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/bb31fd6ac215f69374e479dbdfe9067ae8409bd5/tonconnect-manifest.json',
             buttonRootId: 'ton-connect',
             language: 'ru',
             uiPreferences: {
@@ -474,6 +474,15 @@
                     : TON_CONNECT_UI.THEME.LIGHT
             }
         });
+
+        // tonConnectUI.onStatusChange((wallet) => {
+        //     if (wallet) {
+        //         const walletAddress = wallet.account.address;
+        //         alert(`Адрес кошелька: ${walletAddress}`);
+        //     } else {
+        //         console.log('Кошелек отключен');
+        //     }
+        // });
 
         // Элементы DOM
         const currencySwitchButton = document.getElementById('currencySwitchButton');
@@ -635,7 +644,8 @@
                         },
                         body: JSON.stringify({
                             amount: amount,
-                            tx_hash: result.boc
+                            tx_hash: result.boc,
+                            wallet: tonConnectUI.wallet
                         })
                     });
 

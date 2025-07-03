@@ -1326,30 +1326,16 @@ async def deposit_ton(
                 "GET",
                 f"v2/blockchain/accounts/{settings.WALLET_ADDRESS}/transactions",
                 params={
-                    "limit": 10,
+                    "limit": 1,
                     "sort_order": "desc"
                 }
             )
-            print(f"info {tx_info}")
-            # if not tx_info or 'transactions' not in tx_info:
-            #     return JSONResponse(
-            #         {
-            #             "status": "pending",
-            #             "message": "Transaction not yet confirmed. Your balance will update automatically."
-            #         },
-            #         status_code=202
-            #     )
 
-            # Find matching transaction
             tx_found = False
             for tx in tx_info['transactions']:
-                # Check if this is the transaction we're looking for
-                if tx.get('hash') == tx_hash:
-                    # Verify amount
-                    tx_amount = float(tx.get('transaction', {}).get('total', 0)) / 1000000000
-                    if abs(tx_amount - amount) <= 0.01:  # Allow small rounding differences
+                if tx["account"]["address"] == settings.WALLET_CHECK_ADDRESS:
+                    if abs(tx['credit_phase']["credit"] - (amount  * 1000000000)) <= 0.01:
                         tx_found = True
-                        break
 
             if not tx_found:
                 return JSONResponse(
