@@ -1215,16 +1215,14 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
 
-            # Здесь можно добавить логику для получения баланса пользователя
-            balance = 0  # Заглушка, нужно реализовать получение баланса
-
             context = {
                 "request": request,
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "balance": balance,
                 "is_chat_page": True,
-                "tg_id": payload.get("tg_id")
+                "tg_id": payload.get("tg_id"),
+                "recipient_address": settings.WALLET_ADDRESS,
+                "ton_manifest_url": settings.TON_MANIFEST_URL
             }
             return templates.TemplateResponse("wallet.html", context=context)
 

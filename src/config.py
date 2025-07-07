@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     WALLET_ADDRESS: str
     WALLET_CHECK_ADDRESS: str
 
+    TON_MANIFEST_URL: str
+
     BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "static/uploads")
 

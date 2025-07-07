@@ -1,7 +1,6 @@
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import httpx
-from datetime import datetime, timedelta
 import logging
 from fastapi import HTTPException
 

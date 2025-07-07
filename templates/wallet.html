@@ -113,25 +113,37 @@
         opacity: 0.6;
     }
 
-    .ton-connect-button {
-        width: 100%;
-        padding: 8px;
-        border-radius: 12px;
-        color: none;
-        background-color: var(--bg-color);
-        border: none;
-        font-size: 16px;
-        cursor: pointer;
-        margin: 16px 0;
+    .ton-connect-wrapper {
         display: flex;
-        align-items: center;
         justify-content: center;
-        gap: 8px;
+        width: 80vw;
+        margin: 20px 0;
     }
 
-    .ton-connect-button svg {
-        width: 20px;
-        height: 20px;
+    #ton-connect {
+        width: 60vw;
+        /* max-width: 300px; */
+        margin: 0 auto;
+    }
+
+    #ton-connect button {
+        width: 60vw !important;
+        background-color: var(--primary-color) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 12px 24px !important;
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    #ton-connect button:hover {
+        opacity: 0.9 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
 
     .currency-switcher {
@@ -192,18 +204,6 @@
 
     .history-item-amount.negative {
         color: #F44336;
-    }
-
-    #ton-connect button {
-        width: 100% !important;
-        background-color: var(--primary-color) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 20px !important;
-        padding: 10px 16px !important;
-        font-size: 8px !important;
-        cursor: pointer !important;
-        white-space: nowrap !important;
     }
 
     /* Модальное окно для отправки TON */
@@ -315,6 +315,39 @@
         margin-top: 8px;
         display: none;
     }
+
+    /* Стили для уведомлений */
+    .notification {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--primary-color);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        z-index: 1100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        max-width: 90%;
+        text-align: center;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; top: 0; }
+        to { opacity: 1; top: 20px; }
+    }
+
+    .notification.error {
+        background-color: #F44336;
+    }
+
+    .notification.success {
+        background-color: #4CAF50;
+    }
 </style>
 {% endblock %}
 
@@ -378,10 +411,12 @@
         </div>
     </div>
 
-    <div id="ton-connect" style="display: none;"></div>
+    <div class="ton-connect-wrapper">
+        <div id="ton-connect" style="display: none;"></div>
+    </div>
 
-    <h2 class="history-title" id="rubHistoryTitle">История операций (рубли)</h2>
-    <h2 class="history-title" id="tonHistoryTitle" style="display: none;">История операций (TON)</h2>
+    <h2 class="history-title" id="rubHistoryTitle">История операций</h2>
+    <h2 class="history-title" id="tonHistoryTitle" style="display: none;">История операций</h2>
 
     <div id="rubHistory">
         <div class="history-empty">Нет операций</div>
@@ -410,13 +445,9 @@
             <button class="modal-close" id="closeSendTonModal">&times;</button>
         </div>
         <div class="form-group">
-            <label class="form-label">Сумма (TON)</label>
+            <label class="form-label">Сумма</label>
             <input type="number" class="form-input" id="tonAmount" placeholder="0.0" step="0.01" min="0.01">
             <div class="error-message" id="amountError">Введите корректную сумму</div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">На кошелёк</label>
-            <input type="text" class="form-input" id="tonAddress" value="UQAPGwt3Ky2eQpGYSB9PbQ2PBNtTBoA4sJahv-ZjHX1LwUup" readonly>
         </div>
         <div class="form-actions">
             <button class="form-button secondary" id="cancelSendTon">Отмена</button>
@@ -428,9 +459,22 @@
 
 {% block scripts %}
 <script>
+    // Функция для показа уведомлений
+    function showNotification(message, type = 'info', duration = 5000) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
         // Адрес получателя (замените на свой)
-        const RECIPIENT_ADDRESS = 'UQAPGwt3Ky2eQpGYSB9PbQ2PBNtTBoA4sJahv-ZjHX1LwUup';
+        const RECIPIENT_ADDRESS = '{{ recipient_address }}';
         
         // Функция для форматирования баланса
         function formatBalance(balance, isRub) {
@@ -460,12 +504,13 @@
                 }
             } catch (error) {
                 console.error('Error updating balances:', error);
+                showNotification('Ошибка обновления баланса', 'error');
             }
         }
 
         // Инициализация TonConnectUI
         const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/bb31fd6ac215f69374e479dbdfe9067ae8409bd5/tonconnect-manifest.json',
+            manifestUrl: '{{ ton_manifest_url }}',
             buttonRootId: 'ton-connect',
             language: 'ru',
             uiPreferences: {
@@ -475,14 +520,51 @@
             }
         });
 
-        // tonConnectUI.onStatusChange((wallet) => {
-        //     if (wallet) {
-        //         const walletAddress = wallet.account.address;
-        //         alert(`Адрес кошелька: ${walletAddress}`);
-        //     } else {
-        //         console.log('Кошелек отключен');
-        //     }
-        // });
+        // Проверка незавершенных транзакций при загрузке
+        async function checkPendingTransactions() {
+            const pendingTx = localStorage.getItem('pendingTonTransaction');
+            if (pendingTx) {
+                const txData = JSON.parse(pendingTx);
+                
+                // Проверяем, не прошло ли слишком много времени (5 минут)
+                if (Date.now() - txData.timestamp < 300000) {
+                    try {
+                        showNotification('Проверяем статус транзакции...');
+                        
+                        // Отправляем запрос на сервер для проверки
+                        const response = await fetch('/deposit_ton', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                amount: txData.amount,
+                                tx_hash: txData.tx_hash,
+                                wallet: tonConnectUI.wallet
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok && result.status === 'success') {
+                            showNotification(`Транзакция подтверждена! ${txData.amount} TON зачислены.`, 'success');
+                            await updateAllBalances();
+                        } else {
+                            showNotification('Транзакция не найдена. Попробуйте ещё раз.', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error completing pending transaction:', error);
+                        showNotification('Ошибка проверки транзакции', 'error');
+                    }
+                }
+                
+                // Удаляем запись о транзакции
+                localStorage.removeItem('pendingTonTransaction');
+            }
+        }
+
+        // Вызываем проверку при загрузке
+        await checkPendingTransactions();
 
         // Элементы DOM
         const currencySwitchButton = document.getElementById('currencySwitchButton');
@@ -530,6 +612,7 @@
                 });
             } catch (error) {
                 console.error('Error saving currency preference:', error);
+                showNotification('Ошибка сохранения валюты', 'error');
             }
         }
 
@@ -546,6 +629,7 @@
             }
         } catch (error) {
             console.error('Error loading currency preference:', error);
+            showNotification('Ошибка загрузки настроек валюты', 'error');
             await switchCurrency('rub');
         }
 
@@ -557,15 +641,15 @@
 
         // Обработчики кнопок
         document.getElementById('depositRubButton').addEventListener('click', () => {
-            alert('Функция пополнения рублёвого счёта будет реализована позже');
+            showNotification('Функция пополнения рублёвого счёта будет реализована позже', 'info');
         });
 
         document.getElementById('withdrawRubButton').addEventListener('click', () => {
-            alert('Функция вывода с рублёвого счёта будет реализована позже');
+            showNotification('Функция вывода с рублёвого счёта будет реализована позже', 'info');
         });
 
         document.getElementById('withdrawTonButton').addEventListener('click', () => {
-            alert('Функция вывода с TON счёта будет реализована позже');
+            showNotification('Функция вывода с TON счёта будет реализована позже', 'info');
         });
 
         // Модальное окно для отправки TON
@@ -613,7 +697,7 @@
             try {
                 // Check wallet connection
                 if (!tonConnectUI.wallet) {
-                    alert('Пожалуйста, подключите кошелек TON');
+                    showNotification('Пожалуйста, подключите кошелек TON', 'error');
                     return;
                 }
                 
@@ -628,10 +712,23 @@
                     ]
                 };
                 
+                // Сохраняем данные транзакции перед отправкой
+                const txData = {
+                    amount: amount,
+                    tx_hash: 'pending', // временное значение
+                    recipient: RECIPIENT_ADDRESS,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('pendingTonTransaction', JSON.stringify(txData));
+                
                 // Send transaction
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
                 if (result) {
+                    // Обновляем данные транзакции с реальным tx_hash
+                    txData.tx_hash = result.boc;
+                    localStorage.setItem('pendingTonTransaction', JSON.stringify(txData));
+                    
                     // Show loading state
                     confirmSendTon.disabled = true;
                     confirmSendTon.textContent = 'Проверка транзакции...';
@@ -653,8 +750,11 @@
                     
                     if (depositResponse.status === 202) {
                         // Transaction pending
-                        alert('Транзакция отправлена! Баланс будет обновлён автоматически после подтверждения.');
+                        showNotification('Транзакция отправлена! Баланс будет обновлён автоматически после подтверждения.', 'success');
                         closeModal();
+                        
+                        // Удаляем запись о транзакции, так как сервер её обработал
+                        localStorage.removeItem('pendingTonTransaction');
                         
                         // Poll for balance updates
                         const checkBalance = async () => {
@@ -664,16 +764,17 @@
                         setTimeout(checkBalance, 30000);
                         
                     } else if (depositData.status === 'success') {
-                        alert(`Успешно! ${amount} TON зачислены на ваш баланс.`);
+                        showNotification(`Успешно! ${amount} TON зачислены на ваш баланс.`, 'success');
                         closeModal();
+                        localStorage.removeItem('pendingTonTransaction');
                         await updateAllBalances();
                     } else {
-                        alert('Ошибка: ' + (depositData.message || 'Неизвестная ошибка'));
+                        showNotification('Ошибка: ' + (depositData.message || 'Неизвестная ошибка'), 'error');
                     }
                 }
             } catch (error) {
                 console.error('Error sending TON:', error);
-                alert(`Ошибка: ${error.message}`);
+                showNotification(`Ошибка: ${error.message}`, 'error');
             } finally {
                 // Reset button state
                 if (confirmSendTon) {

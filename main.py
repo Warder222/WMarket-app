@@ -16,9 +16,9 @@ app.mount("/static", StaticFiles(directory="static"))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],  # Явно укажите методы
+    allow_origins=["*"],
+    allow_methods=["*"],  # Явно укажите методы
     allow_headers=["*"],
     expose_headers=["Access-Control-Allow-Origin"]  # Добавьте это
 )
