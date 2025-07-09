@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     TONAPI_KEY: str
     WALLET_ADDRESS: str
     WALLET_CHECK_ADDRESS: str
+    WALLET_MNEMONIC: str
 
     TON_MANIFEST_URL: str
 

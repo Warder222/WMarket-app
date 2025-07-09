@@ -26,7 +26,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance)
-from src.tonapi import TonapiClient
+from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
 wmarket_router = APIRouter(
@@ -1366,3 +1366,84 @@ async def deposit_ton(
                 {"status": "error", "message": "Transaction processing error"},
                 status_code=500
             )
+
+
+@wmarket_router.post("/withdraw_ton")
+async def withdraw_ton(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    try:
+        payload = await decode_jwt(session_token)
+        data = await request.json()
+        amount = float(data.get("amount", 0))
+        address = data.get("address", "")
+
+        # Валидация
+        if amount < 0.1:
+            return JSONResponse(
+                {"status": "error", "message": "Минимальная сумма вывода 0.1 TON"},
+                status_code=400
+            )
+
+        async with async_session_maker() as session:
+            try:
+                # Проверяем баланс пользователя
+                user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
+                user = user.scalar_one_or_none()
+
+                if not user:
+                    return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+
+                # Проверяем баланс с учетом минимальной суммы
+                if user.ton_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на балансе"},
+                        status_code=400
+                    )
+
+                # Выполняем вывод
+                withdraw_result = await withdraw_ton_request(address, amount)
+
+                if withdraw_result:
+                    # Обновляем баланс пользователя только после успешного вывода
+                    user.ton_balance -= amount
+                    await session.commit()
+
+                    await send_notification_to_user(
+                        payload.get("tg_id"),
+                        f"✅ {amount} TON успешно отправлены на адрес {address[:6]}...{address[-4:]}"
+                    )
+
+                    return JSONResponse({
+                        "status": "success",
+                        "message": "Средства успешно отправлены"
+                    })
+                else:
+                    return JSONResponse({
+                        "status": "failed",
+                        "message": "Не удалось выполнить вывод. Попробуйте позже."
+                    })
+
+            except Exception as e:
+                await session.rollback()
+                print(f"Error processing withdrawal: {e}")
+                return JSONResponse({
+                    "status": "error",
+                    "message": "Внутренняя ошибка сервера"
+                }, status_code=500)
+
+    except ValueError:
+        return JSONResponse(
+            {"status": "error", "message": "Неверный формат суммы"},
+            status_code=400
+        )
+    except Exception as e:
+        logger.error(f"Error in withdraw_ton endpoint: {e}")
+        return JSONResponse(
+            {"status": "error", "message": "Internal server error"},
+            status_code=500
+        )

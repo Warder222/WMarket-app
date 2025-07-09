@@ -348,6 +348,11 @@
     .notification.success {
         background-color: #4CAF50;
     }
+
+    .balance-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 {% endblock %}
 
@@ -446,12 +451,30 @@
         </div>
         <div class="form-group">
             <label class="form-label">Сумма</label>
-            <input type="number" class="form-input" id="tonAmount" placeholder="0.0" step="0.01" min="0.01">
+            <input type="number" class="form-input" id="tonAmount" placeholder="0.1" step="0.01" min="0.1">
             <div class="error-message" id="amountError">Введите корректную сумму</div>
         </div>
         <div class="form-actions">
             <button class="form-button secondary" id="cancelSendTon">Отмена</button>
             <button class="form-button primary" id="confirmSendTon">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="withdrawTonModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Вывести TON</h3>
+            <button class="modal-close" id="closeWithdrawTonModal">&times;</button>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Сумма</label>
+            <input type="number" class="form-input" id="withdrawTonAmount" placeholder="0.1" step="0.01" min="0.1">
+            <div class="error-message" id="withdrawAmountError">Введите корректную сумму</div>
+        </div>
+        <div class="form-actions">
+            <button class="form-button secondary" id="cancelWithdrawTon">Отмена</button>
+            <button class="form-button primary" id="confirmWithdrawTon">Отправить</button>
         </div>
     </div>
 </div>
@@ -648,10 +671,6 @@
             showNotification('Функция вывода с рублёвого счёта будет реализована позже', 'info');
         });
 
-        document.getElementById('withdrawTonButton').addEventListener('click', () => {
-            showNotification('Функция вывода с TON счёта будет реализована позже', 'info');
-        });
-
         // Модальное окно для отправки TON
         const sendTonModal = document.getElementById('sendTonModal');
         const closeSendTonModal = document.getElementById('closeSendTonModal');
@@ -686,8 +705,8 @@
                 return;
             }
             
-            if (amount <= 0) {
-                amountError.textContent = 'Сумма должна быть больше 0';
+            if (amount < 0.1) {
+                amountError.textContent = 'Сумма должна быть больше 0.1 TON';
                 amountError.style.display = 'block';
                 return;
             }
@@ -781,6 +800,123 @@
                     confirmSendTon.disabled = false;
                     confirmSendTon.textContent = 'Отправить';
                 }
+            }
+        });
+
+        // Добавьте этот код в конец блока scripts в wallet.html
+
+        // Модальное окно для вывода TON
+        const withdrawTonModal = document.getElementById('withdrawTonModal');
+        const closeWithdrawTonModal = document.getElementById('closeWithdrawTonModal');
+        const cancelWithdrawTon = document.getElementById('cancelWithdrawTon');
+        const confirmWithdrawTon = document.getElementById('confirmWithdrawTon');
+        const withdrawTonAmountInput = document.getElementById('withdrawTonAmount');
+        const withdrawAmountError = document.getElementById('withdrawAmountError');
+
+        // Открытие модального окна вывода
+        document.getElementById('withdrawTonButton').addEventListener('click', async () => {
+            // Проверяем баланс
+            try {
+                const response = await fetch('/get_wallet_balance');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.status === 'success' && data.ton_balance < 0.1) {
+                        showNotification('У вас недостаточно средств на балансе, минимальная сумма вывода 0.1 TON', 'error');
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking balance:', error);
+                showNotification('Ошибка проверки баланса', 'error');
+                return;
+            }
+
+            // Проверяем подключен ли кошелек
+            if (tonConnectUI.wallet) {
+                console.log("wallet connected")
+            } else {
+                showNotification('Пожалуйста, подключите кошелек TON', 'error');
+                return;
+            }
+
+            withdrawTonModal.classList.add('active');
+        });
+
+        // Закрытие модального окна вывода
+        function closeWithdrawModal() {
+            withdrawTonModal.classList.remove('active');
+            withdrawTonAmountInput.value = '';
+            withdrawAmountError.style.display = 'none';
+        }
+
+        closeWithdrawTonModal.addEventListener('click', closeWithdrawModal);
+        cancelWithdrawTon.addEventListener('click', closeWithdrawModal);
+
+        // Обработка вывода TON
+        confirmWithdrawTon.addEventListener('click', async () => {
+            const amount = parseFloat(withdrawTonAmountInput.value);
+            const address = tonConnectUI.wallet.account.address;
+            
+            // Валидация
+            let isValid = true;
+            
+            if (isNaN(amount) || amount < 0.1) {
+                withdrawAmountError.textContent = amount < 0.1 ? 
+                    'Минимальная сумма вывода 0.1 TON' : 'Введите корректную сумму';
+                withdrawAmountError.style.display = 'block';
+                isValid = false;
+            } else {
+                withdrawAmountError.style.display = 'none';
+            }
+            
+            if (!isValid) return;
+            
+            try {
+                // Проверяем баланс еще раз
+                const balanceResponse = await fetch('/get_wallet_balance');
+                if (balanceResponse.ok) {
+                    const balanceData = await balanceResponse.json();
+                    
+                    if (balanceData.status === 'success') {
+                        if (amount > balanceData.ton_balance) {
+                            showNotification('Недостаточно средств на балансе', 'error');
+                            return;
+                        }
+                        
+                        // Показываем загрузку
+                        confirmWithdrawTon.disabled = true;
+                        confirmWithdrawTon.textContent = 'Отправка...';
+                        
+                        // Отправляем запрос на вывод
+                        const response = await fetch('/withdraw_ton', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                amount: amount,
+                                address: address
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (response.ok && result.status === 'success') {
+                            showNotification('Запрос на вывод принят! Средства будут зачислены в ближайшее время.', 'success');
+                            closeWithdrawModal();
+                            await updateAllBalances();
+                        } else {
+                            showNotification(result.message || 'Ошибка при выводе средств', 'error');
+                        }
+                    }
+                }
+            } catch (error) {
+                alert(`Error withdrawing TON: ${error}`);
+                showNotification('Ошибка при выводе средств', 'error');
+            } finally {
+                confirmWithdrawTon.disabled = false;
+                confirmWithdrawTon.textContent = 'Вывести';
             }
         });
 
