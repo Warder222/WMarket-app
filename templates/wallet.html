@@ -789,11 +789,14 @@
                         await updateAllBalances();
                     } else {
                         showNotification('Ошибка: ' + (depositData.message || 'Неизвестная ошибка'), 'error');
+                        closeModal();
                     }
                 }
             } catch (error) {
                 console.error('Error sending TON:', error);
-                showNotification(`Ошибка: ${error.message}`, 'error');
+                showNotification(`Транзакция не состоялась`);
+                closeModal();
+                localStorage.removeItem('pendingTonTransaction');
             } finally {
                 // Reset button state
                 if (confirmSendTon) {
@@ -832,14 +835,6 @@
                 return;
             }
 
-            // Проверяем подключен ли кошелек
-            if (tonConnectUI.wallet) {
-                console.log("wallet connected")
-            } else {
-                showNotification('Пожалуйста, подключите кошелек TON', 'error');
-                return;
-            }
-
             withdrawTonModal.classList.add('active');
         });
 
@@ -856,6 +851,14 @@
         // Обработка вывода TON
         confirmWithdrawTon.addEventListener('click', async () => {
             const amount = parseFloat(withdrawTonAmountInput.value);
+            
+            // Проверяем подключен ли кошелек
+            if (!tonConnectUI.wallet) {
+                showNotification('Пожалуйста, подключите кошелёк TON', 'error');
+                closeWithdrawModal();
+                return;
+            }
+
             const address = tonConnectUI.wallet.account.address;
             
             // Валидация
@@ -908,12 +911,14 @@
                             await updateAllBalances();
                         } else {
                             showNotification(result.message || 'Ошибка при выводе средств', 'error');
+                            closeWithdrawModal();
                         }
                     }
                 }
             } catch (error) {
-                alert(`Error withdrawing TON: ${error}`);
+                console.error('Error withdrawing TON:', error);
                 showNotification('Ошибка при выводе средств', 'error');
+                closeWithdrawModal();
             } finally {
                 confirmWithdrawTon.disabled = false;
                 confirmWithdrawTon.textContent = 'Вывести';

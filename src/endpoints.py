@@ -1442,7 +1442,7 @@ async def withdraw_ton(
             status_code=400
         )
     except Exception as e:
-        logger.error(f"Error in withdraw_ton endpoint: {e}")
+        print(f"Error in withdraw_ton endpoint: {e}")
         return JSONResponse(
             {"status": "error", "message": "Internal server error"},
             status_code=500
