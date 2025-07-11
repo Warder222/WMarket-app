@@ -197,16 +197,9 @@
                     <img src="/{{ chat.product_image }}" class="chat-image" alt="{{ chat.product_title }}">
                     <button class="leave-chat-button" data-chatid="{{ chat.id }}">
                         <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Основная часть корзины -->
                             <rect x="4" y="6" width="12" height="11" rx="1" fill="#777"/>
-                            
-                            <!-- Верхняя часть (открытый край) -->
                             <rect x="2" y="5" width="16" height="2" fill="#999"/>
-                            
-                            <!-- Ручка -->
                             <rect x="8" y="2" width="4" height="2" fill="#bbb" rx="1"/>
-                            
-                            <!-- Горизонтальные линии (полоски на корзине) -->
                             <rect x="5" y="8" width="10" height="1" fill="#555" rx="0.5"/>
                             <rect x="5" y="11" width="10" height="1" fill="#555" rx="0.5"/>
                             <rect x="5" y="14" width="10" height="1" fill="#555" rx="0.5"/>
@@ -279,9 +272,10 @@
 
         document.querySelectorAll('.leave-chat-button').forEach(button => {
             button.addEventListener('click', function(e) {
+                alert("Функция удаления чата будет доступна позже")
                 e.stopPropagation();
-                currentChatIdToLeave = this.dataset.chatid;
-                confirmationModal.style.display = 'flex';
+                // currentChatIdToLeave = this.dataset.chatid;
+                // confirmationModal.style.display = 'flex';
             });
         });
 

@@ -686,11 +686,15 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
     if not chat_data:
         return RedirectResponse(url="/chats", status_code=303)
 
-    # Проверяем, заблокирован ли собеседник
-    other_user_id = chat_data["other_user"].tg_id
-    block = await check_user_blocked_post(other_user_id)
-    is_blocked = block.get("is_blocked", False)
+    is_blocked = False
     unblock_at = None
+
+    # Проверяем, заблокирован ли собеседник
+    if chat_data["other_user"]:
+        other_user_id = chat_data["other_user"].tg_id
+        block = await check_user_blocked_post(other_user_id)
+        is_blocked = block.get("is_blocked", False)
+        unblock_at = None
 
     if is_blocked:
         block_info = await check_user_block_post(other_user_id)
@@ -1177,7 +1181,6 @@ async def check_user_block(request: Request, session_token=Cookie(default=None))
     payload = await decode_jwt(session_token)
     block = await check_user_block_post(payload.get("tg_id"))
 
-    print(block)
     if block:
         unblock_time = block[0].replace(tzinfo=timezone.utc)  # если нет информации о часовом поясе
         current_time = datetime.now(timezone.utc)
