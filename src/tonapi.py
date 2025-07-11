@@ -112,11 +112,11 @@ async def withdraw_ton_request(wallet_address, amount):
 
         if current_balance < min_amount_with_fee:
             logger.warning(f"Insufficient wallet balance: {current_balance} < {min_amount_with_fee}")
-            return False
+            return {"status": False, "error": "Insufficient wallet balance"}
 
         # Отправляем TON (переводим в нанотоны)
         amount_nano = int(amount * 1e9)
-        await asyncio.wait_for(
+        transfer = await asyncio.wait_for(
             wallet.transfer(
                 destination=wallet_address,
                 amount=amount_nano,
@@ -125,14 +125,18 @@ async def withdraw_ton_request(wallet_address, amount):
             timeout=60
         )
 
-        return True
+        return {
+            "status": True,
+            "amount": amount,
+            "destination": wallet_address
+        }
 
     except asyncio.TimeoutError:
         logger.error("TON operation timed out")
-        return False
+        return {"status": False, "error": "Timeout"}
     except Exception as e:
         logger.error(f"Error in withdraw_ton_request: {e}")
-        return False
+        return {"status": False, "error": str(e)}
     finally:
         if wallet:
             try:

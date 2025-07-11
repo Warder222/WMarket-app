@@ -6,12 +6,12 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.database import async_session_maker, User
+from src.database.database import async_session_maker, User, TonTransaction
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -25,7 +25,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
-                                add_ton_balance)
+                                add_ton_balance, get_user_ton_transactions, create_ton_transaction)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
 
@@ -1300,26 +1300,20 @@ async def deposit_ton(
     payload = await decode_jwt(session_token)
     data = await request.json()
     amount = float(data.get("amount", 0))
-    tx_hash = data.get("tx_hash")
-
-    if not tx_hash:
-        return JSONResponse(
-            {"status": "error", "message": "Transaction hash is required"},
-            status_code=400
-        )
 
     if amount <= 0:
         return JSONResponse({"status": "error", "message": "Invalid amount"}, status_code=400)
 
     async with async_session_maker() as session:
         try:
-            # Get user info
-            user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
-            user = user.scalar_one_or_none()
-            if not user:
-                return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+            # Создаем запись о транзакции
+            transaction = await create_ton_transaction(
+                payload.get("tg_id"),
+                amount,
+                "deposit"
+            )
 
-            # Check transaction via tonapi
+            # Проверяем транзакцию через tonapi
             tx_info = await tonapi._make_request(
                 "GET",
                 f"v2/blockchain/accounts/{settings.WALLET_ADDRESS}/transactions",
@@ -1332,7 +1326,7 @@ async def deposit_ton(
             tx_found = False
             for tx in tx_info['transactions']:
                 if tx["account"]["address"] == settings.WALLET_CHECK_ADDRESS:
-                    if abs(tx['credit_phase']["credit"] - (amount  * 1000000000)) <= 0.01:
+                    if abs(tx['credit_phase']["credit"] - (amount * 1000000000)) <= 0.01:
                         tx_found = True
 
             if not tx_found:
@@ -1344,11 +1338,20 @@ async def deposit_ton(
                     status_code=202
                 )
 
-            # Update balance
-            user.ton_balance += amount
+            user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
+            user = user.scalar_one_or_none()
+            # Обновляем баланс
+            await add_ton_balance(payload.get("tg_id"), amount)
+
+            # Обновляем статус транзакции
+            await session.execute(
+                update(TonTransaction)
+                .where(TonTransaction.id == transaction.id)
+                .values(status="completed")
+            )
             await session.commit()
 
-            # Send notification
+            # Отправляем уведомление
             await send_notification_to_user(
                 payload.get("tg_id"),
                 f"💰 На ваш счёт WMarket поступили средства: {amount} TON"
@@ -1382,15 +1385,15 @@ async def withdraw_ton(
         amount = float(data.get("amount", 0))
         address = data.get("address", "")
 
-        # Валидация
-        if amount < 0.1:
-            return JSONResponse(
-                {"status": "error", "message": "Минимальная сумма вывода 0.1 TON"},
-                status_code=400
-            )
-
         async with async_session_maker() as session:
             try:
+                # Создаем запись о транзакции
+                tx = await create_ton_transaction(
+                    payload.get("tg_id"),
+                    amount,
+                    "withdraw"
+                )
+
                 # Проверяем баланс пользователя
                 user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
                 user = user.scalar_one_or_none()
@@ -1398,7 +1401,6 @@ async def withdraw_ton(
                 if not user:
                     return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
 
-                # Проверяем баланс с учетом минимальной суммы
                 if user.ton_balance < amount:
                     return JSONResponse(
                         {"status": "error", "message": "Недостаточно средств на балансе"},
@@ -1408,25 +1410,40 @@ async def withdraw_ton(
                 # Выполняем вывод
                 withdraw_result = await withdraw_ton_request(address, amount)
 
-                if withdraw_result:
-                    # Обновляем баланс пользователя только после успешного вывода
-                    user.ton_balance -= amount
-                    await session.commit()
-
-                    await send_notification_to_user(
-                        payload.get("tg_id"),
-                        f"✅ {amount} TON успешно отправлены на адрес {address[:6]}...{address[-4:]}"
+                if not withdraw_result or not withdraw_result.get("status"):
+                    error_msg = withdraw_result.get("error", "Неизвестная ошибка")
+                    await session.execute(
+                        update(TonTransaction)
+                        .where(TonTransaction.id == tx.id)
+                        .values(status="failed")
                     )
-
-                    return JSONResponse({
-                        "status": "success",
-                        "message": "Средства успешно отправлены"
-                    })
-                else:
+                    await session.commit()
                     return JSONResponse({
                         "status": "failed",
-                        "message": "Не удалось выполнить вывод. Попробуйте позже."
+                        "message": f"Не удалось выполнить вывод: {error_msg}"
                     })
+
+                # Обновляем баланс пользователя
+                user.ton_balance -= amount
+
+                # Обновляем статус транзакции
+                await session.execute(
+                    update(TonTransaction)
+                    .where(TonTransaction.id == tx.id)
+                    .values(status="completed")
+                )
+
+                await session.commit()
+
+                await send_notification_to_user(
+                    payload.get("tg_id"),
+                    f"✅ {amount} TON успешно отправлены на адрес {address[:6]}...{address[-4:]}"
+                )
+
+                return JSONResponse({
+                    "status": "success",
+                    "message": "Средства успешно отправлены"
+                })
 
             except Exception as e:
                 await session.rollback()
@@ -1447,3 +1464,26 @@ async def withdraw_ton(
             {"status": "error", "message": "Internal server error"},
             status_code=500
         )
+
+
+@wmarket_router.get("/get_ton_transactions")
+async def get_ton_transactions(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    transactions = await get_user_ton_transactions(payload.get("tg_id"))
+
+    return JSONResponse({
+        "status": "success",
+        "transactions": [
+            {
+                "id": tx.id,
+                "amount": tx.amount,
+                "type": tx.transaction_type,
+                "status": tx.status,
+                "created_at": tx.created_at.isoformat(),
+            }
+            for tx in transactions
+        ]
+    })

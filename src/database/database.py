@@ -121,3 +121,14 @@ class UserBlock(Base):
     reason = Column(String)
     blocked_at = Column(DateTime(timezone=True), server_default=func.now())
     unblock_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class TonTransaction(Base):
+    __tablename__ = 'ton_transactions'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey('users.tg_id', ondelete='CASCADE'))
+    amount = Column(Float)
+    transaction_type = Column(String)  # 'deposit' или 'withdraw'
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String, default='pending')  # 'pending', 'completed', 'failed'

@@ -122,7 +122,6 @@
 
     #ton-connect {
         width: 60vw;
-        /* max-width: 300px; */
         margin: 0 auto;
     }
 
@@ -172,11 +171,26 @@
         height: 24px;
     }
 
+    .history-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 8px;
+    }
+
     .history-item {
         display: flex;
         justify-content: space-between;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border-color);
+        align-items: center;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+
+    .history-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .history-item-info {
@@ -191,11 +205,12 @@
     .history-item-date {
         font-size: 12px;
         color: var(--text-color);
-        opacity: 0.6;
+        opacity: 0.7;
     }
 
     .history-item-amount {
         font-weight: bold;
+        font-size: 16px;
     }
 
     .history-item-amount.positive {
@@ -204,6 +219,42 @@
 
     .history-item-amount.negative {
         color: #F44336;
+    }
+
+    .history-item-status {
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 8px;
+    }
+
+    .status-pending {
+        background-color: #FFC107;
+        color: #000;
+    }
+
+    .status-completed {
+        background-color: #4CAF50;
+        color: #fff;
+    }
+
+    .status-failed {
+        background-color: #F44336;
+        color: #fff;
+    }
+
+    .history-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .history-container::-webkit-scrollbar-track {
+        background: var(--card-bg);
+        border-radius: 3px;
+    }
+
+    .history-container::-webkit-scrollbar-thumb {
+        background: var(--primary-color);
+        border-radius: 3px;
     }
 
     /* Модальное окно для отправки TON */
@@ -428,7 +479,7 @@
     </div>
 
     <div id="tonHistory" style="display: none;">
-        <div class="history-empty">Нет операций</div>
+        <div class="history-container" id="tonHistoryContainer"></div>
     </div>
 
     <div class="currency-switcher">
@@ -493,6 +544,74 @@
             notification.style.opacity = '0';
             setTimeout(() => notification.remove(), 300);
         }, duration);
+    }
+
+    // Функция для форматирования даты
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    // Функция для отображения истории операций
+    async function updateTransactionHistory() {
+        try {
+            const response = await fetch('/get_ton_transactions');
+            if (response.ok) {
+                const data = await response.json();
+                
+                const historyContainer = document.getElementById('tonHistoryContainer');
+                
+                if (data.status === 'success' && data.transactions.length > 0) {
+                    historyContainer.innerHTML = '';
+                    
+                    // Фильтруем только успешные транзакции
+                    const successfulTransactions = data.transactions.filter(tx => tx.status === 'completed');
+                    
+                    if (successfulTransactions.length === 0) {
+                        historyContainer.innerHTML = '<div class="history-empty">Нет операций</div>';
+                        return;
+                    }
+                    
+                    successfulTransactions.forEach(tx => {
+                        const txElement = document.createElement('div');
+                        txElement.className = 'history-item';
+                        
+                        const txInfo = document.createElement('div');
+                        txInfo.className = 'history-item-info';
+                        
+                        const txTitle = document.createElement('div');
+                        txTitle.className = 'history-item-title';
+                        txTitle.textContent = tx.type === 'deposit' ? 'Пополнение' : 'Вывод средств';
+                        
+                        const txDate = document.createElement('div');
+                        txDate.className = 'history-item-date';
+                        txDate.textContent = formatDate(tx.created_at);
+                        
+                        txInfo.appendChild(txTitle);
+                        txInfo.appendChild(txDate);
+                        
+                        const txAmount = document.createElement('div');
+                        txAmount.className = `history-item-amount ${tx.type === 'deposit' ? 'positive' : 'negative'}`;
+                        txAmount.textContent = `${tx.type === 'deposit' ? '+' : '-'}${tx.amount} TON`;
+                        
+                        txElement.appendChild(txInfo);
+                        txElement.appendChild(txAmount);
+                        
+                        historyContainer.appendChild(txElement);
+                    });
+                } else {
+                    historyContainer.innerHTML = '<div class="history-empty">Нет операций</div>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading transaction history:', error);
+        }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -562,7 +681,6 @@
                             },
                             body: JSON.stringify({
                                 amount: txData.amount,
-                                tx_hash: txData.tx_hash,
                                 wallet: tonConnectUI.wallet
                             })
                         });
@@ -622,6 +740,9 @@
                 rubHistory.style.display = 'none';
                 tonHistory.style.display = 'block';
                 tonConnectContainer.style.display = 'block';
+                
+                // Обновляем историю операций при переключении на TON
+                await updateTransactionHistory();
             }
             
             // Сохраняем выбор валюты
@@ -734,7 +855,6 @@
                 // Сохраняем данные транзакции перед отправкой
                 const txData = {
                     amount: amount,
-                    tx_hash: 'pending', // временное значение
                     recipient: RECIPIENT_ADDRESS,
                     timestamp: Date.now()
                 };
@@ -744,10 +864,6 @@
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
                 if (result) {
-                    // Обновляем данные транзакции с реальным tx_hash
-                    txData.tx_hash = result.boc;
-                    localStorage.setItem('pendingTonTransaction', JSON.stringify(txData));
-                    
                     // Show loading state
                     confirmSendTon.disabled = true;
                     confirmSendTon.textContent = 'Проверка транзакции...';
@@ -760,7 +876,6 @@
                         },
                         body: JSON.stringify({
                             amount: amount,
-                            tx_hash: result.boc,
                             wallet: tonConnectUI.wallet
                         })
                     });
@@ -775,6 +890,9 @@
                         // Удаляем запись о транзакции, так как сервер её обработал
                         localStorage.removeItem('pendingTonTransaction');
                         
+                        // Обновляем историю операций
+                        await updateTransactionHistory();
+                        
                         // Poll for balance updates
                         const checkBalance = async () => {
                             await updateAllBalances();
@@ -787,6 +905,7 @@
                         closeModal();
                         localStorage.removeItem('pendingTonTransaction');
                         await updateAllBalances();
+                        await updateTransactionHistory();
                     } else {
                         showNotification('Ошибка: ' + (depositData.message || 'Неизвестная ошибка'), 'error');
                         closeModal();
@@ -805,8 +924,6 @@
                 }
             }
         });
-
-        // Добавьте этот код в конец блока scripts в wallet.html
 
         // Модальное окно для вывода TON
         const withdrawTonModal = document.getElementById('withdrawTonModal');
@@ -909,6 +1026,7 @@
                             showNotification('Запрос на вывод принят! Средства будут зачислены в ближайшее время.', 'success');
                             closeWithdrawModal();
                             await updateAllBalances();
+                            await updateTransactionHistory();
                         } else {
                             showNotification(result.message || 'Ошибка при выводе средств', 'error');
                             closeWithdrawModal();
@@ -927,6 +1045,16 @@
 
         // Обновляем балансы при загрузке
         await updateAllBalances();
+        
+        // Обновляем историю операций при загрузке
+        await updateTransactionHistory();
+        
+        // Обновляем историю при изменении статуса кошелька
+        tonConnectUI.onStatusChange(async (wallet) => {
+            if (wallet) {
+                await updateTransactionHistory();
+            }
+        });
     });
 </script>
 {% endblock %}
