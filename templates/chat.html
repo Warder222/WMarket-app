@@ -5,7 +5,7 @@
     .chat-container {
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        height: 87vh;
         padding: 16px;
         padding-bottom: 0; /* Убираем отступ снизу, так как навигации нет */
     }
@@ -46,7 +46,7 @@
     .chat-messages {
         flex: 1;
         overflow-y: auto;
-        padding-bottom: 120px;
+        padding-bottom: 30px;
     }
 
     .message {
@@ -282,18 +282,10 @@
             <div class="product-price">{{ product.product_price }} ₽</div>
         </div>
     </div>
-    <div style="background-color: var(--card-bg); color: var(--secondary-text); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; text-align: center; border-left: 3px solid var(--primary-color);">
-            Уважаемый пользователь,<br>
-            Маркет не несёт ответственности за предоплату/оплату<br>
-            напрямую между пользователями (самостоятельные переводы и сделки).
-        </div>
     <div class="chat-messages" id="chatMessages">
         {% for message in messages %}
         <div class="message {% if message.sender_id == current_user.id %}message-sent{% elif message.sender_id == 0 %}message-admin{% else %}message-received{% endif %}">
             <div class="message-content">
-                {% if message.sender_id == 0 %}
-                    <strong>Администратор:</strong><br>
-                {% endif %}
                 {{ message.content }}
             </div>
             <div class="message-time">
@@ -359,7 +351,7 @@
         const isAdmin = currentUserId === 0;
 
         // Удаляем все сообщения, которые были загружены при рендеринге шаблона
-        chatMessages.innerHTML = '';
+        chatMessages.innerHTML = '<div style="background-color: var(--card-bg); color: var(--secondary-text); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; text-align: center; border-left: 3px solid var(--primary-color);">Уважаемый пользователь,<br>Маркет не несёт ответственности<br> за предоплату/оплату<br>напрямую между пользователями (самостоятельные переводы и сделки).</div>';
 
         // Для админа - получаем информацию об участниках чата
         let participantsInfo = {};
