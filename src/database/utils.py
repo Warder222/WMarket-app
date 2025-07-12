@@ -534,7 +534,7 @@ async def get_chat_info_post(chat_id):
         }
 
 
-async def send_message(chat_id: int, sender_id: int, content: str):
+async def send_message(chat_id: int, sender_id: int, content: str, mark_unread: bool = True):
     async with async_session_maker() as db:
         # Получаем chat и определяем получателя
         participants = await db.execute(
@@ -550,7 +550,8 @@ async def send_message(chat_id: int, sender_id: int, content: str):
             chat_id=chat_id,
             sender_id=sender_id,
             receiver_id=receiver_id,
-            content=content
+            content=content,
+            is_read=not mark_unread  # Устанавливаем статус прочитанности
         )
         db.add(message)
         await db.commit()

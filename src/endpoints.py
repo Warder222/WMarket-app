@@ -766,7 +766,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             message_data = json.loads(data)
 
             if message_data["type"] == "get_history":
-                # Отправляем историю сообщений при подключении
                 chat_data = await get_chat_messages(message_data["chat_id"], int(user_id))
                 if chat_data:
                     await websocket.send_text(json.dumps({
@@ -785,18 +784,32 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                     }))
 
             if message_data["type"] == "send_message" and user_id != "0":
+                # Получаем получателя из базы данных
+                participants = await get_chat_participants(message_data["chat_id"])
+                receiver_id = next((p.user_id for p in participants if p.user_id != int(user_id)), None)
+
+                if not receiver_id:
+                    continue
+
+                # Проверяем, подключен ли получатель к чату
+                receiver_connected = manager.is_connected(str(receiver_id))
+
                 message = await send_message(
                     message_data["chat_id"],
                     int(user_id),
-                    message_data["content"]
+                    message_data["content"],
+                    mark_unread=not receiver_connected
                 )
+
                 if message:
-                    # Отправляем уведомление о новом сообщении
-                    await notify_new_message(
-                        message_data["chat_id"],
-                        int(user_id),
-                        message_data["content"]
-                    )
+                    # Отправляем уведомление только если получатель не в чате
+                    if not receiver_connected:
+                        await notify_new_message(
+                            message_data["chat_id"],
+                            int(user_id),
+                            message_data["content"]
+                        )
+
                     await manager.broadcast(json.dumps({
                         "type": "new_message",
                         "chat_id": message.chat_id,
@@ -809,7 +822,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     except WebSocketDisconnect:
         manager.disconnect(user_id)
     except Exception as e:
-        print(f"WebSocket error: {str(e)}")
+        print(f"WebSocket error: {e}")
         await websocket.close(code=1011)
 
 
@@ -922,7 +935,7 @@ async def resolve_report_route(
 # bot___________________________________________________________________________________________________________________
 async def notify_new_message(chat_id: int, sender_id: int, content: str):
     """
-    Отправляет уведомление о новом сообщении в чате
+    Отправляет уведомление о новом сообщении в чате только если получатель не в чате
     :param chat_id: ID чата
     :param sender_id: ID отправителя сообщения
     :param content: Текст сообщения
@@ -935,6 +948,12 @@ async def notify_new_message(chat_id: int, sender_id: int, content: str):
             return
 
         receiver_id = chat_data["other_user"].tg_id
+
+        # Проверяем, подключен ли получатель к чату
+        if manager.is_connected(str(receiver_id)):
+            print(f"User {receiver_id} is in chat, skipping notification")
+            return
+
         product = chat_data["product"]
         username = await get_user_info(sender_id)
 

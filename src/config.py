@@ -46,8 +46,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
-        # Перенесите accept() сюда, если он был в эндпоинте
-        await websocket.accept()  # ← Только ОДИН раз в коде!
+        await websocket.accept()
         self.active_connections[user_id] = websocket
 
     def disconnect(self, user_id: str):
@@ -61,5 +60,9 @@ class ConnectionManager:
     async def broadcast(self, message: str):
         for connection in self.active_connections.values():
             await connection.send_text(message)
+
+    def is_connected(self, user_id: str) -> bool:
+        """Проверяет, подключен ли пользователь к WebSocket"""
+        return user_id in self.active_connections
 
 manager = ConnectionManager()
