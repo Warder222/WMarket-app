@@ -906,7 +906,31 @@ async def get_user_active_deals(tg_id: int):
                 ),
                 Deal.status == 'active'
             ).order_by(Deal.created_at.desc()))
-        return result.scalars().all()
+        deals = result.scalars().all()
+
+        # Добавляем информацию о пользователях
+        deals_with_users = []
+        for deal in deals:
+            seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+            seller = seller.scalar_one_or_none()
+            buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+            buyer = buyer.scalar_one_or_none()
+
+            deals_with_users.append({
+                "id": deal.id,
+                "product_name": deal.product_name,
+                "seller_id": deal.seller_id,
+                "buyer_id": deal.buyer_id,
+                "seller_username": seller.username if seller else "Unknown",
+                "buyer_username": buyer.username if buyer else "Unknown",
+                "amount": deal.amount,
+                "currency": deal.currency,
+                "status": deal.status,
+                "created_at": deal.created_at
+            })
+
+        return deals_with_users
+
 
 async def get_user_completed_deals(tg_id: int):
     """Получаем завершенные сделки пользователя"""

@@ -800,13 +800,51 @@
             document.getElementById('tonAmount').textContent = tonAmount;
         }
         
-        function processPayment(method) {
-            if (method === 'rub') {
-                alert('Оплата рублями будет обработана');
+        async function processPayment(method) {
+            const rubAmount = {{ product_info[3] }};
+            const tonAmount = parseFloat(document.getElementById('tonAmount').textContent);
+            
+            try {
+                // Проверяем баланс пользователя
+                const balanceResponse = await fetch('/get_wallet_balance');
+                const balanceData = await balanceResponse.json();
+                
+                if (method === 'rub' && balanceData.rub_balance < rubAmount) {
+                    alert(`Недостаточно средств на рублёвом балансе. Требуется: ${rubAmount} ₽, доступно: ${balanceData.rub_balance} ₽`);
+                    return;
+                }
+                
+                if (method === 'ton' && balanceData.ton_balance < tonAmount) {
+                    alert(`Недостаточно средств на TON балансе. Требуется: ${tonAmount} TON, доступно: ${balanceData.ton_balance} TON`);
+                    return;
+                }
+                
+                // Создаем сделку
+                const response = await fetch('/create_deal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_id: {{ product_info[0] }},
+                        amount: method === 'rub' ? rubAmount : tonAmount,
+                        currency: method
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('Оплата прошла успешно! Сделка создана.');
+                    window.location.href = '/deals';
+                } else {
+                    alert('Ошибка при создании сделки: ' + result.message);
+                }
+                
                 closePaymentModal();
-            } else if (method === 'ton') {
-                alert('Оплата TON будет обработана');
-                closePaymentModal();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Произошла ошибка при обработке платежа');
             }
         }
     </script>

@@ -142,8 +142,9 @@ class Deal(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     product_name = Column(String)
-    seller_id = Column(Integer)
-    buyer_id = Column(Integer)
+    seller_id = Column(BigInteger, ForeignKey('users.tg_id'))
+    buyer_id = Column(BigInteger, ForeignKey('users.tg_id'))
+    currency = Column(String)
     amount = Column(Float)
     status = Column(String, default="active")  # active, completed, cancelled
     created_at = Column(DateTime(timezone=True), server_default=func.now())

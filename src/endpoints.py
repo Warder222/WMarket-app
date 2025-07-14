@@ -11,7 +11,7 @@ from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat
+from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -25,7 +25,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
-                                add_ton_balance, get_user_ton_transactions, create_ton_transaction)
+                                add_ton_balance, get_user_ton_transactions, create_ton_transaction,
+                                get_user_active_deals, get_user_completed_deals)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -1526,8 +1527,8 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
             # Здесь должна быть логика получения активных и завершенных сделок
             # Временные заглушки для примера
-            active_deals = []  # await get_user_active_deals(payload.get("tg_id"))
-            completed_deals = []  # await get_user_completed_deals(payload.get("tg_id"))
+            active_deals = await get_user_active_deals(payload.get("tg_id"))
+            completed_deals = await get_user_completed_deals(payload.get("tg_id"))
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
@@ -1538,7 +1539,8 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                 "completed_deals": completed_deals,
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "current_tab": tab
+                "current_tab": tab,
+                "user_tg_id": payload.get("tg_id")
             }
             return templates.TemplateResponse("deals.html", context=context)
 
@@ -1584,3 +1586,146 @@ async def get_ton_to_rub_rate_endpoint():
         return JSONResponse({"rate": rate})
     else:
         return JSONResponse({"status": "error", "message": "Не удалось получить курс TON/RUB"}, status_code=500)
+
+
+@wmarket_router.post("/create_deal")
+async def create_deal(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    product_id = data.get("product_id")
+    amount = data.get("amount")
+    currency = data.get("currency")
+
+    # Получаем информацию о продукте
+    product = await get_product_info(product_id, None)
+    if not product:
+        return JSONResponse({"status": "error", "message": "Product not found"}, status_code=404)
+
+    seller_id = product[1]
+    buyer_id = payload.get("tg_id")
+
+    if seller_id == buyer_id:
+        return JSONResponse({"status": "error", "message": "Cannot buy your own product"}, status_code=400)
+
+    async with async_session_maker() as session:
+        try:
+            # Проверяем баланс и списываем средства
+            user = await session.execute(select(User).where(User.tg_id == buyer_id))
+            user = user.scalar_one_or_none()
+
+            if currency == 'rub':
+                if user.rub_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
+                        status_code=400
+                    )
+                user.rub_balance -= amount
+            else:  # TON
+                if user.ton_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на TON балансе"},
+                        status_code=400
+                    )
+                user.ton_balance -= amount
+
+            # Создаем сделку
+            deal = Deal(
+                product_id=product_id,
+                product_name=product[2],
+                seller_id=seller_id,
+                buyer_id=buyer_id,
+                amount=amount,
+                currency=currency,
+                status="active",
+                created_at=datetime.now(timezone.utc)
+            )
+            session.add(deal)
+            await session.commit()
+
+            # Отправляем уведомление продавцу
+            await send_notification_to_user(
+                seller_id,
+                f"💰 Товар оплачен, но не подтверждён!\n\n"
+                f"📌 Название: {product[2]}\n"
+                f"💰 Сумма: {amount} {currency.upper()}\n"
+                f"👤 Покупатель: @{user.username or 'без username'}\n\n"
+                f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error creating deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+@wmarket_router.post("/confirm_deal")
+async def confirm_deal(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    deal_id = data.get("deal_id")
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            # Проверяем, что это покупатель подтверждает сделку
+            if deal.buyer_id != payload.get("tg_id"):
+                return JSONResponse(
+                    {"status": "error", "message": "Only buyer can confirm deal"},
+                    status_code=403
+                )
+
+            # Обновляем статус сделки
+            deal.status = "completed"
+            deal.completed_at = datetime.now(timezone.utc)
+
+            # Зачисляем средства продавцу
+            seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+            seller = seller.scalar_one_or_none()
+
+            if deal.currency == 'rub':
+                seller.rub_balance += deal.amount
+            else:
+                seller.ton_balance += deal.amount
+
+            await session.commit()
+
+            # Отправляем уведомление продавцу
+            await send_notification_to_user(
+                deal.seller_id,
+                f"✅ Сделка завершена!\n\n"
+                f"📌 Товар: {deal.product_name}\n"
+                f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"👤 Покупатель подтвердил получение товара."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error confirming deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )

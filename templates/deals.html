@@ -62,49 +62,119 @@
         background-color: var(--card-bg);
         border-radius: 12px;
         padding: 16px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 4px var(--shadow-color);
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid var(--border-color);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .deal-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     
     .deal-header {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 8px;
+        align-items: center;
+        margin-bottom: 12px;
     }
     
     .deal-title {
         font-weight: 600;
+        font-size: 16px;
+        color: var(--text-color);
     }
     
     .deal-status {
-        padding: 4px 8px;
-        border-radius: 4px;
+        padding: 4px 10px;
+        border-radius: 12px;
         font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .status-active {
         background-color: rgba(63, 136, 248, 0.1);
         color: var(--primary-color);
+        border: 1px solid rgba(63, 136, 248, 0.3);
     }
     
     .status-completed {
         background-color: rgba(40, 167, 69, 0.1);
         color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .status-cancelled {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.3);
     }
     
     .deal-info {
         display: flex;
         justify-content: space-between;
-        margin-top: 8px;
+        margin-top: 12px;
         font-size: 14px;
+        color: var(--text-secondary);
+    }
+
+    .deal-amount {
+        font-weight: 600;
         color: var(--text-color);
-        opacity: 0.8;
+        margin: 8px 0;
+    }
+
+    .deal-currency {
+        font-weight: 500;
+    }
+
+    .deal-currency.rub {
+        color: #4CAF50;
+    }
+
+    .deal-currency.ton {
+        color: #0088CC;
+    }
+
+    .deal-counterparty {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .deal-counterparty-username {
+        font-weight: 500;
+        color: var(--text-color);
+    }
+
+    .deal-time {
+        color: var(--text-secondary);
+        font-size: 13px;
     }
     
     .empty-state {
         text-align: center;
         padding: 40px 20px;
-        color: var(--text-color);
+        color: var(--text-secondary);
+        opacity: 0.7;
+    }
+
+    .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state-text {
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+
+    .empty-state-subtext {
+        font-size: 14px;
         opacity: 0.6;
     }
 
@@ -120,6 +190,48 @@
 
     .tab-content.active {
         display: block;
+    }
+
+    .deal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .deal-btn {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+    }
+
+    .deal-btn.confirm {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .deal-btn.confirm:hover {
+        background-color: #1a73e8;
+    }
+
+    .deal-btn.cancel {
+        background-color: #f8f9fa;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+    }
+
+    .deal-btn.cancel:hover {
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+
+    .deal-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 </style>
 {% endblock %}
@@ -142,18 +254,42 @@
                 <div class="deal-card">
                     <div class="deal-header">
                         <div class="deal-title">{{ deal.product_name }}</div>
-                        <div class="deal-status status-active">Активна</div>
+                        <div class="deal-status status-active">
+                            {% if deal.buyer_id == user_tg_id %}Ожидает получения{% else %}Требует подтверждения{% endif %}
+                        </div>
                     </div>
-                    <div>Сумма: {{ deal.amount }} ₽</div>
+                    <div class="deal-amount">
+                        Сумма: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
+                            {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
+                        </span>
+                    </div>
                     <div class="deal-info">
-                        <div>С покупателем: @{{ deal.buyer_username }}</div>
-                        <div>{{ deal.created_at }}</div>
+                        <div class="deal-counterparty">
+                            {% if deal.buyer_id == user_tg_id %}
+                                <span>Продавец:</span>
+                                <span class="deal-counterparty-username">@{{ deal.seller_username }}</span>
+                            {% else %}
+                                <span>Покупатель:</span>
+                                <span class="deal-counterparty-username">@{{ deal.buyer_username }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="deal-time">{{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                    </div>
+                    <div class="deal-actions">
+                        {% if deal.buyer_id == user_tg_id %}
+                            <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">Подтвердить получение</button>
+                            <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                        {% else %}
+                            <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <p>У вас нет активных сделок</p>
+                    <div class="empty-state-icon">📭</div>
+                    <div class="empty-state-text">У вас нет активных сделок</div>
+                    <div class="empty-state-subtext">Здесь будут отображаться ваши текущие сделки</div>
                 </div>
             {% endif %}
         </div>
@@ -165,18 +301,40 @@
                 <div class="deal-card">
                     <div class="deal-header">
                         <div class="deal-title">{{ deal.product_name }}</div>
-                        <div class="deal-status status-completed">Завершена</div>
+                        <div class="deal-status {% if deal.status == 'completed' %}status-completed{% else %}status-cancelled{% endif %}">
+                            {% if deal.status == 'completed' %}Завершена{% else %}Отменена{% endif %}
+                        </div>
                     </div>
-                    <div>Сумма: {{ deal.amount }} ₽</div>
+                    <div class="deal-amount">
+                        Сумма: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
+                            {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
+                        </span>
+                    </div>
                     <div class="deal-info">
-                        <div>С покупателем: @{{ deal.buyer_username }}</div>
-                        <div>{{ deal.created_at }}</div>
+                        <div class="deal-counterparty">
+                            {% if deal.buyer_id == user_tg_id %}
+                                <span>Продавец:</span>
+                                <span class="deal-counterparty-username">@{{ deal.seller_username }}</span>
+                            {% else %}
+                                <span>Покупатель:</span>
+                                <span class="deal-counterparty-username">@{{ deal.buyer_username }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="deal-time">
+                            {% if deal.completed_at %}
+                                {{ deal.completed_at.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                {{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <p>У вас нет завершенных сделок</p>
+                    <div class="empty-state-icon">📜</div>
+                    <div class="empty-state-text">У вас нет завершенных сделок</div>
+                    <div class="empty-state-subtext">Здесь будет история ваших сделок</div>
                 </div>
             {% endif %}
         </div>
@@ -186,6 +344,54 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Обработчики для кнопок подтверждения сделки
+        document.querySelectorAll('.confirm-deal-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const dealId = btn.dataset.dealId;
+                if (confirm('Вы уверены, что получили товар? После подтверждения средства будут переведены продавцу.')) {
+                    const response = await fetch('/confirm_deal', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ deal_id: dealId })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert('Сделка успешно подтверждена! Средства переведены продавцу.');
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка: ' + result.message);
+                    }
+                }
+            });
+        });
+
+        // Обработчики для кнопок отмены сделки
+        document.querySelectorAll('.cancel-deal-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const dealId = btn.dataset.dealId;
+                if (confirm('Вы уверены, что хотите отменить сделку? Средства будут возвращены.')) {
+                    const response = await fetch('/cancel_deal', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ deal_id: dealId })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert('Сделка отменена. Средства возвращены покупателю.');
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка: ' + result.message);
+                    }
+                }
+            });
+        });
+
         // Устанавливаем активную вкладку на основе параметра URL
         const urlParams = new URLSearchParams(window.location.search);
         const activeTab = urlParams.get('tab') || 'active';
