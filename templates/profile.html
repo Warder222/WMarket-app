@@ -297,6 +297,42 @@
         color: #999;
     }
 
+    .avatar-container {
+        position: relative;
+        display: inline-block;
+        margin-top: 40px; /* Опускаем весь блок с аватаром ниже */
+    }
+
+    .admin-crown {
+        position: absolute;
+        top: -50px; /* Поднимаем корону выше */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px; /* Увеличиваем размер короны */
+        height: 70px;
+        z-index: 10;
+        filter: drop-shadow(0 3px 6px rgba(33, 150, 243, 0.4));
+        transition: all 0.3s ease;
+        animation: crown-float 3s ease-in-out infinite alternate;
+        fill: #1976D2; /* Синий цвет короны */
+    }
+
+    {% if admin_crown %}
+        .avatar {
+            margin-top: 20px; /* Дополнительный отступ аватара */
+        }
+    {% endif %}
+
+    .avatar-container:hover .admin-crown {
+        transform: translateX(-50%) scale(1.15);
+        filter: drop-shadow(0 5px 10px rgba(33, 150, 243, 0.6));
+    }
+
+    @keyframes crown-float {
+        0% { transform: translateX(-50%) translateY(0px); }
+        100% { transform: translateX(-50%) translateY(-8px); }
+    }
+
     @media (max-width: 400px) {
         .ads-grid {
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -342,7 +378,14 @@
     </div>
 
     <div class="profile-info">
-        <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
+        <div class="avatar-container">
+            {% if admin_crown %}
+            <svg class="admin-crown" viewBox="0 0 170.23 170.23">
+                <path d="M168.695,54.759c-1.424-1.124-3.406-1.187-4.861-0.119l-45.395,32.329L88.771,24.415c-1.34-2.818-5.98-2.818-7.309,0 L51.446,87.702L6.448,54.672c-1.46-1.079-3.464-1.042-4.899,0.081c-1.429,1.124-1.936,3.051-1.239,4.736l30.955,74.667 c0.147,0.343,0.385,0.606,0.606,0.896c5.938,10.035,35.158,12.878,53.246,12.878c17.95,0,46.886-2.79,53.124-12.646 c0.29-0.332,0.549-0.696,0.723-1.129l30.961-74.667C170.61,57.81,170.119,55.887,168.695,54.759z M85.112,139.819 c-28.039,0-44.645-5.543-46.269-8.264c-0.011-0.048-0.011-0.09-0.021-0.121c1.529-3.164,18.151-8.754,46.291-8.754 c28.271,0,44.946,5.647,46.327,8.342C130.058,134.171,113.383,139.819,85.112,139.819z M134.561,123.608 c-10.183-6.935-33.919-9.039-49.449-9.039c-15.53,0-39.277,2.104-49.449,9.039L13.34,69.777L50.597,97.12 c0.981,0.717,2.22,0.96,3.385,0.664c1.176-0.301,2.152-1.097,2.668-2.193L85.112,35.6l28.081,59.21 c0.512,1.081,1.472,1.888,2.632,2.183c1.16,0.307,2.395,0.074,3.37-0.622l37.831-26.952L134.561,123.608z"/>
+            </svg>
+            {% endif %}
+            <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
+        </div>
         <div class="username">{{ user_info[1] }}</div>
         {% if user_info[0] == user_tg_id %}
         <div class="earned-container">

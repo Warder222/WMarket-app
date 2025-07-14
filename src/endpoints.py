@@ -529,7 +529,7 @@ async def profile(request: Request, session_token=Cookie(default=None)):
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
             referrals_count = await get_ref_count(payload.get("tg_id"))
-
+            admin_crown = await is_admin(user_info[0])
             context = {
                 "request": request,
                 "reputation": reputation,
@@ -541,7 +541,8 @@ async def profile(request: Request, session_token=Cookie(default=None)):
                 "now": now,
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "referrals_count": referrals_count
+                "referrals_count": referrals_count,
+                "admin_crown": admin_crown
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -583,6 +584,7 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            admin_crown = await is_admin(user_info[0])
             context = {
                 "request": request,
                 "reputation": reputation,
@@ -595,7 +597,8 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "is_blocked": is_blocked,
-                "unblock_at": unblock_at
+                "unblock_at": unblock_at,
+                "admin_crown": admin_crown
             }
             return templates.TemplateResponse("profile.html", context=context)
 
