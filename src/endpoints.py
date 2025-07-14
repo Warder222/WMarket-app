@@ -1512,3 +1512,35 @@ async def get_ton_transactions(request: Request, session_token=Cookie(default=No
             for tx in transactions
         ]
     })
+
+@wmarket_router.get("/deals")
+async def deals(request: Request, session_token=Cookie(default=None)):
+    if session_token:
+        users = await get_all_users()
+        payload = await decode_jwt(session_token)
+
+        if (payload.get("tg_id") in users
+                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+            # Получаем параметр tab из URL (по умолчанию 'active')
+            tab = request.query_params.get('tab', 'active')
+
+            # Здесь должна быть логика получения активных и завершенных сделок
+            # Временные заглушки для примера
+            active_deals = []  # await get_user_active_deals(payload.get("tg_id"))
+            completed_deals = []  # await get_user_completed_deals(payload.get("tg_id"))
+
+            all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+            admin_res = await is_admin(payload.get("tg_id"))
+
+            context = {
+                "request": request,
+                "active_deals": active_deals,
+                "completed_deals": completed_deals,
+                "all_undread_count_message": all_undread_count_message,
+                "admin": admin_res,
+                "current_tab": tab
+            }
+            return templates.TemplateResponse("deals.html", context=context)
+
+    response = RedirectResponse(url="/", status_code=303)
+    return response

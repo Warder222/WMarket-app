@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func, BigInteger, Boolean, Float
 from sqlalchemy.orm import DeclarativeBase
@@ -132,3 +134,17 @@ class TonTransaction(Base):
     transaction_type = Column(String)  # 'deposit' или 'withdraw'
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String, default='pending')  # 'pending', 'completed', 'failed'
+
+
+class Deal(Base):
+    __tablename__ = "deals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    product_name = Column(String)
+    seller_id = Column(Integer)
+    buyer_id = Column(Integer)
+    amount = Column(Float)
+    status = Column(String, default="active")  # active, completed, cancelled
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)

@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block style %}
+<style>
+    .header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background-color: var(--bg-color);
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .page-title {
+        font-size: 20px;
+        font-weight: bold;
+    }
+
+    .tabs-header {
+        display: flex;
+        width: 100%;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab {
+        flex: 1;
+        text-align: center;
+        padding: 16px 0;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        position: relative;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+    }
+
+    .tab.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+
+    .tab-indicator {
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        height: 3px;
+        width: 50%;
+        background-color: var(--primary-color);
+        transition: all 0.3s ease;
+    }
+
+    .deals-container {
+        padding: 16px;
+        margin-bottom: 60px;
+    }
+    
+    .deal-card {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px var(--shadow-color);
+    }
+    
+    .deal-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+    
+    .deal-title {
+        font-weight: 600;
+    }
+    
+    .deal-status {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    
+    .status-active {
+        background-color: rgba(63, 136, 248, 0.1);
+        color: var(--primary-color);
+    }
+    
+    .status-completed {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+    
+    .deal-info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 14px;
+        color: var(--text-color);
+        opacity: 0.8;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-color);
+        opacity: 0.6;
+    }
+
+    .main-content {
+        flex: 1;
+        padding: 16px;
+        min-height: calc(100vh - 180px);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <header class="header">
+        <div class="page-title">Мои сделки</div>
+    </header>
+
+    <div class="tabs-header">
+        <div class="tab active" data-tab="active">Активные</div>
+        <div class="tab" data-tab="completed">История</div>
+    </div>
+
+    <main class="main-content" id="mainContent">
+        <!-- Активные сделки -->
+        <div class="tab-content active" id="activeTab">
+            {% if active_deals %}
+                {% for deal in active_deals %}
+                <div class="deal-card">
+                    <div class="deal-header">
+                        <div class="deal-title">{{ deal.product_name }}</div>
+                        <div class="deal-status status-active">Активна</div>
+                    </div>
+                    <div>Сумма: {{ deal.amount }} ₽</div>
+                    <div class="deal-info">
+                        <div>С покупателем: @{{ deal.buyer_username }}</div>
+                        <div>{{ deal.created_at }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>У вас нет активных сделок</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Завершенные сделки -->
+        <div class="tab-content" id="completedTab">
+            {% if completed_deals %}
+                {% for deal in completed_deals %}
+                <div class="deal-card">
+                    <div class="deal-header">
+                        <div class="deal-title">{{ deal.product_name }}</div>
+                        <div class="deal-status status-completed">Завершена</div>
+                    </div>
+                    <div>Сумма: {{ deal.amount }} ₽</div>
+                    <div class="deal-info">
+                        <div>С покупателем: @{{ deal.buyer_username }}</div>
+                        <div>{{ deal.created_at }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>У вас нет завершенных сделок</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Устанавливаем активную вкладку на основе параметра URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab') || 'active';
+        
+        // Удаляем класс active у всех вкладок и добавляем только активной
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (tab.dataset.tab === activeTab) {
+                tab.classList.add('active');
+            }
+        });
+
+        // Показываем только активную вкладку
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(`${activeTab}Tab`).classList.add('active');
+
+        // Обработчики кликов по вкладкам
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = tab.dataset.tab;
+                
+                // Удаляем активный класс у всех вкладок
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Добавляем активный класс текущей вкладке
+                tab.classList.add('active');
+                
+                // Скрываем все контенты и показываем только активный
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabName}Tab`).classList.add('active');
+                
+                // Обновляем URL без перезагрузки страницы
+                history.pushState(null, '', `?tab=${tabName}`);
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -389,16 +389,6 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="reputation-bar">
-                    <div class="reputation-fill" 
-                         style="width: {{ (positive_reviews / (positive_reviews + negative_reviews) * 100) if (positive_reviews + negative_reviews) > 0 else 50 }}%">
-                    </div>
-                </div>
-                <div class="reputation-labels">
-                    <span class="positive">{{ positive_reviews }}</span>
-                    <span class="negative">{{ negative_reviews }}</span>
-                </div>
             </div>
             
             <button class="contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">Написать продавцу</button>

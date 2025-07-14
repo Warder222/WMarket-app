@@ -3,7 +3,7 @@ from datetime import datetime
 from starlette.responses import JSONResponse
 
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
-    Referral, UserBlock, TonTransaction
+    Referral, UserBlock, TonTransaction, Deal
 from sqlalchemy.future import select
 from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer
 
@@ -893,3 +893,30 @@ async def get_user_ton_transactions(user_id: int, limit: int = 20):
         except Exception as e:
             print(f"Error getting transactions: {e}")
             return []
+
+
+async def get_user_active_deals(tg_id: int):
+    """Получаем активные сделки пользователя"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Deal).where(
+                or_(
+                    Deal.seller_id == tg_id,
+                    Deal.buyer_id == tg_id
+                ),
+                Deal.status == 'active'
+            ).order_by(Deal.created_at.desc()))
+        return result.scalars().all()
+
+async def get_user_completed_deals(tg_id: int):
+    """Получаем завершенные сделки пользователя"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Deal).where(
+                or_(
+                    Deal.seller_id == tg_id,
+                    Deal.buyer_id == tg_id
+                ),
+                Deal.status.in_(['completed', 'cancelled'])
+            ).order_by(Deal.created_at.desc()))
+        return result.scalars().all()
