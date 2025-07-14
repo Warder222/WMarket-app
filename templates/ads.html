@@ -324,6 +324,50 @@
             border: 1px dashed var(--border-color);
             display: none;
         }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-content button[onclick="closePaymentModal()"] {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--primary-color);
+        }
+
+        .payment-method-btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            text-align: left;
+            cursor: pointer;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+
+        .payment-method-btn:hover {
+            background-color: var(--hover-color);
+        }
+
+        .payment-method-btn.active {
+            border-color: var(--primary-color);
+            background-color: rgba(63, 136, 248, 0.1);
+        }
     </style>
 {% endblock %}
 
@@ -391,6 +435,55 @@
                 </div>
             </div>
             
+            <div class="payment-actions" style="margin-top: 16px; display: flex; gap: 8px;">
+                <button id="payButton" class="payment-btn" style="flex: 1; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                    Оплатить
+                </button>
+                <button id="reserveButton" class="payment-btn" style="flex: 1; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                    Забронировать
+                </button>
+            </div>
+
+            <!-- Payment Modal -->
+            <div id="paymentModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 400px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">Способ оплаты</h2>
+                        <button onclick="closePaymentModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✕</button>
+                    </div>
+                    
+                    <div class="payment-methods">
+                        <button onclick="showPaymentDetails('meet')" class="payment-method-btn" style="width: 100%; padding: 12px; margin-bottom: 8px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-align: left; cursor: pointer;">
+                            Личная встреча (в разработке)
+                        </button>
+                        
+                        <button onclick="showPaymentDetails('rub')" class="payment-method-btn" style="width: 100%; padding: 12px; margin-bottom: 8px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-align: left; cursor: pointer;">
+                            Оплата рублями
+                        </button>
+                        
+                        <button onclick="showPaymentDetails('ton')" class="payment-method-btn" style="width: 100%; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-align: left; cursor: pointer;">
+                            Оплата TON
+                        </button>
+                    </div>
+                    
+                    <div id="paymentDetails" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                        <div id="rubDetails" style="display: none;">
+                            <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Сумма к оплате: {{ product_info[3] }} ₽</p>
+                            <button onclick="processPayment('rub')" class="payment-confirm-btn" style="width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                                Оплатить
+                            </button>
+                        </div>
+                        
+                        <div id="tonDetails" style="display: none;">
+                            <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Сумма к оплате: <span id="tonAmount">0</span> TON</p>
+                            <button onclick="processPayment('ton')" class="payment-confirm-btn" style="width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                                Оплатить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button class="contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">Написать продавцу</button>
         {% endif %}
         
@@ -573,6 +666,49 @@
                     }
                 });
             }
+            
+            const payButton = document.getElementById('payButton');
+            const reserveButton = document.getElementById('reserveButton');
+            
+            // This should be replaced with actual API call to check if chat exists
+            async function checkChatExists() {
+                try {
+                    const response = await fetch(`/check_chat_exists/{{ product_info[0] }}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    return data.exists;
+                } catch (error) {
+                    console.error('Error checking chat:', error);
+                    return false;
+                }
+            }
+            
+            // Add click handlers
+            payButton.addEventListener('click', async () => {
+                const chatExists = await checkChatExists();
+                if (!chatExists) {
+                    alert('Перед покупкой сначала напишите продавцу');
+                    return;
+                }
+                openPaymentModal();
+            });
+            
+            reserveButton.addEventListener('click', async () => {
+                const chatExists = await checkChatExists();
+                if (!chatExists) {
+                    alert('Перед бронированием сначала напишите продавцу');
+                    return;
+                }
+                alert('Функция бронирования в разработке');
+            });
+            
+            // Initialize TON amount
+            updateTonAmount();
         });
 
         // Функции для работы с модальным окном
@@ -603,6 +739,74 @@
             } catch (error) {
                 console.error('Error:', error);
                 return { status: 'error' };
+            }
+        }
+
+        async function getTonToRubRate() {
+            try {
+                const response = await fetch('/get_ton_to_rub_rate');
+                const data = await response.json();
+                if (data.rate) {
+                    return data.rate;
+                } else {
+                    console.error('Failed to get TON rate:', data);
+                    return 400; // fallback value
+                }
+            } catch (error) {
+                console.error('Error fetching TON rate:', error);
+                return 400; // fallback value
+            }
+        }
+
+        function openPaymentModal() {
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+        
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+            resetPaymentDetails();
+        }
+        
+        function showPaymentDetails(method) {
+            const paymentDetails = document.getElementById('paymentDetails');
+            const rubDetails = document.getElementById('rubDetails');
+            const tonDetails = document.getElementById('tonDetails');
+            
+            paymentDetails.style.display = 'block';
+            
+            if (method === 'rub') {
+                rubDetails.style.display = 'block';
+                tonDetails.style.display = 'none';
+            } else if (method === 'ton') {
+                rubDetails.style.display = 'none';
+                tonDetails.style.display = 'block';
+                updateTonAmount(); // Обновляем курс при каждом открытии
+            } else {
+                paymentDetails.style.display = 'none';
+                alert('Этот способ оплаты в разработке');
+            }
+        }
+        
+        function resetPaymentDetails() {
+            document.getElementById('paymentDetails').style.display = 'none';
+            document.getElementById('rubDetails').style.display = 'none';
+            document.getElementById('tonDetails').style.display = 'none';
+        }
+        
+        async function updateTonAmount() {
+            const rubAmount = {{ product_info[3] }};
+            const conversionRate = await getTonToRubRate();
+            const tonAmount = (rubAmount / conversionRate).toFixed(4);
+            document.getElementById('tonAmount').textContent = tonAmount;
+        }
+        
+        function processPayment(method) {
+            if (method === 'rub') {
+                alert('Оплата рублями будет обработана');
+                closePaymentModal();
+            } else if (method === 'ton') {
+                alert('Оплата TON будет обработана');
+                closePaymentModal();
             }
         }
     </script>

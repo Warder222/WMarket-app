@@ -1,9 +1,9 @@
 import json
 from datetime import datetime, timezone, timedelta
 import jwt
-from urllib.parse import parse_qs
 from src.config import settings
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs
+import requests
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
@@ -48,3 +48,19 @@ async def is_admin(tg_id):
         return True
     else:
         return False
+
+async def get_ton_to_rub_rate():
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {
+        "ids": "the-open-network",
+        "vs_currencies": "rub"
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        data = response.json()
+        rate = data["the-open-network"]["rub"]
+        return rate
+    except Exception as e:
+        print("Ошибка при получении данных:", e)
+        return None

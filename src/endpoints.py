@@ -6,12 +6,12 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.database import async_session_maker, User, TonTransaction
+from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -27,7 +27,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction)
 from src.tonapi import TonapiClient, withdraw_ton_request
-from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin
+from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
 wmarket_router = APIRouter(
     prefix="",
@@ -1544,3 +1544,43 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
     response = RedirectResponse(url="/", status_code=303)
     return response
+
+
+@wmarket_router.get("/check_chat_exists/{product_id}")
+async def check_chat_exists(product_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"exists": False}
+
+    payload = await decode_jwt(session_token)
+    buyer_id = payload.get("tg_id")
+
+    # Get product owner
+    product = await get_product_info(product_id, None)
+    if not product:
+        return {"exists": False}
+
+    seller_id = product[1]
+
+    # Check if chat exists between buyer and seller for this product
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(func.count())
+            .select_from(Chat)
+            .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+            .where(Chat.product_id == product_id)
+            .where(ChatParticipant.user_id.in_([buyer_id, seller_id]))
+            .group_by(Chat.id)
+            .having(func.count(ChatParticipant.user_id) == 2)
+        )
+
+        exists = result.scalar() is not None
+        return {"exists": exists}
+
+
+@wmarket_router.get("/get_ton_to_rub_rate")
+async def get_ton_to_rub_rate_endpoint():
+    rate = await get_ton_to_rub_rate()
+    if rate:
+        return JSONResponse({"rate": rate})
+    else:
+        return JSONResponse({"status": "error", "message": "Не удалось получить курс TON/RUB"}, status_code=500)
