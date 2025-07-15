@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, desc
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
@@ -2030,3 +2030,37 @@ async def moderate_cancel_request(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
             )
+
+
+@wmarket_router.get("/api/user_reviews/{user_id}")
+async def get_user_reviews(user_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем отзывы о пользователе
+            result = await session.execute(
+                select(Review, User.first_name)
+                .join(User, Review.from_user_id == User.tg_id)
+                .where(Review.to_user_id == user_id)
+                .where(Review.moderated == True)
+                .order_by(desc(Review.created_at)))
+
+            reviews = []
+            for review, from_user_name in result.all():
+                reviews.append({
+                    "id": review.id,
+                    "from_user_id": review.from_user_id,
+                    "from_user_name": from_user_name,
+                    "to_user_id": review.to_user_id,
+                    "rating": review.rating,
+                    "text": review.text,
+                    "created_at": review.created_at.isoformat()
+                })
+
+            return reviews
+
+        except Exception as e:
+            print(f"Error getting user reviews: {e}")
+            return JSONResponse({"status": "error", "message": "Internal server error"}, status_code=500)

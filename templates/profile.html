@@ -2,6 +2,9 @@
 
 {% block style %}
 <style>
+    a {
+        text-decoration: none;
+    }
     .profile-header {
         display: flex;
         justify-content: space-between;
@@ -149,6 +152,9 @@
 
     .reviews-count {
         margin-bottom: 15px;
+        cursor: pointer;
+        color: var(--secondary-text);
+        transition: color 0.2s;
     }
 
     .reputation-bar {
@@ -375,6 +381,121 @@
         font-weight: bold;
         color: var(--text-color);
     }
+
+    /* Модальное окно с отзывами */
+    .reviews-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .reviews-modal.show {
+        display: flex;
+        opacity: 1;
+    }
+
+    .reviews-content {
+        background-color: var(--bg-color);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        transform: translateY(20px);
+        transition: transform 0.3s ease;
+    }
+
+    .reviews-modal.show .reviews-content {
+        transform: translateY(0);
+    }
+
+    .reviews-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .reviews-title {
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .close-reviews {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--secondary-text);
+        padding: 4px;
+    }
+
+    .reviews-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .review-item {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .review-item:last-child {
+        border-bottom: none;
+    }
+
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .review-author {
+        font-weight: bold;
+    }
+
+    .review-date {
+        color: var(--secondary-text);
+        font-size: 12px;
+    }
+
+    .review-rating {
+        display: inline-block;
+        margin-right: 8px;
+        font-weight: bold;
+    }
+
+    .review-rating.positive {
+        color: #4CAF50;
+    }
+
+    .review-rating.negative {
+        color: #F44336;
+    }
+
+    .review-text {
+        margin-top: 8px;
+        line-height: 1.4;
+    }
+
+    .no-reviews {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--secondary-text);
+    }
 </style>
 {% endblock %}
 
@@ -439,7 +560,7 @@
             </div>
         </div>
         {% endif %}
-        <div class="reputation-container">
+        <div class="reputation-container" id="reputationContainer">
             <div class="reputation-header">
                 <div class="reputation-title">Репутация</div>
                 <div class="reputation-value 
@@ -449,7 +570,17 @@
                     {% if reputation > 0 %}+{% endif %}{{ reputation }}
                 </div>
             </div>
-            <div class="reviews-count">{{ positive_reviews + negative_reviews }} отзывов</div>
+            <div class="reviews-count" id="reviewsCount">
+                {{ positive_reviews + negative_reviews }} 
+                {% set total_reviews = positive_reviews + negative_reviews %}
+                {% if total_reviews % 10 == 1 and total_reviews % 100 != 11 %}
+                    отзыв
+                {% elif total_reviews % 10 >= 2 and total_reviews % 10 <= 4 and (total_reviews % 100 < 10 or total_reviews % 100 >= 20) %}
+                    отзыва
+                {% else %}
+                    отзывов
+                {% endif %}
+            </div>
             
             <div class="reputation-bar">
                 <div class="reputation-fill" 
@@ -504,6 +635,21 @@
         {% endif %}
     </div>
 </main>
+
+<!-- Модальное окно с отзывами -->
+<div class="reviews-modal" id="reviewsModal">
+    <div class="reviews-content">
+        <div class="reviews-header">
+            <div class="reviews-title">Отзывы о {{ user_info[1] }}</div>
+            <button class="close-reviews" id="closeReviews">&times;</button>
+        </div>
+        <div class="reviews-list" id="reviewsList">
+            <!-- Отзывы будут загружены через JavaScript -->
+            <div class="no-reviews">Загрузка отзывов...</div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -523,6 +669,76 @@
                 btn.style.opacity = "0.5";
             });
         {% endif %}
+
+        // Обработчик клика на контейнер репутации
+        const reputationContainer = document.getElementById('reputationContainer');
+        const reviewsModal = document.getElementById('reviewsModal');
+        const closeReviews = document.getElementById('closeReviews');
+        const reviewsList = document.getElementById('reviewsList');
+
+        // Открытие модального окна
+        reputationContainer.addEventListener('click', async function(e) {
+            // Проверяем, что клик не был по дочерним элементам, которые не должны открывать модальное окно
+            if (e.target.closest('.reputation-value') || e.target.closest('.reputation-labels')) {
+                return;
+            }
+            
+            e.stopPropagation();
+            reviewsModal.classList.add('show');
+            
+            try {
+                // Загружаем отзывы с сервера
+                const response = await fetch(`/api/user_reviews/{{ user_info[0] }}`);
+                const reviews = await response.json();
+                
+                if (reviews.length > 0) {
+                    // Очищаем список
+                    reviewsList.innerHTML = '';
+                    
+                    // Сортируем отзывы по дате (новые сверху)
+                    reviews.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    
+                    // Добавляем отзывы в список
+                    reviews.forEach(review => {
+                        const reviewItem = document.createElement('div');
+                        reviewItem.className = 'review-item';
+                        
+                        const ratingClass = review.rating > 0 ? 'positive' : 'negative';
+                        const ratingText = review.rating > 0 ? 'Положительный' : 'Отрицательный';
+                        
+                        reviewItem.innerHTML = `
+                            <div class="review-header">
+                                <div>
+                                    <span class="review-rating ${ratingClass}">${ratingText}</span>
+                                    <span class="review-author">${review.from_user_name}</span>
+                                </div>
+                                <div class="review-date">${new Date(review.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div class="review-text">${review.text || 'Без текста'}</div>
+                        `;
+                        
+                        reviewsList.appendChild(reviewItem);
+                    });
+                } else {
+                    reviewsList.innerHTML = '<div class="no-reviews">Нет отзывов</div>';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки отзывов:', error);
+                reviewsList.innerHTML = '<div class="no-reviews">Ошибка загрузки отзывов</div>';
+            }
+        });
+
+        // Закрытие модального окна
+        closeReviews.addEventListener('click', function() {
+            reviewsModal.classList.remove('show');
+        });
+
+        // Закрытие при клике вне окна
+        reviewsModal.addEventListener('click', function(e) {
+            if (e.target === reviewsModal) {
+                reviewsModal.classList.remove('show');
+            }
+        });
     });
 </script>
 <script>
