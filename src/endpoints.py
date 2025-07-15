@@ -1651,10 +1651,10 @@ async def create_deal(
             # Отправляем уведомление продавцу
             await send_notification_to_user(
                 seller_id,
-                f"💰 Товар оплачен, но не подтверждён!\n\n"
+                f"💰 Товар оплачен, и ждёт подтверждения!\n\n"
                 f"📌 Название: {product[2]}\n"
                 f"💰 Сумма: {amount} {currency.upper()}\n"
-                f"👤 Покупатель: @{user.username or 'без username'}\n\n"
+                f"👤 Покупатель: {user.first_name or 'без username'}\n\n"
                 f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
             )
 
@@ -1736,14 +1736,14 @@ async def confirm_deal(
             session.add(review)
 
             await session.commit()
-
+            buyer_info_arr = await get_user_info(deal.buyer_id)
             # Отправляем уведомление продавцу
             await send_notification_to_user(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
-                f"📌 Товар: {deal.product_name}\n"
+                f"📌 Товар: {deal.product_name} был архивирован\n"
                 f"💰 Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия: {market_fee:.2f})\n"
-                f"👤 Покупатель подтвердил получение товара и оставил отзыв.\n\n"
+                f"👤 {buyer_info_arr[1]} подтвердил получение товара и оставил отзыв.\n\n"
                 f"Средства зачислены на ваш баланс!"
             )
 
@@ -1753,10 +1753,12 @@ async def confirm_deal(
                 f"✅ Вы подтвердили сделку!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
-                f"👤 Продавец: @{seller.username if seller else 'неизвестен'}\n\n"
+                f"👤 Продавец: {seller.first_name if seller else 'неизвестен'}\n\n"
                 f"Ваш отзыв отправлен на модерацию."
             )
 
+            await archive_product_post(deal.product_id)
+            await session.commit()
             return JSONResponse({"status": "success"})
 
         except Exception as e:

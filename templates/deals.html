@@ -2,6 +2,9 @@
 
 {% block style %}
 <style>
+    a {
+        text-decoration: none;
+    }
     .header {
         position: sticky;
         top: 0;
@@ -350,13 +353,13 @@
     </header>
 
     <div class="tabs-header">
-        <div class="tab active" data-tab="active">Активные</div>
-        <div class="tab" data-tab="completed">История</div>
+        <a href="/deals?tab=active" class="tab {% if current_tab == 'active' %}active{% endif %}" data-tab="active">Активные</a>
+        <a href="/deals?tab=completed" class="tab {% if current_tab == 'completed' %}active{% endif %}" data-tab="completed">История</a>
     </div>
 
     <main class="main-content" id="mainContent">
         <!-- Активные сделки -->
-        <div class="tab-content active" id="activeTab">
+        <div class="tab-content {% if current_tab == 'active' %}active{% endif %}" id="activeTab">
             {% if active_deals %}
                 {% for deal in active_deals %}
                 <div class="deal-card">
@@ -375,10 +378,10 @@
                         <div class="deal-counterparty">
                             {% if deal.buyer_id == user_tg_id %}
                                 <span>Продавец:</span>
-                                <span class="deal-counterparty-username">@{{ deal.seller_username }}</span>
+                                <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
                             {% else %}
                                 <span>Покупатель:</span>
-                                <span class="deal-counterparty-username">@{{ deal.buyer_username }}</span>
+                                <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
                             {% endif %}
                         </div>
                         <div class="deal-time">{{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
@@ -395,15 +398,13 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <div class="empty-state-icon">📭</div>
                     <div class="empty-state-text">У вас нет активных сделок</div>
-                    <div class="empty-state-subtext">Здесь будут отображаться ваши текущие сделки</div>
                 </div>
             {% endif %}
         </div>
 
         <!-- Завершенные сделки -->
-        <div class="tab-content" id="completedTab">
+        <div class="tab-content {% if current_tab == 'completed' %}active{% endif %}" id="completedTab">
             {% if completed_deals %}
                 {% for deal in completed_deals %}
                 <div class="deal-card">
@@ -422,10 +423,10 @@
                         <div class="deal-counterparty">
                             {% if deal.buyer_id == user_tg_id %}
                                 <span>Продавец:</span>
-                                <span class="deal-counterparty-username">@{{ deal.seller_username }}</span>
+                                <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
                             {% else %}
                                 <span>Покупатель:</span>
-                                <span class="deal-counterparty-username">@{{ deal.buyer_username }}</span>
+                                <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
                             {% endif %}
                         </div>
                         <div class="deal-time">
@@ -440,9 +441,7 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <div class="empty-state-icon">📜</div>
                     <div class="empty-state-text">У вас нет завершенных сделок</div>
-                    <div class="empty-state-subtext">Здесь будет история ваших сделок</div>
                 </div>
             {% endif %}
         </div>
@@ -570,49 +569,6 @@
                         alert('Ошибка: ' + result.message);
                     }
                 }
-            });
-        });
-
-        // Устанавливаем активную вкладку на основе параметра URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTab = urlParams.get('tab') || 'active';
-        
-        // Удаляем класс active у всех вкладок и добавляем только активной
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('active');
-            if (tab.dataset.tab === activeTab) {
-                tab.classList.add('active');
-            }
-        });
-
-        // Показываем только активную вкладку
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(`${activeTab}Tab`).classList.add('active');
-
-        // Обработчики кликов по вкладкам
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
-                const tabName = tab.dataset.tab;
-                
-                // Удаляем активный класс у всех вкладок
-                document.querySelectorAll('.tab').forEach(t => {
-                    t.classList.remove('active');
-                });
-                
-                // Добавляем активный класс текущей вкладке
-                tab.classList.add('active');
-                
-                // Скрываем все контенты и показываем только активный
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
-                document.getElementById(`${tabName}Tab`).classList.add('active');
-                
-                // Обновляем URL без перезагрузки страницы
-                history.pushState(null, '', `?tab=${tabName}`);
             });
         });
     });
