@@ -1529,10 +1529,6 @@ async def deals(request: Request, session_token=Cookie(default=None)):
             # Временные заглушки для примера
             active_deals = await get_user_active_deals(payload.get("tg_id"))
             completed_deals = await get_user_completed_deals(payload.get("tg_id"))
-            print(active_deals)
-
-            for deal_com in completed_deals:
-                print(deal_com)
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
@@ -1831,6 +1827,181 @@ async def moderate_review(
         except Exception as e:
             await session.rollback()
             print(f"Error moderating review: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.get("/check_deal_status")
+async def check_deal_status(request: Request, deal_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    async with async_session_maker() as session:
+        deal = await session.execute(select(Deal).where(Deal.id == deal_id))
+        deal = deal.scalar_one_or_none()
+
+        if not deal:
+            return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+        return JSONResponse({
+            "status": deal.status,
+            "pending_cancel": deal.pending_cancel
+        })
+
+
+@wmarket_router.post("/request_cancel_deal")
+async def request_cancel_deal(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+
+    try:
+        deal_id = int(data.get("deal_id"))  # Convert to integer
+    except (TypeError, ValueError):
+        return JSONResponse({"status": "error", "message": "Invalid deal ID"}, status_code=400)
+
+    reason = data.get("reason")
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку - now using the integer deal_id
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            # Проверяем, что сделка активна
+            if deal.status != "active":
+                return JSONResponse({"status": "error", "message": "Deal is not active"}, status_code=400)
+
+            # Проверяем, что запрос на отмену еще не отправлен
+            if deal.pending_cancel:
+                return JSONResponse({"status": "error", "message": "Cancel request already sent"}, status_code=400)
+
+            # Обновляем статус сделки
+            deal.pending_cancel = True
+            deal.cancel_reason = reason
+            deal.cancel_request_by = payload.get("tg_id")
+
+            await session.commit()
+
+            # Отправляем уведомления
+            other_user_id = deal.buyer_id if payload.get("tg_id") == deal.seller_id else deal.seller_id
+
+            # Уведомление инициатору
+            await send_notification_to_user(
+                payload.get("tg_id"),
+                f"✅ Ваш запрос на отмену сделки по товару '{deal.product_name}' отправлен на модерацию.\n\n"
+                f"Причина: {reason}\n\n"
+                f"Ожидайте решения администратора."
+            )
+
+            # Уведомление второй стороне
+            await send_notification_to_user(
+                other_user_id,
+                f"⚠️ Вторая сторона подала запрос на отмену сделки по товару '{deal.product_name}'.\n\n"
+                f"Причина: {reason}\n\n"
+                f"Сделка приостановлена до решения администратора."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error requesting deal cancellation: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+@wmarket_router.post("/admin/moderate_cancel_request/{deal_id}")
+async def moderate_cancel_request(
+        deal_id: int,
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    data = await request.json()
+    approve = data.get("approve", False)
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку
+            deal = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = deal.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if not deal.pending_cancel:
+                return JSONResponse({"status": "error", "message": "No pending cancellation"}, status_code=400)
+
+            if approve:
+                # Возвращаем средства покупателю
+                buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+                buyer = buyer.scalar_one_or_none()
+
+                if deal.currency == 'rub':
+                    buyer.rub_balance += deal.amount
+                else:
+                    buyer.ton_balance += deal.amount
+
+                # Обновляем статус сделки
+                deal.status = "cancelled"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.pending_cancel = False
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"✅ Администратор одобрил отмену сделки по товару '{deal.product_name}'.\n\n"
+                    f"Сумма {deal.amount} {deal.currency.upper()} возвращена на ваш баланс."
+                )
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"ℹ️ Администратор одобрил отмену сделки по товару '{deal.product_name}'.\n\n"
+                    f"Средства возвращены покупателю."
+                )
+            else:
+                # Отклоняем запрос на отмену
+                deal.pending_cancel = False
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.cancel_request_by,
+                    f"❌ Администратор отклонил ваш запрос на отмену сделки по товару '{deal.product_name}'.\n\n"
+                    f"Сделка возобновлена."
+                )
+
+                other_user_id = deal.buyer_id if deal.cancel_request_by == deal.seller_id else deal.seller_id
+                await send_notification_to_user(
+                    other_user_id,
+                    f"ℹ️ Администратор отклонил запрос на отмену сделки по товару '{deal.product_name}'.\n\n"
+                    f"Сделка возобновлена."
+                )
+
+            await session.commit()
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error moderating cancel request: {e}")
             return JSONResponse(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500

@@ -149,6 +149,9 @@ class Deal(Base):
     currency = Column(String)
     amount = Column(Float)
     status = Column(String, default="active")  # active, completed, cancelled
+    pending_cancel = Column(Boolean, default=False)
+    cancel_reason = Column(String, nullable=True)
+    cancel_request_by = Column(BigInteger, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
 

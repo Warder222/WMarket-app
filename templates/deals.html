@@ -344,6 +344,120 @@
         cursor: not-allowed;
         background-color: var(--border-color);
     }
+
+    .cancel-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .cancel-content {
+        background-color: var(--card-bg);
+        padding: 16px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .cancel-content h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-color);
+    }
+
+    .cancel-content p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+    }
+
+    .cancel-text {
+        width: 100%;
+        min-height: 80px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 16px;
+        font-size: 14px;
+        resize: vertical;
+    }
+
+    .cancel-submit {
+        width: 100%;
+        padding: 10px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .cancel-submit:hover {
+        background-color: #c82333;
+    }
+
+    .cancel-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: var(--border-color);
+    }
+
+    /* Pending deal styles */
+    .deal-pending {
+        opacity: 0.7;
+        background-color: rgba(0, 0, 0, 0.05);
+        pointer-events: none;
+    }
+
+    .deal-pending-notice {
+        padding: 8px;
+        background-color: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 8px;
+        color: #ffc107;
+        font-size: 14px;
+        margin-bottom: 12px;
+        text-align: center;
+    }
+
+    .status-pending {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .modal-close {
+        position: absolute;
+        bottom: 0px;
+        right: 16px;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-secondary);
+        background: none;
+        border: none;
+        padding: 0;
+    }
+    
+    .modal-close:hover {
+        color: var(--text-color);
+    }
+    
+    .modal-header {
+        position: relative;
+        padding-right: 30px;
+    }
 </style>
 {% endblock %}
 
@@ -362,11 +476,22 @@
         <div class="tab-content {% if current_tab == 'active' %}active{% endif %}" id="activeTab">
             {% if active_deals %}
                 {% for deal in active_deals %}
-                <div class="deal-card">
+                <div class="deal-card {% if deal.pending_cancel %}deal-pending{% endif %}">
+                    {% if deal.pending_cancel %}
+                    <div class="deal-pending-notice">
+                        Сделка на проверке у модератора
+                    </div>
+                    {% endif %}
                     <div class="deal-header">
                         <div class="deal-title">{{ deal.product_name }}</div>
-                        <div class="deal-status status-active">
-                            {% if deal.buyer_id == user_tg_id %}Ожидает получения{% else %}Требует подтверждения{% endif %}
+                        <div class="deal-status {% if deal.pending_cancel %}status-pending{% else %}status-active{% endif %}">
+                            {% if deal.pending_cancel %}
+                                На модерации
+                            {% elif deal.buyer_id == user_tg_id %}
+                                Ожидает получения
+                            {% else %}
+                                Требует подтверждения
+                            {% endif %}
                         </div>
                     </div>
                     <div class="deal-amount">
@@ -386,6 +511,7 @@
                         </div>
                         <div class="deal-time" data-utc-time="{{ deal.created_at.isoformat() }}"></div>
                     </div>
+                    {% if not deal.pending_cancel %}
                     <div class="deal-actions">
                         {% if deal.buyer_id == user_tg_id %}
                             <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">Подтвердить получение</button>
@@ -394,6 +520,7 @@
                             <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
                         {% endif %}
                     </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
@@ -460,6 +587,22 @@
         </div>
     </div>
 
+    <div class="cancel-modal" id="cancelModal">
+        <div class="cancel-content">
+            <div class="modal-header">
+                <h3>Отмена сделки</h3>
+                <button class="modal-close" id="closeCancelModal">&times;</button>
+            </div>
+            <p>Пожалуйста, укажите причину отмены сделки. Заявка будет отправлена на модерацию администратору.</p>
+            
+            <textarea class="cancel-text" id="cancelText" 
+                    placeholder="Укажите причину отмены..." required></textarea>
+            
+            <button class="cancel-submit" id="submitCancel" disabled>
+                Отправить на модерацию
+            </button>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
@@ -467,15 +610,113 @@
     document.addEventListener('DOMContentLoaded', () => {
         let selectedDealId = null;
         let selectedRating = null;
+        let cancelDealId = null;
         
-        // Обработчики для кнопок подтверждения сделки
+        // Обработчики для кнопок отмены сделки
+        document.querySelectorAll('.cancel-deal-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const dealId = btn.dataset.dealId;
+                
+                // Проверяем статус сделки
+                const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
+                const result = await response.json();
+                
+                if (result.status !== 'active') {
+                    alert('Сделка уже завершена или отменена');
+                    window.location.reload();
+                    return;
+                }
+                
+                if (result.pending_cancel) {
+                    alert('Запрос на отмену уже отправлен на модерацию');
+                    window.location.reload();
+                    return;
+                }
+                
+                cancelDealId = dealId;
+                document.getElementById('cancelModal').style.display = 'flex';
+            });
+        });
+        
+        // Проверка готовности формы отмены
+        document.getElementById('closeCancelModal').addEventListener('click', () => {
+            document.getElementById('cancelModal').style.display = 'none';
+            document.getElementById('cancelText').value = '';
+        });
+        
+        // Проверка готовности формы отмены (уже есть, оставляем)
+        document.getElementById('cancelText').addEventListener('input', function() {
+            const submitBtn = document.getElementById('submitCancel');
+            submitBtn.disabled = this.value.trim().length === 0;
+        });
+        
+        // Отправка запроса на отмену (добавляем проверку)
+        document.getElementById('submitCancel').addEventListener('click', async () => {
+            const cancelReason = document.getElementById('cancelText').value.trim();
+            
+            if (!cancelReason) {
+                alert('Пожалуйста, укажите причину отмены');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/request_cancel_deal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        deal_id: parseInt(cancelDealId),
+                        reason: cancelReason
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert('Запрос на отмену сделки отправлен на модерацию');
+                    document.getElementById('cancelModal').style.display = 'none';
+                    document.getElementById('cancelText').value = '';
+                    window.location.reload();
+                } else {
+                    alert('Ошибка: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Произошла ошибка при отправке запроса');
+            }
+        });
+        
+        // Закрытие модального окна отмены
+        document.getElementById('cancelModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('cancelModal')) {
+                document.getElementById('cancelModal').style.display = 'none';
+                document.getElementById('cancelText').value = '';
+            }
+        });
+        
+        // Обновленная функция подтверждения сделки с проверкой статуса
         document.querySelectorAll('.confirm-deal-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const dealId = btn.dataset.dealId;
-                selectedDealId = dealId;
                 
-                // Показываем модальное окно для отзыва
+                // Проверяем статус сделки
+                const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
+                const result = await response.json();
+                
+                if (result.status !== 'active') {
+                    alert('Сделка уже завершена или отменена');
+                    window.location.reload();
+                    return;
+                }
+                
+                if (result.pending_cancel) {
+                    alert('Нельзя подтвердить сделку, так как запрос на отмену находится на модерации');
+                    return;
+                }
+                
+                selectedDealId = dealId;
                 document.getElementById('reviewModal').style.display = 'flex';
             });
         });
@@ -527,7 +768,7 @@
                     alert('Сделка подтверждена! Отзыв отправлен на модерацию.');
                     window.location.reload();
                 } else {
-                    alert('Ошибка: ' + result.message);
+                    console.log('Ошибка: ' + result.message);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -540,30 +781,6 @@
             if (e.target === document.getElementById('reviewModal')) {
                 document.getElementById('reviewModal').style.display = 'none';
             }
-        });
-
-        // Обработчики для кнопок отмены сделки
-        document.querySelectorAll('.cancel-deal-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const dealId = btn.dataset.dealId;
-                if (confirm('Вы уверены, что хотите отменить сделку? Средства будут возвращены.')) {
-                    const response = await fetch('/cancel_deal', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ deal_id: dealId })
-                    });
-                    
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        alert('Сделка отменена. Средства возвращены покупателю.');
-                        window.location.reload();
-                    } else {
-                        alert('Ошибка: ' + result.message);
-                    }
-                }
-            });
         });
 
         // Конвертация UTC времени в локальное

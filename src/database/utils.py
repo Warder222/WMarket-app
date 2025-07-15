@@ -908,7 +908,6 @@ async def get_user_active_deals(tg_id: int):
             ).order_by(Deal.created_at.desc()))
         deals = result.scalars().all()
 
-        # Добавляем информацию о пользователях
         deals_with_users = []
         for deal in deals:
             seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
@@ -921,11 +920,15 @@ async def get_user_active_deals(tg_id: int):
                 "product_name": deal.product_name,
                 "seller_id": deal.seller_id,
                 "buyer_id": deal.buyer_id,
-                "seller_username": seller.first_name if seller else "Unknown",
-                "buyer_username": buyer.first_name if buyer else "Unknown",
+                "seller_first_name": seller.first_name if seller else None,
+                "seller_username": seller.username if seller else None,
+                "buyer_first_name": buyer.first_name if buyer else None,
+                "buyer_username": buyer.username if buyer else None,
                 "amount": deal.amount,
                 "currency": deal.currency,
                 "status": deal.status,
+                "pending_cancel": deal.pending_cancel,
+                "cancel_request_by": deal.cancel_request_by,
                 "created_at": deal.created_at
             })
 
