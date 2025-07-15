@@ -1529,6 +1529,10 @@ async def deals(request: Request, session_token=Cookie(default=None)):
             # Временные заглушки для примера
             active_deals = await get_user_active_deals(payload.get("tg_id"))
             completed_deals = await get_user_completed_deals(payload.get("tg_id"))
+            print(active_deals)
+
+            for deal_com in completed_deals:
+                print(deal_com)
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))

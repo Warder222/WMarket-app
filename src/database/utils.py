@@ -921,8 +921,8 @@ async def get_user_active_deals(tg_id: int):
                 "product_name": deal.product_name,
                 "seller_id": deal.seller_id,
                 "buyer_id": deal.buyer_id,
-                "seller_username": seller.username if seller else "Unknown",
-                "buyer_username": buyer.username if buyer else "Unknown",
+                "seller_username": seller.first_name if seller else "Unknown",
+                "buyer_username": buyer.first_name if buyer else "Unknown",
                 "amount": deal.amount,
                 "currency": deal.currency,
                 "status": deal.status,
@@ -943,7 +943,29 @@ async def get_user_completed_deals(tg_id: int):
                 ),
                 Deal.status.in_(['completed', 'cancelled'])
             ).order_by(Deal.created_at.desc()))
-        return result.scalars().all()
+        comp_deals = result.scalars().all()
+
+        comp_deals_with_users = []
+        for deal in comp_deals:
+            seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+            seller = seller.scalar_one_or_none()
+            buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+            buyer = buyer.scalar_one_or_none()
+
+            comp_deals_with_users.append({
+                "id": deal.id,
+                "product_name": deal.product_name,
+                "seller_id": deal.seller_id,
+                "buyer_id": deal.buyer_id,
+                "seller_username": seller.first_name if seller else "Unknown",
+                "buyer_username": buyer.first_name if buyer else "Unknown",
+                "amount": deal.amount,
+                "currency": deal.currency,
+                "status": deal.status,
+                "created_at": deal.created_at
+            })
+
+        return comp_deals_with_users
 
 
 async def create_review(deal_id: int, from_user_id: int, to_user_id: int, product_id: int, rating: int, text: str):
