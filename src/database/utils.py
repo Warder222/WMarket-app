@@ -3,7 +3,7 @@ from datetime import datetime
 from starlette.responses import JSONResponse
 
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
-    Referral, UserBlock, TonTransaction, Deal
+    Referral, UserBlock, TonTransaction, Deal, Review
 from sqlalchemy.future import select
 from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer
 
@@ -944,3 +944,23 @@ async def get_user_completed_deals(tg_id: int):
                 Deal.status.in_(['completed', 'cancelled'])
             ).order_by(Deal.created_at.desc()))
         return result.scalars().all()
+
+
+async def create_review(deal_id: int, from_user_id: int, to_user_id: int, product_id: int, rating: int, text: str):
+    async with async_session_maker() as session:
+        try:
+            review = Review(
+                deal_id=deal_id,
+                from_user_id=from_user_id,
+                to_user_id=to_user_id,
+                product_id=product_id,
+                rating=rating,
+                text=text
+            )
+            session.add(review)
+            await session.commit()
+            return review
+        except Exception as e:
+            await session.rollback()
+            print(f"Error creating review: {e}")
+            return None

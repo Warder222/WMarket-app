@@ -29,9 +29,11 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     plus_rep = Column(Integer, default=0)
     minus_rep = Column(Integer, default=0)
-    rub_balance = Column(Float, default=0.0)  # Добавляем
-    ton_balance = Column(Float, default=0.0)  # Добавляем
-    current_currency = Column(String, default='rub')  # Добавляем для хранения выбранной валюты
+    rub_balance = Column(Float, default=0.0)
+    ton_balance = Column(Float, default=0.0)
+    current_currency = Column(String, default='rub')
+    earned_rub = Column(Float, default=0.0)  # Changed to default=0.0
+    earned_ton = Column(Float, default=0.0)  # Changed to default=0.0
 
 
 class Category(Base):
@@ -149,3 +151,17 @@ class Deal(Base):
     status = Column(String, default="active")  # active, completed, cancelled
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    deal_id = Column(Integer, ForeignKey("deals.id"))
+    from_user_id = Column(BigInteger, ForeignKey("users.tg_id"))
+    to_user_id = Column(BigInteger, ForeignKey("users.tg_id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    rating = Column(Integer)  # 1 for plus_rep, -1 for minus_rep
+    text = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    moderated = Column(Boolean, default=False)

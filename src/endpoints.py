@@ -11,7 +11,7 @@ from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal
+from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal, Review
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -1679,11 +1679,13 @@ async def confirm_deal(
     payload = await decode_jwt(session_token)
     data = await request.json()
     deal_id = data.get("deal_id")
+    rating = data.get("rating")
+    review_text = data.get("review_text")
 
     async with async_session_maker() as session:
         try:
             # Получаем сделку
-            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            result = await session.execute(select(Deal).where(Deal.id == int(deal_id)))
             deal = result.scalar_one_or_none()
 
             if not deal:
@@ -1696,6 +1698,10 @@ async def confirm_deal(
                     status_code=403
                 )
 
+            # Рассчитываем сумму с учетом комиссии (7%)
+            seller_amount = deal.amount * 0.93
+            market_fee = deal.amount * 0.07
+
             # Обновляем статус сделки
             deal.status = "completed"
             deal.completed_at = datetime.now(timezone.utc)
@@ -1704,10 +1710,30 @@ async def confirm_deal(
             seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
             seller = seller.scalar_one_or_none()
 
+            # Добавляем баланс продавцу в зависимости от валюты сделки
             if deal.currency == 'rub':
-                seller.rub_balance += deal.amount
+                # Инициализируем earned_rub если None
+                if seller.earned_rub is None:
+                    seller.earned_rub = 0.0
+                seller.earned_rub += seller_amount
+                seller.rub_balance += seller_amount  # Добавляем на баланс
             else:
-                seller.ton_balance += deal.amount
+                # Инициализируем earned_ton если None
+                if seller.earned_ton is None:
+                    seller.earned_ton = 0.0
+                seller.earned_ton += seller_amount
+                seller.ton_balance += seller_amount  # Добавляем на баланс
+
+            # Создаем отзыв
+            review = Review(
+                deal_id=deal.id,
+                from_user_id=deal.buyer_id,
+                to_user_id=deal.seller_id,
+                product_id=deal.product_id,
+                rating=rating,
+                text=review_text
+            )
+            session.add(review)
 
             await session.commit()
 
@@ -1716,8 +1742,19 @@ async def confirm_deal(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
+                f"💰 Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия: {market_fee:.2f})\n"
+                f"👤 Покупатель подтвердил получение товара и оставил отзыв.\n\n"
+                f"Средства зачислены на ваш баланс!"
+            )
+
+            # Отправляем уведомление покупателю
+            await send_notification_to_user(
+                deal.buyer_id,
+                f"✅ Вы подтвердили сделку!\n\n"
+                f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
-                f"👤 Покупатель подтвердил получение товара."
+                f"👤 Продавец: @{seller.username if seller else 'неизвестен'}\n\n"
+                f"Ваш отзыв отправлен на модерацию."
             )
 
             return JSONResponse({"status": "success"})
@@ -1725,6 +1762,69 @@ async def confirm_deal(
         except Exception as e:
             await session.rollback()
             print(f"Error confirming deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.post("/admin/moderate_review/{review_id}")
+async def moderate_review(
+    review_id: int,
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    data = await request.json()
+    approve = data.get("approve", False)
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем отзыв
+            result = await session.execute(select(Review).where(Review.id == review_id))
+            review = result.scalar_one_or_none()
+
+            if not review:
+                return JSONResponse({"status": "error", "message": "Review not found"}, status_code=404)
+
+            if approve:
+                # Обновляем репутацию пользователя
+                user = await session.execute(select(User).where(User.tg_id == review.to_user_id))
+                user = user.scalar_one_or_none()
+
+                if review.rating > 0:
+                    user.plus_rep += 1
+                else:
+                    user.minus_rep += 1
+
+                review.moderated = True
+
+                # Отправляем уведомление пользователю
+                await send_notification_to_user(
+                    review.to_user_id,
+                    f"📢 Ваш рейтинг обновлён!\n\n"
+                    f"Получен {'положительный' if review.rating > 0 else 'отрицательный'} отзыв "
+                    f"от пользователя @{review.from_user.username if review.from_user else 'неизвестен'}.\n\n"
+                    f"Текст отзыва: {review.text}"
+                )
+            else:
+                # Отклоняем отзыв
+                await session.delete(review)
+
+            await session.commit()
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error moderating review: {e}")
             return JSONResponse(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
