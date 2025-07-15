@@ -338,6 +338,43 @@
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
         }
     }
+
+    .earned-container {
+        width: 100%;
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 15px;
+        margin-top: 10px;
+    }
+
+    .earned-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .earned-amount {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+    }
+
+    .earned-currency {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .currency-symbol {
+        font-size: 16px;
+        color: var(--primary-color);
+        font-weight: bold;
+    }
+
+    .earned-currency span:last-child {
+        font-size: 20px;
+        font-weight: bold;
+        color: var(--text-color);
+    }
 </style>
 {% endblock %}
 
@@ -390,7 +427,16 @@
         {% if user_info[0] == user_tg_id %}
         <div class="earned-container">
             <div class="earned-title">Заработано</div>
-            <div class="earned-amount">24,500 ₽</div>
+            <div class="earned-amount">
+                <div class="earned-currency">
+                    <span class="currency-symbol">₽</span>
+                    <span>{{ "%.2f"|format(user_info[7]) if user_info[5] else "0.00" }}</span>
+                </div>
+                <div class="earned-currency">
+                    <span class="currency-symbol">TON</span>
+                    <span>{{ "%.2f"|format(user_info[8]) if user_info[6] else "0.00" }}</span>
+                </div>
+            </div>
         </div>
         {% endif %}
         <div class="reputation-container">

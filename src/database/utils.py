@@ -104,7 +104,8 @@ async def get_user_info(tg_id):
                 return None
             # 0-tg_id / 1-username / 2-photo_url / 3-plus_rep / 4-minus_rep / 5-rub_balance / 6-ton_balance
             user_info = [user.tg_id, user.first_name, user.photo_url,
-                         user.plus_rep, user.minus_rep, user.rub_balance, user.ton_balance]
+                         user.plus_rep, user.minus_rep, user.rub_balance, user.ton_balance,
+                         user.earned_rub, user.earned_ton]
             return user_info
         except Exception as exc:
             print(f"Error: {exc}")
