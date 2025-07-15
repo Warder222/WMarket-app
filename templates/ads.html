@@ -66,7 +66,7 @@
             font-size: 24px;
             font-weight: bold;
             color: var(--primary-color);
-            margin: 8px 0 16px 0;
+            margin: -12px 0 16px 0;
         }
 
         .ad-description-title {
@@ -368,6 +368,48 @@
             border-color: var(--primary-color);
             background-color: rgba(63, 136, 248, 0.1);
         }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Стиль для кнопки "Написать продавцу" */
+        .contact-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Стиль для кнопок оплаты и бронирования с диагональным градиентом */
+        .payment-btn {
+            background: linear-gradient(45deg, #3f88f8 0%, #2a5d9e 50%, #3f88f8 100%);
+            background-size: 200% 200%;
+            color: white;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: background-position 0.5s ease;
+        }
+
+        .payment-btn:hover {
+            background-position: 100% 100%;
+        }
     </style>
 {% endblock %}
 
@@ -445,11 +487,11 @@
                 </div>
             </div>
             
-            <div class="payment-actions" style="margin-top: 16px; display: flex; gap: 8px;">
-                <button id="payButton" class="payment-btn" style="flex: 1; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;">
+            <div class="action-buttons">
+                <button id="payButton" class="action-btn payment-btn">
                     Оплатить
                 </button>
-                <button id="reserveButton" class="payment-btn" style="flex: 1; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                <button id="reserveButton" class="action-btn payment-btn">
                     Забронировать
                 </button>
             </div>
@@ -494,7 +536,9 @@
                 </div>
             </div>
 
-            <button class="contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">Написать продавцу</button>
+            <button class="action-btn contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">
+                Написать продавцу
+            </button>
         {% endif %}
         
         <h3 class="ad-description-title">Описание</h3>
