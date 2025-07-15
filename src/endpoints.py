@@ -872,9 +872,16 @@ async def admin_chat_reports(
         reports = await get_chat_reports(resolved=False)
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
         moderation_products = await get_all_moderation_products()
-
-        # Получаем список пользователей
         users = await get_all_users_info()
+
+        # Получаем отзывы на модерации
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(Review)
+                .where(Review.moderated == False)
+                .order_by(Review.created_at.desc())
+            )
+            reviews = result.scalars().all()
 
         context = {
             "request": request,
@@ -883,10 +890,10 @@ async def admin_chat_reports(
             "admin": admin_res,
             "moderation_products": moderation_products,
             "users": users,
+            "reviews": reviews,
             "active_tab": request.query_params.get("tab", "reports")
         }
         return templates.TemplateResponse("admin_chat_reports.html", context=context)
-
 
 @wmarket_router.get("/admin/chat/{chat_id}")
 async def admin_chat_view(
@@ -1772,9 +1779,9 @@ async def confirm_deal(
 
 @wmarket_router.post("/admin/moderate_review/{review_id}")
 async def moderate_review(
-    review_id: int,
-    request: Request,
-    session_token=Cookie(default=None)
+        review_id: int,
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -1786,6 +1793,7 @@ async def moderate_review(
 
     data = await request.json()
     approve = data.get("approve", False)
+    reason = data.get("reason", "")
 
     async with async_session_maker() as session:
         try:
@@ -1809,19 +1817,35 @@ async def moderate_review(
                 review.moderated = True
 
                 # Отправляем уведомление пользователю
+                from_user_info = await get_user_info(review.from_user_id)
+                to_user_info = await get_user_info(review.to_user_id)
+
                 await send_notification_to_user(
                     review.to_user_id,
                     f"📢 Ваш рейтинг обновлён!\n\n"
                     f"Получен {'положительный' if review.rating > 0 else 'отрицательный'} отзыв "
-                    f"от пользователя @{review.from_user.username if review.from_user else 'неизвестен'}.\n\n"
+                    f"от пользователя {from_user_info[1] if from_user_info else 'неизвестен'}.\n\n"
                     f"Текст отзыва: {review.text}"
+                )
+
+                # Уведомление автору отзыва
+                await send_notification_to_user(
+                    review.from_user_id,
+                    f"✅ Ваш отзыв был одобрен модератором и учтён в репутации пользователя."
                 )
             else:
                 # Отклоняем отзыв
                 await session.delete(review)
 
-            await session.commit()
+                # Уведомление автору отзыва
+                await send_notification_to_user(
+                    review.from_user_id,
+                    f"❌ Ваш отзыв был отклонён модератором.\n\n"
+                    f"Причина: {reason or 'не указана'}\n\n"
+                    f"Вы можете оставить новый отзыв, соблюдая правила платформы."
+                )
 
+            await session.commit()
             return JSONResponse({"status": "success"})
 
         except Exception as e:

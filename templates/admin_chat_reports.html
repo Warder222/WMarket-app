@@ -358,6 +358,132 @@
     textarea::-webkit-resizer {
         display: none; /* Скрывает индикатор изменения размера в WebKit-браузерах */
     }
+
+    .review-item {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .review-meta {
+        flex: 1;
+    }
+
+    .review-deal-id {
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+
+    .review-date {
+        font-size: 12px;
+        color: var(--secondary-text);
+    }
+
+    .review-rating {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .review-rating.positive {
+        background-color: rgba(46, 204, 113, 0.1);
+        color: var(--success-color);
+    }
+
+    .review-rating.negative {
+        background-color: rgba(231, 76, 60, 0.1);
+        color: var(--error-color);
+    }
+
+    .review-users {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+        font-size: 14px;
+    }
+
+    .review-user {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .user-label {
+        color: var(--secondary-text);
+    }
+
+    .user-link {
+        color: var(--primary-color);
+        text-decoration: none;
+    }
+
+    .review-text {
+        padding: 12px;
+        background-color: var(--bg-color);
+        border-radius: 4px;
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+
+    .review-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .action-button {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .action-button.approve {
+        background-color: var(--success-color);
+        color: white;
+    }
+
+    .action-button.reject {
+        background-color: var(--error-color);
+        color: white;
+    }
+
+    .action-button:hover {
+        opacity: 0.9;
+    }
+
+    .no-items {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--secondary-text);
+    }
+
+    .no-items svg {
+        margin-bottom: 16px;
+    }
+
+    .no-items p {
+        margin: 0;
+        font-size: 16px;
+    }
 </style>
 {% endblock %}
 
@@ -368,6 +494,7 @@
         <div class="tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
         <div class="tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
         <div class="tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
+        <div class="tab {% if active_tab == 'reviews' %}active{% endif %}" data-tab="reviews">Отзывы</div>
         <div class="tab-indicator" id="tabIndicator"></div>
     </div>
 </header>
@@ -486,6 +613,67 @@
             <div class="no-items">Нет объявлений на модерации</div>
         {% endif %}
     </div>
+
+    <!-- Секция модерации отзывов -->
+    <div id="reviewsTab" {% if active_tab != 'reviews' %}class="hidden"{% endif %}>
+        {% if reviews %}
+            {% for review in reviews %}
+            <div class="review-item">
+                <div class="review-header">
+                    <div class="review-meta">
+                        <div class="review-deal-id">Сделка #{{ review.deal_id }}</div>
+                        <div class="review-date">{{ review.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                    </div>
+                    <div class="review-rating {% if review.rating > 0 %}positive{% else %}negative{% endif %}">
+                        {% if review.rating > 0 %}+1{% else %}-1{% endif %}
+                    </div>
+                </div>
+                
+                <div class="review-users">
+                    <div class="review-user">
+                        <span class="user-label">От:</span>
+                        <a href="/profile/{{ review.from_user_id }}" class="user-link">
+                            ID: {{ review.from_user_id }}
+                        </a>
+                    </div>
+                    <div class="review-user">
+                        <span class="user-label">Кому:</span>
+                        <a href="/profile/{{ review.to_user_id }}" class="user-link">
+                            ID: {{ review.to_user_id }}
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="review-text">
+                    {{ review.text }}
+                </div>
+                
+                <div class="review-actions">
+                    <button class="action-button approve" data-action="approve-review" data-id="{{ review.id }}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 6L9 17L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Одобрить
+                    </button>
+                    <button class="action-button reject" data-action="reject-review" data-id="{{ review.id }}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Отклонить
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-items">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="var(--secondary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 8V12M12 16H12.01" stroke="var(--secondary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <p>Нет отзывов на модерации</p>
+            </div>
+        {% endif %}
+    </div>
 </main>
 
 <!-- Модальное окно только для отклонения объявлений -->
@@ -530,6 +718,18 @@
         <div class="modal-actions">
             <button id="cancel-block" class="modal-button">Отмена</button>
             <button id="confirm-block" class="modal-button" style="background-color: var(--error-color);">Заблокировать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно отклонения отзыва -->
+<div id="reject-review-modal" class="modal">
+    <div class="modal-content">
+        <h3>Укажите причину отклонения отзыва</h3>
+        <textarea id="reject-review-reason" placeholder="Введите причину отклонения отзыва..."></textarea>
+        <div class="modal-actions">
+            <button id="cancel-review-reject" class="modal-button">Отмена</button>
+            <button id="confirm-review-reject" class="modal-button" style="background-color: var(--error-color);">Отклонить</button>
         </div>
     </div>
 </div>
@@ -844,6 +1044,75 @@
                 }
             });
         }
+
+        document.addEventListener('click', async function(event) {
+            if (event.target.matches('[data-action="approve-review"]')) {
+                const reviewId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/moderate_review/${reviewId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ approve: true })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при одобрении отзыва');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при одобрении отзыва');
+                }
+            }
+            
+            if (event.target.matches('[data-action="reject-review"]')) {
+                const reviewId = event.target.dataset.id;
+                document.getElementById('reject-review-modal').dataset.reviewId = reviewId;
+                document.getElementById('reject-review-modal').style.display = 'flex';
+            }
+        });
+
+        // Обработка модального окна отклонения отзыва
+        document.getElementById('cancel-review-reject').addEventListener('click', function() {
+            document.getElementById('reject-review-modal').style.display = 'none';
+            document.getElementById('reject-review-reason').value = '';
+        });
+
+        document.getElementById('confirm-review-reject').addEventListener('click', async function() {
+            const reviewId = document.getElementById('reject-review-modal').dataset.reviewId;
+            const reason = document.getElementById('reject-review-reason').value.trim();
+            
+            if (!reason) {
+                alert('Пожалуйста, укажите причину отклонения');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/moderate_review/${reviewId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        approve: false,
+                        reason: reason
+                    })
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при отклонении отзыва');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при отклонении отзыва');
+            }
+        });
     });
 </script>
 {% endblock %}
