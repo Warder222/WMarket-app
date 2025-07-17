@@ -990,3 +990,16 @@ async def create_review(deal_id: int, from_user_id: int, to_user_id: int, produc
             await session.rollback()
             print(f"Error creating review: {e}")
             return None
+
+
+async def get_pending_deals():
+    """
+    Получает список сделок, ожидающих отмены (pending_cancel=True)
+    """
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Deal)
+            .where(Deal.pending_cancel == True)
+            .order_by(Deal.created_at.desc())
+        )
+        return result.scalars().all()

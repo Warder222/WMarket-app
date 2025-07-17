@@ -484,18 +484,89 @@
         margin: 0;
         font-size: 16px;
     }
+
+    .tabs-dropdown {
+        position: relative;
+        width: 100%;
+        margin-bottom: 16px;
+    }
+
+    .tabs-dropdown-btn {
+        width: 100%;
+        padding: 12px 16px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .tabs-dropdown-btn::after {
+        content: "▼";
+        font-size: 12px;
+        margin-left: 8px;
+    }
+
+    .tabs-dropdown-content {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        z-index: 100;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .tabs-dropdown-content.show {
+        display: block;
+    }
+
+    .dropdown-tab {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .dropdown-tab:last-child {
+        border-bottom: none;
+    }
+
+    .dropdown-tab.active {
+        color: var(--secondary-text);
+        font-weight: bold;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <header class="header">
     <div class="admin-title">Панель администратора</div>
-    <div class="tabs-header">
-        <div class="tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
-        <div class="tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
-        <div class="tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
-        <div class="tab {% if active_tab == 'reviews' %}active{% endif %}" data-tab="reviews">Отзывы</div>
-        <div class="tab-indicator" id="tabIndicator"></div>
+    
+    <!-- Changed tabs header to dropdown -->
+    <div class="tabs-dropdown">
+        <button class="tabs-dropdown-btn">
+            {% if active_tab == 'reports' %}Жалобы на чаты
+            {% elif active_tab == 'moderation' %}Модерация объявлений
+            {% elif active_tab == 'users' %}Пользователи
+            {% elif active_tab == 'reviews' %}Отзывы
+            {% elif active_tab == 'deals' %}Сделки
+            {% else %}Жалобы на чаты{% endif %}
+        </button>
+        <div class="tabs-dropdown-content" id="tabsDropdown">
+            <div class="dropdown-tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
+            <div class="dropdown-tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
+            <div class="dropdown-tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
+            <div class="dropdown-tab {% if active_tab == 'reviews' %}active{% endif %}" data-tab="reviews">Отзывы</div>
+            <div class="dropdown-tab {% if active_tab == 'deals' %}active{% endif %}" data-tab="deals">Сделки</div>
+        </div>
     </div>
 </header>
 
@@ -674,6 +745,50 @@
             </div>
         {% endif %}
     </div>
+
+    <div id="dealsTab" {% if active_tab != 'deals' %}class="hidden"{% endif %}>
+        {% if pending_deals %}
+            {% for deal in pending_deals %}
+            <div class="deal-item">
+                <div class="item-header">
+                    <div>
+                        <span class="item-id">Сделка #{{ deal.id }}</span>
+                        <span>Товар: {{ deal.product_name }}</span>
+                    </div>
+                    <div class="item-time">{{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                </div>
+                
+                <div class="deal-info">
+                    <div><strong>Продавец:</strong> {{ deal.seller_first_name }} (ID: {{ deal.seller_id }})</div>
+                    <div><strong>Покупатель:</strong> {{ deal.buyer_first_name }} (ID: {{ deal.buyer_id }})</div>
+                    <div><strong>Сумма:</strong> {{ deal.amount }} {{ deal.currency.upper() }}</div>
+                    <div><strong>Статус:</strong> {{ deal.status }}</div>
+                    <div><strong>Запрос на отмену:</strong> {% if deal.pending_cancel %}Да{% else %}Нет{% endif %}</div>
+                    {% if deal.pending_cancel %}
+                        <div class="cancel-reason">
+                            <strong>Причина отмены:</strong> {{ deal.cancel_reason }}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                {% if deal.pending_cancel %}
+                <div class="item-actions">
+                    <button class="approve-button" data-action="approve-cancel" data-id="{{ deal.id }}">Одобрить отмену</button>
+                    <button class="reject-button" data-action="reject-cancel" data-id="{{ deal.id }}">Отклонить отмену</button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-items">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="var(--secondary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 8V12M12 16H12.01" stroke="var(--secondary-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <p>Нет сделок, ожидающих отмены</p>
+            </div>
+        {% endif %}
+    </div>
 </main>
 
 <!-- Модальное окно только для отклонения объявлений -->
@@ -740,8 +855,99 @@
     document.addEventListener('DOMContentLoaded', () => {
         // Инициализация индикатора вкладок
         const tabsHeader = document.querySelector('.tabs-header');
-        const tabs = document.querySelectorAll('.tab');
         const tabIndicator = document.getElementById('tabIndicator');
+
+        const dropdownBtn = document.querySelector('.tabs-dropdown-btn');
+        const dropdownContent = document.getElementById('tabsDropdown');
+        
+        dropdownBtn.addEventListener('click', () => {
+            dropdownContent.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.tabs-dropdown')) {
+                dropdownContent.classList.remove('show');
+            }
+        });
+
+        // Tab switching logic
+        const tabs = document.querySelectorAll('.dropdown-tab');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tabName = tab.dataset.tab;
+                
+                // Update URL without reload
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', tabName);
+                window.history.pushState({}, '', url);
+                
+                // Update dropdown button text
+                dropdownBtn.textContent = tab.textContent;
+                dropdownContent.classList.remove('show');
+                
+                // Hide all content and show selected
+                document.querySelectorAll('.content-container > div').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`${tabName}Tab`).classList.remove('hidden');
+                
+                // Update active tab in dropdown
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
+
+        // Handle pending deal actions
+        document.addEventListener('click', async function(event) {
+            if (event.target.matches('[data-action="approve-cancel"]')) {
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/moderate_cancel_request/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ approve: true })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при одобрении отмены сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при одобрении отмены сделки');
+                }
+            }
+            
+            if (event.target.matches('[data-action="reject-cancel"]')) {
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/moderate_cancel_request/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ approve: false })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при отклонении отмены сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при отклонении отмены сделки');
+                }
+            }
+        });
         
         // Функция для активации вкладки
         function activateTab(tabName) {
@@ -795,20 +1001,20 @@
         }
         
         // Обработка кликов по вкладкам
-        tabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
-                const tabName = tab.dataset.tab;
+        // tabs.forEach(tab => {
+        //     tab.addEventListener('click', (e) => {
+        //         e.preventDefault();
+        //         const tabName = tab.dataset.tab;
                 
-                // Обновляем URL без перезагрузки страницы
-                const url = new URL(window.location.href);
-                url.searchParams.set('tab', tabName);
-                window.history.pushState({}, '', url);
+        //         // Обновляем URL без перезагрузки страницы
+        //         const url = new URL(window.location.href);
+        //         url.searchParams.set('tab', tabName);
+        //         window.history.pushState({}, '', url);
                 
-                // Активируем вкладку
-                activateTab(tabName);
-            });
-        });
+        //         // Активируем вкладку
+        //         activateTab(tabName);
+        //     });
+        // });
         
         // Инициализация при загрузке
         checkUrlParams();

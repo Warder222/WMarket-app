@@ -26,7 +26,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
-                                get_user_active_deals, get_user_completed_deals)
+                                get_user_active_deals, get_user_completed_deals, get_pending_deals)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -883,6 +883,9 @@ async def admin_chat_reports(
             )
             reviews = result.scalars().all()
 
+        # Получаем сделки, ожидающие отмены
+        pending_deals = await get_pending_deals()
+
         context = {
             "request": request,
             "reports": reports,
@@ -891,6 +894,7 @@ async def admin_chat_reports(
             "moderation_products": moderation_products,
             "users": users,
             "reviews": reviews,
+            "pending_deals": pending_deals,  # Добавляем сделки в контекст
             "active_tab": request.query_params.get("tab", "reports")
         }
         return templates.TemplateResponse("admin_chat_reports.html", context=context)
