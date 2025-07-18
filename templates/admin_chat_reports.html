@@ -543,6 +543,65 @@
         color: var(--secondary-text);
         font-weight: bold;
     }
+
+    .deal-item {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .deal-info {
+        margin: 12px 0;
+        padding: 12px;
+        background-color: var(--bg-color);
+        border-radius: 4px;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .deal-info div {
+        margin-bottom: 6px;
+    }
+
+    .cancel-reason {
+        margin-top: 8px;
+        padding: 8px;
+        background-color: rgba(255, 0, 0, 0.1);
+        border-left: 3px solid var(--error-color);
+        border-radius: 4px;
+    }
+
+    .actions-button {
+        padding: 8px 16px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .modal-actions-column {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .action-option {
+        width: 100%;
+        background-color: var(--primary-color);
+        text-align: center;
+    }
+
+    .deal-info-modal {
+        padding: 12px;
+        background-color: var(--bg-color);
+        border-radius: 4px;
+        margin-bottom: 16px;
+    }
 </style>
 {% endblock %}
 
@@ -749,7 +808,7 @@
     <div id="dealsTab" {% if active_tab != 'deals' %}class="hidden"{% endif %}>
         {% if pending_deals %}
             {% for deal in pending_deals %}
-            <div class="deal-item">
+            <div class="deal-item" data-deal-id="{{ deal.id }}">
                 <div class="item-header">
                     <div>
                         <span class="item-id">Сделка #{{ deal.id }}</span>
@@ -768,15 +827,14 @@
                         <div class="cancel-reason">
                             <strong>Причина отмены:</strong> {{ deal.cancel_reason }}
                         </div>
+                        <div><strong>Запросил отмену:</strong> {% if deal.cancel_request_by == deal.seller_id %}Продавец{% else %}Покупатель{% endif %}</div>
                     {% endif %}
                 </div>
                 
-                {% if deal.pending_cancel %}
                 <div class="item-actions">
-                    <button class="approve-button" data-action="approve-cancel" data-id="{{ deal.id }}">Одобрить отмену</button>
-                    <button class="reject-button" data-action="reject-cancel" data-id="{{ deal.id }}">Отклонить отмену</button>
+                    <button class="view-button" data-action="view-deal" data-id="{{ deal.id }}">Подробнее</button>
+                    <button class="actions-button" data-action="deal-actions" data-id="{{ deal.id }}">Действия</button>
                 </div>
-                {% endif %}
             </div>
             {% endfor %}
         {% else %}
@@ -788,6 +846,78 @@
                 <p>Нет сделок, ожидающих отмены</p>
             </div>
         {% endif %}
+    </div>
+
+    <!-- Модальное окно действий со сделкой -->
+    <div id="deal-actions-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <!-- Основные действия -->
+            <div id="main-actions">
+                <h3 style="margin-top: 0;">Действия со сделкой</h3>
+                <div id="deal-info-container" class="deal-info-modal" style="margin-bottom: 16px; font-size: 14px;">
+                    <!-- Информация о сделке будет подгружаться динамически -->
+                </div>
+                
+                <div class="modal-actions-column">
+                    <button class="modal-button action-option" data-action="complete-deal" style="background-color: var(--primary-color);">
+                        Завершить сделку
+                    </button>
+                    <button class="modal-button action-option" data-action="give-time" style="background-color: var(--primary-color);">
+                        Дать время на завершение
+                    </button>
+                    <button class="modal-button" id="cancel-deal-action" style="background-color: var(--secondary-text); margin-top: 16px;">
+                        Отмена
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Форма завершения сделки -->
+            <div id="complete-deal-actions" class="hidden">
+                <h3 style="margin-top: 0;">Завершить сделку</h3>
+                <div class="form-group">
+                    <label for="complete-reason">Причина решения</label>
+                    <textarea id="complete-reason" rows="3" placeholder="Опишите причину решения" style="width: 100%;"></textarea>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                    <button class="modal-button" id="complete-for-seller" style="background-color: var(--success-color); flex: 1;">
+                        В пользу продавца
+                    </button>
+                    <button class="modal-button" id="complete-for-buyer" style="background-color: var(--primary-color); flex: 1;">
+                        Вернуть средства покупателю
+                    </button>
+                </div>
+                <button class="modal-button" id="back-to-main-actions" style="background-color: var(--secondary-text); margin-top: 12px;">
+                    Назад
+                </button>
+            </div>
+            
+            <!-- Форма продления времени -->
+            <div id="give-time-actions" class="hidden">
+                <h3 style="margin-top: 0;">Дать время на завершение</h3>
+                <div class="form-group">
+                    <label for="time-hours">Дополнительное время</label>
+                    <select id="time-hours" class="form-select" style="width: 100%;">
+                        <option value="1">1 час</option>
+                        <option value="3">3 часа</option>
+                        <option value="6">6 часов</option>
+                        <option value="12">12 часов</option>
+                        <option value="24" selected>24 часа</option>
+                        <option value="48">48 часов</option>
+                        <option value="72">72 часа</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="time-reason">Комментарий (необязательно)</label>
+                    <textarea id="time-reason" rows="2" placeholder="Можете оставить комментарий" style="width: 100%;"></textarea>
+                </div>
+                <button class="modal-button" id="confirm-give-time" style="background-color: var(--primary-color); margin-top: 8px;">
+                    Подтвердить
+                </button>
+                <button class="modal-button" id="back-to-main-actions-2" style="background-color: var(--secondary-text); margin-top: 8px;">
+                    Назад
+                </button>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -999,22 +1129,6 @@
                 }
             }
         }
-        
-        // Обработка кликов по вкладкам
-        // tabs.forEach(tab => {
-        //     tab.addEventListener('click', (e) => {
-        //         e.preventDefault();
-        //         const tabName = tab.dataset.tab;
-                
-        //         // Обновляем URL без перезагрузки страницы
-        //         const url = new URL(window.location.href);
-        //         url.searchParams.set('tab', tabName);
-        //         window.history.pushState({}, '', url);
-                
-        //         // Активируем вкладку
-        //         activateTab(tabName);
-        //     });
-        // });
         
         // Инициализация при загрузке
         checkUrlParams();
@@ -1318,6 +1432,149 @@
                 console.error('Error:', error);
                 alert('Ошибка при отклонении отзыва');
             }
+        });
+
+        // Открытие модального окна действий со сделкой
+        function openDealActionsModal(dealId) {
+            const modal = document.getElementById('deal-actions-modal');
+            modal.style.display = 'flex';
+            modal.dataset.dealId = dealId;
+            
+            // Загружаем информацию о сделке
+            fetch(`/admin/get_deal_info/${dealId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('deal-info-container');
+                    container.innerHTML = `
+                        <div><strong>Товар:</strong> ${data.product_name}</div>
+                        <div><strong>Сумма:</strong> ${data.amount} ${data.currency.toUpperCase()}</div>
+                        <div><strong>Продавец:</strong> ID ${data.seller_id}</div>
+                        <div><strong>Покупатель:</strong> ID ${data.buyer_id}</div>
+                        ${data.pending_cancel ? `
+                            <div style="margin-top: 8px; color: var(--error-color);">
+                                <strong>Запрос на отмену:</strong> ${data.cancel_reason}
+                            </div>
+                        ` : ''}
+                    `;
+                });
+        }
+
+        // Закрытие модального окна
+        function closeDealModal() {
+            document.getElementById('deal-actions-modal').style.display = 'none';
+            document.getElementById('complete-reason').value = '';
+            document.getElementById('time-reason').value = '';
+            backToMainActions();
+        }
+
+        // Возврат к основным действиям
+        function backToMainActions() {
+            document.getElementById('complete-deal-actions').classList.add('hidden');
+            document.getElementById('give-time-actions').classList.add('hidden');
+            document.getElementById('main-actions').classList.remove('hidden');
+        }
+
+        // Обработчики кнопок
+        document.addEventListener('click', function(event) {
+            if (event.target.matches('[data-action="deal-actions"]')) {
+                const dealId = event.target.dataset.id;
+                openDealActionsModal(dealId);
+            }
+            
+            if (event.target.matches('.action-option')) {
+                const action = event.target.dataset.action;
+                document.getElementById('main-actions').classList.add('hidden');
+                
+                if (action === 'complete-deal') {
+                    document.getElementById('complete-deal-actions').classList.remove('hidden');
+                } else if (action === 'give-time') {
+                    document.getElementById('give-time-actions').classList.remove('hidden');
+                }
+            }
+        });
+
+        document.getElementById('cancel-deal-action').addEventListener('click', closeDealModal);
+        document.getElementById('back-to-main-actions').addEventListener('click', backToMainActions);
+        document.getElementById('back-to-main-actions-2').addEventListener('click', backToMainActions);
+
+        // Завершение сделки в пользу продавца
+        document.getElementById('complete-for-seller').addEventListener('click', function() {
+            const dealId = document.getElementById('deal-actions-modal').dataset.dealId;
+            const reason = document.getElementById('complete-reason').value.trim();
+            
+            if (!reason) {
+                alert('Пожалуйста, укажите причину решения');
+                return;
+            }
+            
+            fetch(`/admin/complete_deal/${dealId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'for_seller',
+                    reason: reason
+                })
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при завершении сделки');
+                }
+            });
+        });
+
+        // Возврат средств покупателю
+        document.getElementById('complete-for-buyer').addEventListener('click', function() {
+            const dealId = document.getElementById('deal-actions-modal').dataset.dealId;
+            const reason = document.getElementById('complete-reason').value.trim();
+            
+            if (!reason) {
+                alert('Пожалуйста, укажите причину решения');
+                return;
+            }
+            
+            fetch(`/admin/complete_deal/${dealId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'for_buyer',
+                    reason: reason
+                })
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при завершении сделки');
+                }
+            });
+        });
+
+        // Дать время на завершение
+        document.getElementById('confirm-give-time').addEventListener('click', function() {
+            const dealId = document.getElementById('deal-actions-modal').dataset.dealId;
+            const hours = document.getElementById('time-hours').value;
+            const reason = document.getElementById('time-reason').value;
+            
+            fetch(`/admin/give_more_time/${dealId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    hours: hours,
+                    reason: reason
+                })
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при обновлении сделки');
+                }
+            });
         });
     });
 </script>

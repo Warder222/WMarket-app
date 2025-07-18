@@ -2068,3 +2068,240 @@ async def get_user_reviews(user_id: int, session_token=Cookie(default=None)):
         except Exception as e:
             print(f"Error getting user reviews: {e}")
             return JSONResponse({"status": "error", "message": "Internal server error"}, status_code=500)
+
+
+# Добавим эти endpoint'ы в wmarket_router
+
+@wmarket_router.get("/admin/get_deal_info/{deal_id}")
+async def get_deal_info(
+    deal_id: int,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return {"status": "error", "message": "Unauthorized"}
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Deal)
+            .where(Deal.id == deal_id)
+        )
+        deal = result.scalar_one_or_none()
+
+        if not deal:
+            return {"status": "error", "message": "Deal not found"}
+
+        # Получаем информацию о пользователях
+        seller = await get_user_info(deal.seller_id)
+        buyer = await get_user_info(deal.buyer_id)
+
+        return {
+            "id": deal.id,
+            "product_name": deal.product_name,
+            "seller_id": deal.seller_id,
+            "seller_first_name": seller[1] if seller else "Unknown",
+            "buyer_id": deal.buyer_id,
+            "buyer_first_name": buyer[1] if buyer else "Unknown",
+            "amount": deal.amount,
+            "currency": deal.currency,
+            "status": deal.status,
+            "pending_cancel": deal.pending_cancel,
+            "cancel_reason": deal.cancel_reason,
+            "cancel_request_by": deal.cancel_request_by,
+            "created_at": deal.created_at.isoformat()
+        }
+
+
+@wmarket_router.post("/admin/complete_deal/{deal_id}")
+async def complete_deal(
+    deal_id: int,
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    data = await request.json()
+    action = data.get("action")  # "for_seller" или "for_buyer"
+    reason = data.get("reason", "")
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if deal.status != "active":
+                return JSONResponse({"status": "error", "message": "Deal is not active"}, status_code=400)
+
+            # Получаем информацию о пользователях
+            buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+            buyer = buyer.scalar_one_or_none()
+            seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+            seller = seller.scalar_one_or_none()
+
+            if action == "for_seller":
+                # Рассчитываем сумму с учетом комиссии (7%)
+                seller_amount = deal.amount * 0.93
+                market_fee = deal.amount * 0.07
+
+                # Зачисляем средства продавцу
+                if deal.currency == 'rub':
+                    seller.rub_balance += seller_amount
+                    if seller.earned_rub is None:
+                        seller.earned_rub = 0.0
+                    seller.earned_rub += seller_amount
+                else:
+                    seller.ton_balance += seller_amount
+                    if seller.earned_ton is None:
+                        seller.earned_ton = 0.0
+                    seller.earned_ton += seller_amount
+
+                # Обновляем статус сделки
+                deal.status = "completed_by_admin"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.admin_decision = "for_seller"
+                deal.admin_reason = reason
+                deal.admin_id = payload.get("tg_id")
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"✅ Администратор завершил сделку в вашу пользу!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия 7%)\n"
+                    f"Причина решения: {reason}"
+                )
+
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"ℹ️ Администратор завершил сделку в пользу продавца.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} {deal.currency.upper()}\n"
+                    f"Причина решения: {reason}"
+                )
+
+            elif action == "for_buyer":
+                # Возвращаем средства покупателю
+                if deal.currency == 'rub':
+                    buyer.rub_balance += deal.amount
+                else:
+                    buyer.ton_balance += deal.amount
+
+                # Обновляем статус сделки
+                deal.status = "cancelled_by_admin"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.admin_decision = "for_buyer"
+                deal.admin_reason = reason
+                deal.admin_id = payload.get("tg_id")
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"✅ Администратор вернул вам средства по сделке!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} {deal.currency.upper()}\n"
+                    f"Причина решения: {reason}"
+                )
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"ℹ️ Администратор вернул средства покупателю.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} {deal.currency.upper()}\n"
+                    f"Причина решения: {reason}"
+                )
+
+            await session.commit()
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error completing deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.post("/admin/give_more_time/{deal_id}")
+async def give_more_time(
+    deal_id: int,
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    data = await request.json()
+    hours = int(data.get("hours", 24))
+    reason = data.get("reason", "")
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if deal.status != "active":
+                return JSONResponse({"status": "error", "message": "Deal is not active"}, status_code=400)
+
+            # Устанавливаем время для самостоятельного решения
+            deal.pending_cancel = False
+            deal.cancel_reason = None
+            deal.cancel_request_by = None
+            deal.admin_decision = "more_time"
+            deal.admin_reason = reason
+            deal.admin_id = payload.get("tg_id")
+            deal.time_extension = hours
+            deal.time_extension_until = datetime.now(timezone.utc) + timedelta(hours=hours)
+
+            # Отправляем уведомления
+            await send_notification_to_user(
+                deal.seller_id,
+                f"⏳ Администратор дал вам дополнительное время для завершения сделки!\n\n"
+                f"Товар: {deal.product_name}\n"
+                f"Сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"Время на решение: {hours} часов\n"
+                f"Комментарий администратора: {reason or 'нет'}"
+            )
+
+            await send_notification_to_user(
+                deal.buyer_id,
+                f"⏳ Администратор дал вам дополнительное время для завершения сделки!\n\n"
+                f"Товар: {deal.product_name}\n"
+                f"Сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"Время на решение: {hours} часов\n"
+                f"Комментарий администратора: {reason or 'нет'}"
+            )
+
+            await session.commit()
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error giving more time for deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
