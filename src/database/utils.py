@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from starlette.responses import JSONResponse
 
@@ -915,6 +915,12 @@ async def get_user_active_deals(tg_id: int):
             seller = seller.scalar_one_or_none()
             buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
             buyer = buyer.scalar_one_or_none()
+            admin_gave_time = False
+            try:
+                if deal.time_extension_until > datetime.now(timezone.utc):
+                    admin_gave_time = True
+            except TypeError:
+                pass
 
             deals_with_users.append({
                 "id": deal.id,
@@ -930,7 +936,8 @@ async def get_user_active_deals(tg_id: int):
                 "status": deal.status,
                 "pending_cancel": deal.pending_cancel,
                 "cancel_request_by": deal.cancel_request_by,
-                "created_at": deal.created_at
+                "created_at": deal.created_at,
+                "admin_gave_time": admin_gave_time
             })
 
         return deals_with_users
@@ -945,7 +952,7 @@ async def get_user_completed_deals(tg_id: int):
                     Deal.seller_id == tg_id,
                     Deal.buyer_id == tg_id
                 ),
-                Deal.status.in_(['completed', 'cancelled'])
+                Deal.status.in_(['completed', 'cancelled', 'completed_by_admin', 'cancelled_by_admin'])
             ).order_by(Deal.created_at.desc()))
         comp_deals = result.scalars().all()
 
@@ -955,6 +962,18 @@ async def get_user_completed_deals(tg_id: int):
             seller = seller.scalar_one_or_none()
             buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
             buyer = buyer.scalar_one_or_none()
+
+            status_text = ""
+            if deal.status == 'completed':
+                if deal.admin_decision == 'for_seller':
+                    status_text = "Завершена администратором (в пользу продавца)"
+                else:
+                    status_text = "Завершена"
+            else:
+                if deal.admin_decision == 'for_buyer':
+                    status_text = "Отменена администратором (в пользу покупателя)"
+                else:
+                    status_text = "Отменена"
 
             comp_deals_with_users.append({
                 "id": deal.id,
@@ -966,7 +985,10 @@ async def get_user_completed_deals(tg_id: int):
                 "amount": deal.amount,
                 "currency": deal.currency,
                 "status": deal.status,
-                "created_at": deal.created_at
+                "status_text": status_text,
+                "admin_decision": deal.admin_decision,
+                "created_at": deal.created_at,
+                "completed_at": deal.completed_at
             })
 
         return comp_deals_with_users
@@ -994,12 +1016,38 @@ async def create_review(deal_id: int, from_user_id: int, to_user_id: int, produc
 
 async def get_pending_deals():
     """
-    Получает список сделок, ожидающих отмены (pending_cancel=True)
+    Получает список сделок, ожидающих отмены (pending_cancel=True),
+    исключая завершенные и административно обработанные сделки
     """
     async with async_session_maker() as session:
         result = await session.execute(
             select(Deal)
-            .where(Deal.pending_cancel == True)
+            .where(
+                and_(
+                    Deal.pending_cancel == True,
+                    Deal.completed_at.is_(None),
+                    Deal.admin_decision.is_(None)  # Исключаем сделки с решением администратора
+                )
+            )
             .order_by(Deal.created_at.desc())
         )
         return result.scalars().all()
+
+
+async def get_deal_time_extension(deal_id: int):
+    """
+    Получает время расширения для сделки (time_extension_until)
+
+    :param deal_id: ID сделки
+    :return: datetime объекта time_extension_until или None, если не установлено
+    """
+    async with async_session_maker() as session:
+        try:
+            result = await session.execute(
+                select(Deal.time_extension_until)
+                .where(Deal.id == deal_id)
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            print(f"Error getting deal time extension: {e}")
+            return None
