@@ -92,10 +92,11 @@
     .deal-status {
         padding: 4px 10px;
         border-radius: 12px;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        word-break: break-word;
     }
     
     .status-active {
@@ -511,15 +512,19 @@
                         </div>
                         <div class="deal-time" data-utc-time="{{ deal.created_at.isoformat() }}"></div>
                     </div>
-                    {% if not deal.pending_cancel %}
-                    <div class="deal-actions">
-                        {% if deal.buyer_id == user_tg_id %}
-                            <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">Подтвердить получение</button>
-                            <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
-                        {% else %}
-                            <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
-                        {% endif %}
-                    </div>
+                    {% if not deal.pending_cancel and not deal.time_extension_until %}
+                        <div class="deal-actions">
+                            {% if deal.buyer_id == user_tg_id %}
+                                <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">Подтвердить получение</button>
+                                {% if not deal.admin_gave_time %}
+                                    <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                {% endif %}
+                            {% else %}
+                                {% if not deal.admin_gave_time %}
+                                    <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -538,7 +543,17 @@
                     <div class="deal-header">
                         <div class="deal-title">{{ deal.product_name }}</div>
                         <div class="deal-status {% if deal.status == 'completed' %}status-completed{% else %}status-cancelled{% endif %}">
-                            {% if deal.status == 'completed' %}Завершена{% else %}Отменена{% endif %}
+                            {% if deal.status == 'completed' %}
+                                Завершена
+                            {% elif deal.status == 'completed_by_admin' %}
+                                {% if deal.admin_decision == 'for_seller' %}
+                                    Завершена администратором
+                                {% elif deal.admin_decision == 'for_buyer' %}
+                                    Завершена администратором
+                                {% else %}
+                                    Завершена
+                                {% endif %}
+                            {% endif %}
                         </div>
                     </div>
                     <div class="deal-amount">
@@ -696,7 +711,7 @@
         });
         
         // Обновленная функция подтверждения сделки с проверкой статуса
-        document.querySelectorAll('.confirm-deal-btn').forEach(btn => {
+        document.querySelectorAll('.confirm-deal-btn, .cancel-deal-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const dealId = btn.dataset.dealId;
@@ -705,6 +720,13 @@
                 const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
                 const result = await response.json();
                 
+                // Проверяем истекло ли время расширения
+                if (result.time_extension_until && new Date(result.time_extension_until) < new Date()) {
+                    alert('Время на завершение сделки истекло. Сделка отправлена на модерацию.');
+                    window.location.reload();
+                    return;
+                }
+                
                 if (result.status !== 'active') {
                     alert('Сделка уже завершена или отменена');
                     window.location.reload();
@@ -712,12 +734,18 @@
                 }
                 
                 if (result.pending_cancel) {
-                    alert('Нельзя подтвердить сделку, так как запрос на отмену находится на модерации');
+                    alert('Запрос на отмену уже отправлен на модерацию');
+                    window.location.reload();
                     return;
                 }
                 
-                selectedDealId = dealId;
-                document.getElementById('reviewModal').style.display = 'flex';
+                if (btn.classList.contains('cancel-deal-btn')) {
+                    cancelDealId = dealId;
+                    document.getElementById('cancelModal').style.display = 'flex';
+                } else {
+                    selectedDealId = dealId;
+                    document.getElementById('reviewModal').style.display = 'flex';
+                }
             });
         });
         

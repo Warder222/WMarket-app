@@ -26,7 +26,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
-                                get_user_active_deals, get_user_completed_deals, get_pending_deals)
+                                get_user_active_deals, get_user_completed_deals, get_pending_deals,
+                                get_deal_time_extension)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -1873,9 +1874,17 @@ async def check_deal_status(request: Request, deal_id: int, session_token=Cookie
         if not deal:
             return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
 
+        # Проверяем истекло ли время расширения
+        if deal.time_extension_until and deal.time_extension_until < datetime.now(timezone.utc):
+            # Если время истекло, отправляем сделку на модерацию
+            deal.pending_cancel = True
+            deal.cancel_reason = "Время на завершение сделки истекло"
+            await session.commit()
+
         return JSONResponse({
             "status": deal.status,
-            "pending_cancel": deal.pending_cancel
+            "pending_cancel": deal.pending_cancel,
+            "time_extension_until": deal.time_extension_until.isoformat() if deal.time_extension_until else None
         })
 
 
@@ -2201,7 +2210,7 @@ async def complete_deal(
                     buyer.ton_balance += deal.amount
 
                 # Обновляем статус сделки
-                deal.status = "cancelled_by_admin"
+                deal.status = "completed_by_admin"
                 deal.completed_at = datetime.now(timezone.utc)
                 deal.admin_decision = "for_buyer"
                 deal.admin_reason = reason
@@ -2223,6 +2232,8 @@ async def complete_deal(
                     f"Сумма: {deal.amount} {deal.currency.upper()}\n"
                     f"Причина решения: {reason}"
                 )
+
+                await archive_product_post(deal.product_id)
 
             await session.commit()
             return JSONResponse({"status": "success"})
