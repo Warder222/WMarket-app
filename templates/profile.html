@@ -640,7 +640,7 @@
 <div class="reviews-modal" id="reviewsModal">
     <div class="reviews-content">
         <div class="reviews-header">
-            <div class="reviews-title">Отзывы о {{ user_info[1] }}</div>
+            <div class="reviews-title">Отзывы</div>
             <button class="close-reviews" id="closeReviews">&times;</button>
         </div>
         <div class="reviews-list" id="reviewsList">
@@ -710,7 +710,11 @@
                             <div class="review-header">
                                 <div>
                                     <span class="review-rating ${ratingClass}">${ratingText}</span>
-                                    <span class="review-author">${review.from_user_name}</span>
+                                    <span class="review-author">
+                                        <a href="/profile/${review.from_user_id}" style="color: inherit;">
+                                            ${review.from_user_name}
+                                        </a>
+                                    </span>
                                 </div>
                                 <div class="review-date">${new Date(review.created_at).toLocaleDateString()}</div>
                             </div>

@@ -248,6 +248,11 @@
         margin: 10px auto;
         max-width: 80%;
     }
+
+    a {
+        color: var(--primary-color);
+        text-decoration: none;
+    }
 </style>
 {% endblock %}
 
@@ -264,7 +269,12 @@
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
             </svg>
         </button>
-        <div class="chat-title">Чат с {% if other_user.first_name %}{{ other_user.first_name }}{% else %}Неизвестный{% endif %}</div>
+        <div class="chat-title">
+            Чат с 
+            <a href="/profile/{{ other_user.tg_id }}">
+                {% if other_user.first_name %}{{ other_user.first_name }}{% else %}Неизвестный{% endif %}
+            </a>
+        </div>
         <!-- Добавленная кнопка щита -->
         {% if not current_user.is_admin %}
             <button class="shield-button" id="reportChatButton">
