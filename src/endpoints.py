@@ -620,43 +620,12 @@ async def chats(request: Request, session_token=Cookie(default=None)):
             # Получаем все чаты пользователя
             user_chats = await get_user_chats(payload.get("tg_id"))
 
-            # Формируем список чатов для отображения
-            chats_list = []
-            for chat in user_chats:
-                # Получаем информацию о продукте
-                product = await get_product_info(chat.product_id, payload.get("tg_id"))
-
-                # Получаем информацию о собеседнике
-                other_participants = await get_chat_participants(chat.id, exclude_user_id=payload.get("tg_id"))
-                other_user_id = other_participants[0].user_id if other_participants else None
-
-                # Получаем данные пользователя
-                other_user_info = await get_user_info(other_user_id) if other_user_id else None
-
-                # Получаем последнее сообщение в чате
-                last_message = await get_last_chat_message(chat.id)
-
-                admin_res = await is_admin(payload.get("tg_id"))
-
-                chats_list.append({
-                    "id": chat.id,
-                    "product_id": chat.product_id,
-                    "product_title": product[2] if product else "Неизвестный товар",
-                    "product_price": product[3] if product else 0,
-                    "product_image": product[5] if product else "",
-                    "seller_username": other_user_info[1] if other_user_info else "Неизвестный",
-                    "last_message": last_message.content if last_message else "Чат начат",
-                    "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
-                    "unread_count": await count_unread_messages(chat.id, payload.get("tg_id")),
-                    "admin": admin_res
-                })
-
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
 
             context = {
                 "request": request,
-                "chats": chats_list,
+                "chats": user_chats,  # Use the returned list directly
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res
             }

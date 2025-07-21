@@ -253,6 +253,29 @@
         color: var(--primary-color);
         text-decoration: none;
     }
+
+    .disabled-product {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+    
+    .product-image-container {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .product-status {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        text-align: center;
+    }
 </style>
 {% endblock %}
 
@@ -285,8 +308,16 @@
         {% endif %}
     </div>
 
-    <div class="product-info" onclick="window.location.href='/ads/{{ product.id }}'">
-        <img src="/{{ product.product_image_url }}" class="product-image" alt="{{ product.product_name }}">
+    <div class="product-info {% if not product.active %}disabled-product{% endif %}" 
+    {% if product.active %}onclick="window.location.href='/ads/{{ product.id }}'"{% endif %}>
+        <div class="product-image-container">
+            <img src="/{{ product.product_image_url }}" class="product-image" alt="{{ product.product_name }}">
+            {% if product.active is none %}
+                <div class="product-status">В архиве</div>
+            {% elif not product.active %}
+                <div class="product-status">На модерации</div>
+            {% endif %}
+        </div>
         <div class="product-details">
             <div class="product-title">{{ product.product_name }}</div>
             <div class="product-price">{{ product.product_price }} ₽</div>

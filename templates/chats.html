@@ -167,6 +167,29 @@
         border-radius: 4px;
         cursor: pointer;
     }
+
+    .product-image-container {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .chat-image.grayscale {
+        filter: grayscale(100%);
+        opacity: 0.7;
+    }
+    
+    .product-status {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        text-align: center;
+    }
 </style>
 {% endblock %}
 
@@ -194,7 +217,14 @@
                     <div class="chat-time">{{ chat.last_message_time }}</div>
                 </div>
                 <div class="chat-actions">
-                    <img src="/{{ chat.product_image }}" class="chat-image" alt="{{ chat.product_title }}">
+                    <div class="product-image-container">
+                        <img src="/{{ chat.product_image }}" class="chat-image {% if not chat.product_active %}grayscale{% endif %}" alt="{{ chat.product_title }}">
+                        {% if chat.product_active is none %}
+                            <div class="product-status">В архиве</div>
+                        {% elif not chat.product_active %}
+                            <div class="product-status">На модерации</div>
+                        {% endif %}
+                    </div>
                     <button class="leave-chat-button" data-chatid="{{ chat.id }}">
                         <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                             <rect x="4" y="6" width="12" height="11" rx="1" fill="#777"/>

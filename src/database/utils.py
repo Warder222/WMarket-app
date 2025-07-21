@@ -569,16 +569,82 @@ async def report_message(message_id: int):
         await db.commit()
         return True
 
+
 async def get_user_chats(user_id: int):
-    """Получить все активные чаты пользователя"""
+    """Получить все активные чаты пользователя, отсортированные по последнему сообщению"""
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Chat)
-            .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
-            .where(ChatParticipant.user_id == user_id)
-            .order_by(Chat.created_at.desc())
+        # Подзапрос для получения времени последнего сообщения в каждом чате
+        last_message_subq = (
+            select(
+                Message.chat_id,
+                func.max(Message.created_at).label('last_message_time')
+            )
+            .group_by(Message.chat_id)
+            .subquery()
         )
-        return result.scalars().all()
+
+        # Основной запрос
+        result = await session.execute(
+            select(
+                Chat,
+                last_message_subq.c.last_message_time
+            )
+            .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
+            .join(last_message_subq, Chat.id == last_message_subq.c.chat_id, isouter=True)
+            .where(ChatParticipant.user_id == user_id)
+            .order_by(
+                desc(last_message_subq.c.last_message_time),
+                desc(Chat.created_at)
+            )
+        )
+
+        chats_with_times = result.all()
+
+        # Формируем полную информацию о чатах
+        chats_with_info = []
+        for chat, last_message_time in chats_with_times:
+            # Получаем информацию о продукте
+            product = await session.execute(select(Product).where(Product.id == chat.product_id))
+            product = product.scalar_one_or_none()
+
+            # Получаем информацию о собеседнике
+            other_participants = await session.execute(
+                select(ChatParticipant.user_id)
+                .where(
+                    (ChatParticipant.chat_id == chat.id) &
+                    (ChatParticipant.user_id != user_id)
+                )
+            )
+            other_user_id = other_participants.scalar_one_or_none()
+
+            other_user = await session.execute(select(User).where(User.tg_id == other_user_id))
+            other_user = other_user.scalar_one_or_none()
+
+            # Получаем последнее сообщение - use first() instead of scalar_one_or_none()
+            last_message = await session.execute(
+                select(Message)
+                .where(Message.chat_id == chat.id)
+                .order_by(desc(Message.created_at))
+                .limit(1)
+            )
+            last_message = last_message.first()
+            if last_message:
+                last_message = last_message[0]  # Extract the Message object from the row
+
+            chats_with_info.append({
+                "id": chat.id,
+                "product_id": chat.product_id,
+                "product_title": product.product_name if product else "Неизвестный товар",
+                "product_price": product.product_price if product else 0,
+                "product_image": product.product_image_url if product else "",
+                "product_active": product.active if product else None,
+                "seller_username": other_user.first_name if other_user else "Неизвестный",
+                "last_message": last_message.content if last_message else "Чат начат",
+                "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
+                "unread_count": await count_unread_messages(chat.id, user_id)
+            })
+
+        return chats_with_info
 
 async def get_chat_participants(chat_id: int, exclude_user_id: int = None):
     """Получить участников чата, исключая указанного пользователя"""
