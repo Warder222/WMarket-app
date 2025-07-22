@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Request, Cookie, Depends, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, Cookie, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, update, func, desc
@@ -16,7 +16,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
                                 get_user_moderation_products, create_chat, get_chat_messages, report_message,
-                                send_message, count_unread_messages, get_last_chat_message, get_chat_participants,
+                                send_message, get_chat_participants,
                                 get_user_chats, all_count_unread_messages, get_all_digit_categories,
                                 get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
                                 user_exists, record_referral, get_ref_count, get_chat_part_info,
@@ -26,8 +26,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
-                                get_user_active_deals, get_user_completed_deals, get_pending_deals,
-                                get_deal_time_extension)
+                                get_user_active_deals, get_user_completed_deals, get_pending_deals)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 

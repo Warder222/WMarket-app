@@ -111,6 +111,12 @@
         border: 1px solid rgba(40, 167, 69, 0.3);
     }
 
+    .status-admin-completed {
+        background-color: rgba(85, 79, 0, 0.479);
+        color: #e9c918;
+        border: 1px solid rgba(255, 240, 105, 0.712);
+    }
+
     .status-cancelled {
         background-color: rgba(220, 53, 69, 0.1);
         color: #dc3545;
@@ -542,7 +548,7 @@
                 <div class="deal-card">
                     <div class="deal-header">
                         <div class="deal-title">{{ deal.product_name }}</div>
-                        <div class="deal-status {% if deal.status == 'completed' %}status-completed{% else %}status-cancelled{% endif %}">
+                        <div class="deal-status {% if deal.status == 'completed' %}status-completed{% elif deal.status == 'completed_by_admin' %}status-admin-completed{% else %}status-cancelled{% endif %}">
                             {% if deal.status == 'completed' %}
                                 Завершена
                             {% elif deal.status == 'completed_by_admin' %}
