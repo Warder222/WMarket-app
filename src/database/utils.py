@@ -335,9 +335,9 @@ async def get_user_active_products(tg_id: int, current_user_id: int):
             all_products = []
             for prod in products:
                 product_list = list(prod)
-            # Добавляем флаг избранного (индекс 7)
-            product_list.append(True if product_list[4] in all_favs else False)
-            all_products.append(product_list)
+                # Добавляем флаг избранного (индекс 7)
+                product_list.append(True if product_list[4] in all_favs else False)
+                all_products.append(product_list)
 
             return all_products
         except Exception as exc:

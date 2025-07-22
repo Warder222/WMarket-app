@@ -188,6 +188,7 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
             # Загружаем только нужные данные в зависимости от выбранной вкладки
             if tab == 'active':
                 active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+                print(active_products)
             elif tab == 'moderation':
                 moderation_products = await get_user_moderation_products(payload.get("tg_id"))
             elif tab == 'archived':
