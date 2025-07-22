@@ -56,6 +56,11 @@ class Product(Base):
     product_image_url = Column(String, unique=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     active = Column(Boolean, default=False)
+    reserved = Column(Boolean, default=False)  # New field
+    reserved_until = Column(DateTime(timezone=True), nullable=True)  # New field
+    reserved_by = Column(BigInteger, ForeignKey("users.tg_id", ondelete="SET NULL"), nullable=True)  # New field
+    reservation_amount = Column(Float, nullable=True)  # New field
+    reservation_currency = Column(String, nullable=True)  # New field
 
 
 class Fav(Base):
@@ -148,7 +153,7 @@ class Deal(Base):
     buyer_id = Column(BigInteger, ForeignKey('users.tg_id'))
     currency = Column(String)
     amount = Column(Float)
-    status = Column(String, default="active")  # active, completed, cancelled, completed_by_admin
+    status = Column(String, default="active")  # Добавляем новый статус "reserved"
     pending_cancel = Column(Boolean, default=False)
     cancel_reason = Column(String, nullable=True)
     cancel_request_by = Column(BigInteger, nullable=True)
@@ -159,6 +164,10 @@ class Deal(Base):
     admin_id = Column(BigInteger, ForeignKey('users.tg_id'), nullable=True)
     time_extension = Column(Integer, nullable=True)  # hours
     time_extension_until = Column(DateTime(timezone=True), nullable=True)
+    # Новые поля для бронирования
+    is_reserved = Column(Boolean, default=False)
+    reservation_amount = Column(Float, nullable=True)
+    reservation_until = Column(DateTime(timezone=True), nullable=True)
 
 
 class Review(Base):

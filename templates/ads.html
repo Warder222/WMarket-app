@@ -410,6 +410,91 @@
         .payment-btn:hover {
             background-position: 100% 100%;
         }
+
+        .reservation-modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .reservation-modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .reservation-currency-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .reservation-currency-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+            background-color: var(--card-bg);
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .reservation-currency-btn.active {
+            border-color: var(--primary-color);
+            background-color: rgba(63, 136, 248, 0.1);
+        }
+
+        .reservation-amount {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 12px;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .confirm-reservation-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(45deg, #3f88f8 0%, #2a5d9e 50%, #3f88f8 100%);
+            background-size: 200% 200%;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-position 0.5s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .confirm-reservation-btn:hover {
+            background-position: 100% 100%;
+        }
+
+        .reservation-currency-btn.active {
+            border-color: var(--primary-color) !important;
+            background-color: rgba(63, 136, 248, 0.1) !important;
+            color: var(--primary-color) !important;
+        }
+
+        .close-reservation-modal {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--primary-color);
+        }
     </style>
 {% endblock %}
 
@@ -543,6 +628,40 @@
         
         <h3 class="ad-description-title">Описание</h3>
         <div class="ad-description">{{ product_info[4] }}</div>
+
+        <!-- Add this modal to the ads.html file, just before the closing </div> tag of the ad-container -->
+        <div id="reservationModal" class="modal" style="display: none;">
+            <div class="reservation-modal-content">
+                <button class="close-reservation-modal" onclick="closeReservationModal()">✕</button>
+                
+                <h2 class="reservation-modal-title">Бронирование товара</h2>
+                
+                <p style="margin-bottom: 20px; text-align: center;">
+                    Вы бронируете товар на 48 часов. В течение этого времени другие пользователи не смогут его купить.
+                    Сумма бронирования составит 15% от стоимости товара.
+                </p>
+                
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Способ оплаты</label>
+                    <div class="reservation-currency-buttons">
+                        <button id="rubReserveBtn" class="reservation-currency-btn active" onclick="selectReserveCurrency('rub')">
+                            RUB
+                        </button>
+                        <button id="tonReserveBtn" class="reservation-currency-btn" onclick="selectReserveCurrency('ton')">
+                            TON
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="reserveAmountInfo" class="reservation-amount">
+                    Сумма бронирования: {{ (product_info[3] * 0.15) | round(2) }} ₽
+                </div>
+                
+                <button id="confirmReserveBtn" class="confirm-reservation-btn">
+                    Подтвердить бронирование
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Модальное окно для редактирования объявления -->
@@ -598,12 +717,22 @@
     <script src="/static/js/price_conv.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            function roundUp(value, decimals = 4) {
+                const factor = Math.pow(10, decimals);
+                return Math.floor(value * factor) / factor;
+            }
+
+            // Состояние загрузки курса
+            let isTonRateLoaded = false;
+            let currentTonRate = 0;
+            let tonAmount = 0;
+
             // Обработка выбора изображения для редактирования
             const editImageInput = document.getElementById('editImage');
             const editImagePreview = document.getElementById('edit-image-preview');
 
             if (editImageInput && editImagePreview) {
-                editImagePreview.style.display = 'block'; // Показываем текущее изображение
+                editImagePreview.style.display = 'block';
                 
                 editImageInput.addEventListener('change', function(e) {
                     if (e.target.files && e.target.files[0]) {
@@ -649,15 +778,13 @@
                     e.preventDefault();
                     const productId = reportBtn.dataset.id;
                     
-                    // Показываем подтверждение
                     if (confirm('Вы уверены, что хотите отправить это объявление на повторную проверку?')) {
-                        // Отправляем запрос на сервер
                         fetch('/report_product', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ product_id: parseInt(productId) }) // Явно преобразуем в число
+                            body: JSON.stringify({ product_id: parseInt(productId) })
                         })
                         .then(response => response.json())
                         .then(data => {
@@ -674,15 +801,25 @@
                     }
                 }
 
-                // Обработка кнопки редактирования
                 const editBtn = e.target.closest('.ad-edit');
                 if (editBtn) {
                     e.preventDefault();
                     openEditModal();
                 }
+
+                // Обработка кликов на крестики для закрытия модальных окон
+                if (e.target.closest('[onclick="closePaymentModal()"]')) {
+                    closePaymentModal();
+                }
+                if (e.target.closest('[onclick="closeReservationModal()"]')) {
+                    closeReservationModal();
+                }
+                if (e.target.closest('[onclick="closeEditModal()"]')) {
+                    closeEditModal();
+                }
             });
 
-            // Переход в профиль продавца при клике на блок
+            // Переход в профиль продавца
             const sellerInfo = document.querySelector('.seller-info');
             if (sellerInfo) {
                 sellerInfo.addEventListener('click', (e) => {
@@ -710,7 +847,7 @@
                         const result = await response.json();
                         if (result.status === "success") {
                             alert('Объявление успешно обновлено и отправлено на проверку!');
-                            window.location.reload();  // Перезагружаем страницу
+                            window.location.reload();
                         } else {
                             alert(result.message || 'Ошибка при обновлении объявления');
                         }
@@ -721,19 +858,10 @@
                 });
             }
             
-            const payButton = document.getElementById('payButton');
-            const reserveButton = document.getElementById('reserveButton');
-            
-            // This should be replaced with actual API call to check if chat exists
+            // Проверка существования чата
             async function checkChatExists() {
                 try {
-                    const response = await fetch(`/check_chat_exists/{{ product_info[0] }}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    
+                    const response = await fetch(`/check_chat_exists/{{ product_info[0] }}`);
                     const data = await response.json();
                     return data.exists;
                 } catch (error) {
@@ -742,8 +870,8 @@
                 }
             }
             
-            // Add click handlers
-            payButton.addEventListener('click', async () => {
+            // Обработчики кнопок оплаты и бронирования
+            document.getElementById('payButton')?.addEventListener('click', async () => {
                 const chatExists = await checkChatExists();
                 if (!chatExists) {
                     alert('Перед покупкой сначала напишите продавцу');
@@ -752,154 +880,286 @@
                 openPaymentModal();
             });
             
-            reserveButton.addEventListener('click', async () => {
+            document.getElementById('reserveButton')?.addEventListener('click', async () => {
                 const chatExists = await checkChatExists();
                 if (!chatExists) {
                     alert('Перед бронированием сначала напишите продавцу');
                     return;
                 }
-                alert('Функция бронирования в разработке');
+                openReservationModal();
             });
             
-            // Initialize TON amount
-            updateTonAmount();
+            // Функции для работы с модальным окном бронирования
+            let currentReserveCurrency = 'rub';
+
+            function openReservationModal() {
+                document.getElementById('reservationModal').style.display = 'flex';
+                currentReserveCurrency = 'rub';
+                updateReserveAmount('rub');
+            }
+
+            function closeReservationModal() {
+                document.getElementById('reservationModal').style.display = 'none';
+            }
+
+            function selectReserveCurrency(currency) {
+                currentReserveCurrency = currency;
+                document.getElementById('rubReserveBtn').classList.toggle('active', currency === 'rub');
+                document.getElementById('tonReserveBtn').classList.toggle('active', currency === 'ton');
+                updateReserveAmount(currency);
+            }
+
+            async function updateReserveAmount(currency) {
+                const rubAmount = {{ product_info[3] }} * 0.15;
+                const amountElement = document.getElementById('reserveAmountInfo');
+                const confirmBtn = document.getElementById('confirmReserveBtn');
+                
+                if (currency === 'rub') {
+                    amountElement.textContent = `Сумма бронирования: ${rubAmount.toFixed(2)} ₽`;
+                    confirmBtn.disabled = false;
+                } else {
+                    try {
+                        confirmBtn.disabled = true;
+                        confirmBtn.textContent = 'Загрузка курса...';
+                        
+                        const response = await fetch('/get_ton_to_rub_rate');
+                        const data = await response.json();
+                        const rate = data.rate;
+                        
+                        if (!rate || rate <= 0) {
+                            throw new Error('Неверный курс TON');
+                        }
+                        
+                        const tonAmount = rubAmount / rate;
+                        amountElement.textContent = `Сумма бронирования: ${tonAmount.toFixed(4)} TON`;
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Подтвердить бронирование';
+                    } catch (error) {
+                        console.error('Ошибка при получении курса TON:', error);
+                        amountElement.textContent = `Сумма бронирования: ${rubAmount.toFixed(2)} ₽`;
+                        currentReserveCurrency = 'rub';
+                        selectReserveCurrency('rub');
+                        alert('Не удалось получить курс TON. Используйте RUB.');
+                        confirmBtn.textContent = 'Подтвердить бронирование';
+                    }
+                }
+            }
+
+            document.getElementById('confirmReserveBtn')?.addEventListener('click', async function() {
+                const rubAmount = {{ product_info[3] }} * 0.15;
+                let amount, currency = currentReserveCurrency;
+                
+                if (currency === 'rub') {
+                    amount = roundUp(rubAmount, 2); // Округляем RUB до сотых в большую сторону
+                } else {
+                    try {
+                        const response = await fetch('/get_ton_to_rub_rate');
+                        const data = await response.json();
+                        const rate = data.rate || 400;
+                        amount = roundUp(rubAmount / rate, 4); // Округляем TON до сотых в большую сторону
+                    } catch (error) {
+                        console.error('Ошибка при получении курса TON:', error);
+                        alert('Не удалось получить курс TON. Пожалуйста, попробуйте снова или используйте RUB.');
+                        return;
+                    }
+                }
+                
+                try {
+                    const balanceResponse = await fetch('/get_wallet_balance');
+                    const balanceData = await balanceResponse.json();
+                    
+                    if (currency === 'rub' && balanceData.rub_balance < amount) {
+                        alert(`Недостаточно средств на рублёвом балансе. Требуется: ${amount.toFixed(2)} ₽, доступно: ${balanceData.rub_balance.toFixed(2)} ₽`);
+                        return;
+                    }
+                    
+                    if (currency === 'ton' && balanceData.ton_balance < amount) {
+                        alert(`Недостаточно средств на TON балансе. Требуется: ${amount.toFixed(4)} TON, доступно: ${balanceData.ton_balance.toFixed(4)} TON`);
+                        return;
+                    }
+                    
+                    const response = await fetch('/reserve_product', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            product_id: {{ product_info[0] }},
+                            amount: amount,
+                            currency: currency
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        alert('Товар успешно забронирован на 48 часов!');
+                        closeReservationModal();
+                        window.location.href = '/deals'; // Перенаправляем в раздел сделок
+                    } else {
+                        alert(result.message || 'Ошибка при бронировании');
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при бронировании');
+                }
+            });
+
+            // Функции для работы с модальным окном редактирования
+            function openEditModal() {
+                document.getElementById('editModal').style.display = 'flex';
+            }
+
+            function closeEditModal() {
+                document.getElementById('editModal').style.display = 'none';
+            }
+
+            // Функции для работы с модальным окном оплаты
+            function openPaymentModal() {
+                document.getElementById('paymentModal').style.display = 'flex';
+                // При открытии сразу загружаем курс TON
+                updateTonAmount();
+            }
+            
+            function closePaymentModal() {
+                document.getElementById('paymentModal').style.display = 'none';
+                document.getElementById('paymentDetails').style.display = 'none';
+                document.getElementById('rubDetails').style.display = 'none';
+                document.getElementById('tonDetails').style.display = 'none';
+            }
+            
+            function showPaymentDetails(method) {
+                document.getElementById('paymentDetails').style.display = 'block';
+                const confirmBtn = document.querySelector('.payment-confirm-btn');
+                
+                if (method === 'rub') {
+                    document.getElementById('rubDetails').style.display = 'block';
+                    document.getElementById('tonDetails').style.display = 'none';
+                    confirmBtn.disabled = false;
+                } else if (method === 'ton') {
+                    document.getElementById('rubDetails').style.display = 'none';
+                    document.getElementById('tonDetails').style.display = 'block';
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Загрузка курса...';
+                    updateTonAmount();
+                } else {
+                    document.getElementById('paymentDetails').style.display = 'none';
+                    alert('Этот способ оплаты в разработке');
+                }
+            }
+            
+            async function updateTonAmount() {
+                try {
+                    const response = await fetch('/get_ton_to_rub_rate');
+                    const data = await response.json();
+                    const rate = data.rate;
+                    
+                    if (!rate || rate <= 0) {
+                        throw new Error('Неверный курс TON');
+                    }
+                    
+                    const tonAmount = ({{ product_info[3] }} / rate).toFixed(4);
+                    document.getElementById('tonAmount').textContent = tonAmount;
+                    
+                    // Активируем кнопку подтверждения
+                    const confirmBtn = document.querySelector('.payment-confirm-btn');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Оплатить';
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Ошибка при получении курса TON:', error);
+                    document.getElementById('tonAmount').textContent = '0';
+                    
+                    const confirmBtn = document.querySelector('.payment-confirm-btn');
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Ошибка загрузки курса';
+                    
+                    alert('Не удалось получить актуальный курс TON. Пожалуйста, попробуйте позже или используйте RUB.');
+                    return false;
+                }
+            }
+            
+            async function processPayment(method) {
+                // Дополнительная проверка перед оплатой
+                if (method === 'ton') {
+                    const amountElement = document.getElementById('tonAmount');
+                    const tonAmount = parseFloat(amountElement.textContent);
+                    
+                    if (isNaN(tonAmount) || tonAmount <= 0) {
+                        alert('Неверная сумма для оплаты. Пожалуйста, обновите курс TON.');
+                        return;
+                    }
+                }
+                
+                const amount = method === 'rub' ? {{ product_info[3] }} : parseFloat(document.getElementById('tonAmount').textContent);
+                
+                try {
+                    const balanceResponse = await fetch('/get_wallet_balance');
+                    const balanceData = await balanceResponse.json();
+                    
+                    if (method === 'rub' && balanceData.rub_balance < amount) {
+                        alert(`Недостаточно средств на рублёвом балансе. Требуется: ${amount} ₽, доступно: ${balanceData.rub_balance} ₽`);
+                        return;
+                    }
+                    
+                    if (method === 'ton' && balanceData.ton_balance < amount) {
+                        alert(`Недостаточно средств на TON балансе. Требуется: ${amount} TON, доступно: ${balanceData.ton_balance} TON`);
+                        return;
+                    }
+                    
+                    const response = await fetch('/create_deal', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            product_id: {{ product_info[0] }},
+                            amount: amount,
+                            currency: method
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        alert('Оплата прошла успешно! Сделка создана.');
+                        window.location.href = '/deals';
+                    } else {
+                        alert('Ошибка при создании сделки: ' + (result.message || 'Неизвестная ошибка'));
+                    }
+                    
+                    closePaymentModal();
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Произошла ошибка при обработке платежа');
+                }
+            }
+
+            // Инициализация обработчиков для модального окна оплаты
+            document.querySelectorAll('.payment-method-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const method = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    showPaymentDetails(method);
+                });
+            });
+
+            document.querySelectorAll('.payment-confirm-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const method = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    processPayment(method);
+                });
+            });
+
+            // Инициализация обработчиков для модального окна бронирования
+            document.getElementById('rubReserveBtn')?.addEventListener('click', () => selectReserveCurrency('rub'));
+            document.getElementById('tonReserveBtn')?.addEventListener('click', () => selectReserveCurrency('ton'));
+            document.querySelector('.close-reservation-modal')?.addEventListener('click', closeReservationModal);
+
+            // Добавляем обработчики для всех крестиков закрытия модальных окон
+            document.querySelector('[onclick="closePaymentModal()"]')?.addEventListener('click', closePaymentModal);
+            document.querySelector('[onclick="closeReservationModal()"]')?.addEventListener('click', closeReservationModal);
+            document.querySelector('[onclick="closeEditModal()"]')?.addEventListener('click', closeEditModal);
         });
-
-        // Функции для работы с модальным окном
-        function openEditModal() {
-            const modal = document.getElementById('editModal');
-            if (modal) {
-                modal.style.display = 'flex';
-            }
-        }
-
-        function closeEditModal() {
-            const modal = document.getElementById('editModal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        async function reportProduct(productId) {
-            try {
-                const response = await fetch('/report_product', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ product_id: productId })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error('Error:', error);
-                return { status: 'error' };
-            }
-        }
-
-        async function getTonToRubRate() {
-            try {
-                const response = await fetch('/get_ton_to_rub_rate');
-                const data = await response.json();
-                if (data.rate) {
-                    return data.rate;
-                } else {
-                    console.error('Failed to get TON rate:', data);
-                    return 400; // fallback value
-                }
-            } catch (error) {
-                console.error('Error fetching TON rate:', error);
-                return 400; // fallback value
-            }
-        }
-
-        function openPaymentModal() {
-            document.getElementById('paymentModal').style.display = 'flex';
-        }
-        
-        function closePaymentModal() {
-            document.getElementById('paymentModal').style.display = 'none';
-            resetPaymentDetails();
-        }
-        
-        function showPaymentDetails(method) {
-            const paymentDetails = document.getElementById('paymentDetails');
-            const rubDetails = document.getElementById('rubDetails');
-            const tonDetails = document.getElementById('tonDetails');
-            
-            paymentDetails.style.display = 'block';
-            
-            if (method === 'rub') {
-                rubDetails.style.display = 'block';
-                tonDetails.style.display = 'none';
-            } else if (method === 'ton') {
-                rubDetails.style.display = 'none';
-                tonDetails.style.display = 'block';
-                updateTonAmount(); // Обновляем курс при каждом открытии
-            } else {
-                paymentDetails.style.display = 'none';
-                alert('Этот способ оплаты в разработке');
-            }
-        }
-        
-        function resetPaymentDetails() {
-            document.getElementById('paymentDetails').style.display = 'none';
-            document.getElementById('rubDetails').style.display = 'none';
-            document.getElementById('tonDetails').style.display = 'none';
-        }
-        
-        async function updateTonAmount() {
-            const rubAmount = {{ product_info[3] }};
-            const conversionRate = await getTonToRubRate();
-            const tonAmount = (rubAmount / conversionRate).toFixed(4);
-            document.getElementById('tonAmount').textContent = tonAmount;
-        }
-        
-        async function processPayment(method) {
-            const rubAmount = {{ product_info[3] }};
-            const tonAmount = parseFloat(document.getElementById('tonAmount').textContent);
-            
-            try {
-                // Проверяем баланс пользователя
-                const balanceResponse = await fetch('/get_wallet_balance');
-                const balanceData = await balanceResponse.json();
-                
-                if (method === 'rub' && balanceData.rub_balance < rubAmount) {
-                    alert(`Недостаточно средств на рублёвом балансе. Требуется: ${rubAmount} ₽, доступно: ${balanceData.rub_balance} ₽`);
-                    return;
-                }
-                
-                if (method === 'ton' && balanceData.ton_balance < tonAmount) {
-                    alert(`Недостаточно средств на TON балансе. Требуется: ${tonAmount} TON, доступно: ${balanceData.ton_balance} TON`);
-                    return;
-                }
-                
-                // Создаем сделку
-                const response = await fetch('/create_deal', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        product_id: {{ product_info[0] }},
-                        amount: method === 'rub' ? rubAmount : tonAmount,
-                        currency: method
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert('Оплата прошла успешно! Сделка создана.');
-                    window.location.href = '/deals';
-                } else {
-                    alert('Ошибка при создании сделки: ' + result.message);
-                }
-                
-                closePaymentModal();
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Произошла ошибка при обработке платежа');
-            }
-        }
     </script>
 {% endblock %}

@@ -1117,3 +1117,17 @@ async def get_deal_time_extension(deal_id: int):
         except Exception as e:
             print(f"Error getting deal time extension: {e}")
             return None
+
+
+async def get_user_reserved_deals(tg_id: int):
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Deal)
+            .where(Deal.is_reserved == True)
+            .where(
+                (Deal.buyer_id == tg_id) |
+                (Deal.seller_id == tg_id)
+            )
+            .order_by(Deal.reservation_until)
+        )
+        return result.scalars().all()

@@ -11,7 +11,8 @@ from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings, manager
-from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal, Review
+from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal, Review, \
+    Product
 from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
                                 get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
                                 add_new_product, get_product_info, get_user_active_products,
@@ -26,7 +27,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
-                                get_user_active_deals, get_user_completed_deals, get_pending_deals)
+                                get_user_active_deals, get_user_completed_deals, get_pending_deals,
+                                get_user_reserved_deals)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -1494,6 +1496,7 @@ async def get_ton_transactions(request: Request, session_token=Cookie(default=No
         ]
     })
 
+
 @wmarket_router.get("/deals")
 async def deals(request: Request, session_token=Cookie(default=None)):
     if session_token:
@@ -1502,13 +1505,12 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            # Получаем параметр tab из URL (по умолчанию 'active')
             tab = request.query_params.get('tab', 'active')
 
-            # Здесь должна быть логика получения активных и завершенных сделок
-            # Временные заглушки для примера
+            # Получаем все типы сделок
             active_deals = await get_user_active_deals(payload.get("tg_id"))
             completed_deals = await get_user_completed_deals(payload.get("tg_id"))
+            reserved_deals = await get_user_reserved_deals(payload.get("tg_id"))  # Новая функция
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
@@ -1517,6 +1519,7 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                 "request": request,
                 "active_deals": active_deals,
                 "completed_deals": completed_deals,
+                "reserved_deals": reserved_deals,  # Добавляем в контекст
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "current_tab": tab,
@@ -2280,6 +2283,296 @@ async def give_more_time(
         except Exception as e:
             await session.rollback()
             print(f"Error giving more time for deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.post("/reserve_product")
+async def reserve_product(
+        request: Request,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    product_id = data.get("product_id")
+    amount = data.get("amount")
+    currency = data.get("currency")
+
+    async with async_session_maker() as session:
+        try:
+            # Get the product
+            result = await session.execute(select(Product).where(Product.id == product_id))
+            product = result.scalar_one_or_none()
+
+            if not product:
+                return JSONResponse({"status": "error", "message": "Product not found"}, status_code=404)
+
+            # Check if product is already reserved
+            if product.reserved and product.reserved_until > datetime.now(timezone.utc):
+                return JSONResponse(
+                    {"status": "error", "message": "Product is already reserved"},
+                    status_code=400
+                )
+
+            # Get user balance
+            user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
+            user = user.scalar_one_or_none()
+
+            if not user:
+                return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+
+            # Deduct balance
+            if currency == 'rub':
+                if user.rub_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Insufficient RUB balance"},
+                        status_code=400
+                    )
+                user.rub_balance -= amount
+            else:  # TON
+                if user.ton_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Insufficient TON balance"},
+                        status_code=400
+                    )
+                user.ton_balance -= amount
+
+            # Update product reservation status
+            product.reserved = True
+            product.reserved_until = datetime.now(timezone.utc) + timedelta(hours=48)
+            product.reserved_by = payload.get("tg_id")
+            product.reservation_amount = amount
+            product.reservation_currency = currency
+
+            product_price = product.product_price
+            if currency == "ton":
+                ton_rate = await get_ton_to_rub_rate()
+                product_price = round(product_price / ton_rate, 4)
+
+            # Create a new deal record for the reservation
+            deal = Deal(
+                product_id=product.id,
+                product_name=product.product_name,
+                seller_id=product.tg_id,
+                buyer_id=payload.get("tg_id"),
+                amount=product_price,  # Full price of the product
+                currency=currency,
+                status="reserved",
+                is_reserved=True,
+                reservation_amount=amount,
+                reservation_until=datetime.now(timezone.utc) + timedelta(hours=48),
+                created_at=datetime.now(timezone.utc)
+            )
+            session.add(deal)
+
+            await session.commit()
+
+            # Send notification to seller
+            await send_notification_to_user(
+                product.tg_id,
+                f"🔒 Ваш товар '{product.product_name}' был забронирован!\n\n"
+                f"👤 Покупатель: {user.first_name or 'без username'}\n"
+                f"💰 Сумма брони: {amount} {currency.upper()}\n"
+                f"⏳ Бронь действует до: {product.reserved_until.strftime('%d.%m.%Y %H:%M')}\n\n"
+                f"В течение 48 часов покупатель должен завершить сделку."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error reserving product: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+        
+        
+@wmarket_router.post("/complete_reservation")
+async def complete_reservation(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    deal_id = int(data.get("deal_id"))  # Преобразуем в int
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку - теперь используем целочисленный deal_id
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if not deal.is_reserved:
+                return JSONResponse({"status": "error", "message": "Deal is not reserved"}, status_code=400)
+
+            if deal.buyer_id != payload.get("tg_id"):
+                return JSONResponse({"status": "error", "message": "Not your reservation"}, status_code=403)
+
+            # Проверяем баланс покупателя
+            buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+            buyer = buyer.scalar_one_or_none()
+
+            remaining_amount = deal.amount - deal.reservation_amount
+
+            if deal.currency == 'rub':
+                if buyer.rub_balance < remaining_amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
+                        status_code=400
+                    )
+                buyer.rub_balance -= remaining_amount
+            else:
+                if buyer.ton_balance < remaining_amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на TON балансе"},
+                        status_code=400
+                    )
+                buyer.ton_balance -= remaining_amount
+
+            # Обновляем статус сделки
+            deal.is_reserved = False
+            deal.reservation_until = None
+            deal.status = "active"
+
+            # Обновляем статус товара
+            product = await session.execute(select(Product).where(Product.id == deal.product_id))
+            product = product.scalar_one_or_none()
+            if product:
+                product.reserved = False
+                product.reserved_until = None
+                product.reserved_by = None
+
+            await session.commit()
+
+            # Отправляем уведомление продавцу
+            await send_notification_to_user(
+                deal.seller_id,
+                f"💰 Покупатель выкупил забронированный товар!\n\n"
+                f"📌 Товар: {deal.product_name}\n"
+                f"💰 Полная сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"👤 Покупатель: {buyer.first_name or 'без username'}\n\n"
+                f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error completing reservation: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+@wmarket_router.post("/cancel_reservation")
+async def cancel_reservation(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    deal_id = int(data.get("deal_id"))  # Преобразуем в int
+    is_expired = data.get("is_expired", False)
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку - теперь используем целочисленный deal_id
+            result = await session.execute(select(Deal).where(Deal.id == deal_id))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if not deal.is_reserved:
+                return JSONResponse({"status": "error", "message": "Deal is not reserved"}, status_code=400)
+
+            # Проверяем права (только покупатель или истекшее время)
+            if not is_expired and deal.buyer_id != payload.get("tg_id"):
+                return JSONResponse({"status": "error", "message": "Not your reservation"}, status_code=403)
+
+            # Возвращаем 2/3 суммы брони
+            buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+            buyer = buyer.scalar_one_or_none()
+
+            refund_amount = deal.reservation_amount * 2 / 3
+
+            if deal.currency == 'rub':
+                buyer.rub_balance += refund_amount
+            else:
+                buyer.ton_balance += refund_amount
+
+            # Обновляем статус сделки и товара
+            deal.is_reserved = False
+            deal.reservation_until = None
+            deal.status = "cancelled"
+
+            product = await session.execute(select(Product).where(Product.id == deal.product_id))
+            product = product.scalar_one_or_none()
+            if product:
+                product.reserved = False
+                product.reserved_until = None
+                product.reserved_by = None
+
+            await session.commit()
+
+            # Отправляем уведомления
+            if not is_expired:
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"❌ Вы отменили бронь товара\n\n"
+                    f"📌 Товар: {deal.product_name}\n"
+                    f"💰 Возвращено: {refund_amount} {deal.currency.upper()}\n"
+                    f"💸 Удержан штраф: {deal.reservation_amount - refund_amount} {deal.currency.upper()}"
+                )
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"ℹ️ Покупатель отменил бронь товара\n\n"
+                    f"📌 Товар: {deal.product_name}\n"
+                    f"💰 Сумма брони: {deal.reservation_amount} {deal.currency.upper()}\n"
+                    f"👤 Покупатель: {buyer.first_name or 'без username'}"
+                )
+            else:
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"⌛ Время бронирования истекло\n\n"
+                    f"📌 Товар: {deal.product_name}\n"
+                    f"💰 Возвращено: {refund_amount} {deal.currency.upper()}\n"
+                    f"💸 Удержан штраф: {deal.reservation_amount - refund_amount} {deal.currency.upper()}"
+                )
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"⌛ Время бронирования истекло\n\n"
+                    f"📌 Товар: {deal.product_name}\n"
+                    f"💰 Сумма брони: {deal.reservation_amount} {deal.currency.upper()}\n"
+                    f"👤 Покупатель: {buyer.first_name or 'без username'}"
+                )
+
+            return JSONResponse({
+                "status": "success",
+                "refunded_amount": refund_amount,
+                "currency": deal.currency
+            })
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error canceling reservation: {e}")
             return JSONResponse(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
