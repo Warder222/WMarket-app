@@ -5,7 +5,7 @@ from starlette.responses import JSONResponse
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
     Referral, UserBlock, TonTransaction, Deal, Review
 from sqlalchemy.future import select
-from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer
+from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer, exists
 
 
 # auth&users_utils______________________________________________________________________________________________________
@@ -188,26 +188,39 @@ async def get_all_products_from_category(category_name, tg_id):
             return []
 
 
-async def get_product_info(product_id: int, tg_id):
-    async with async_session_maker() as db:
-        try:
-            # Явно указываем тип параметра
-            q = select(Product).filter_by(id=product_id)
-            result = await db.execute(q)
-            product = result.scalar_one_or_none()
-            if not product:
-                return None
-            # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
-            # 8-is_fav
-            product_info = [product.id, product.tg_id, product.product_name, product.product_price,
-                            product.product_description, product.product_image_url, product.category_name,
-                            product.created_at]
-            all_favs = await get_all_user_favs(tg_id) if tg_id else []
-            product_info.append(product.id in all_favs)
-            return product_info
-        except Exception as exc:
-            print(exc)
+# В функции get_product_info убедитесь, что запрос включает все поля:
+async def get_product_info(product_id: int, user_tg_id: int | None):
+    async with async_session_maker() as session:
+        query = select(
+            Product.id,
+            Product.tg_id,
+            Product.product_name,
+            Product.product_price,
+            Product.product_description,
+            Product.product_image_url,
+            Product.category_name,
+            Product.created_at,
+            # Добавляем проверку на избранное
+            exists().where(
+                and_(
+                    Fav.tg_id == user_tg_id,
+                    Fav.product_id == Product.id
+                )
+            ).label("is_fav"),
+            Product.reserved,  # product_info[9]
+            Product.reserved_by,  # product_info[10]
+            Product.reserved_until,  # product_info[11]
+            Product.reservation_amount,  # product_info[12]
+            Product.reservation_currency  # product_info[13]
+        ).where(Product.id == product_id)
+
+        result = await session.execute(query)
+        product = result.first()
+
+        if not product:
             return None
+
+        return product
 
 
 async def add_new_product(product_data, tg_id):
@@ -294,22 +307,41 @@ async def get_user_archived_products(tg_id):
             return []
 
 
-async def get_user_active_products(seller_id, tg_id):
-    async with async_session_maker() as db:
+async def get_user_active_products(tg_id: int, current_user_id: int):
+    async with async_session_maker() as session:
         try:
-            q = select(Product).filter_by(tg_id=seller_id, active=True).order_by(desc(Product.created_at))
-            result = await db.execute(q)
-            products = result.scalars()
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-id
-            # 7-is_fav
-            all_products = [[prod.product_name, prod.product_price,
-                             prod.product_description, prod.product_image_url,
-                             prod.id, prod.created_at, prod.id] for prod in products]
-            all_favs = await get_all_user_favs(tg_id)
-            [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            # Получаем продукты с нужными полями
+            result = await session.execute(
+                select(
+                    Product.product_name,
+                    Product.product_price,
+                    Product.product_description,
+                    Product.product_image_url,
+                    Product.id,
+                    Product.created_at,
+                    Product.id,  # Дублируем id для совместимости с шаблоном
+                    Product.reserved  # Добавляем информацию о бронировании
+                )
+                .where(Product.tg_id == tg_id)
+                .where(Product.active == True)
+                .order_by(desc(Product.created_at)))
+
+            products = result.all()
+
+            # Получаем избранное текущего пользователя
+            all_favs = await get_all_user_favs(current_user_id)
+
+            # Формируем результат в том же формате, что и раньше
+            all_products = []
+            for prod in products:
+                product_list = list(prod)
+            # Добавляем флаг избранного (индекс 7)
+            product_list.append(True if product_list[4] in all_favs else False)
+            all_products.append(product_list)
+
             return all_products
         except Exception as exc:
-            print(f"Error: {exc}")
+            print(f"Error in get_user_active_products: {exc}")
             return []
 
 
