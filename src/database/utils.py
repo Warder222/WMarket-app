@@ -1176,3 +1176,13 @@ async def get_user_reserved_deals(tg_id: int):
             .order_by(Deal.reservation_until)
         )
         return result.scalars().all()
+
+
+async def get_user_active_deals_count(tg_id: int):
+    async with async_session_maker() as session:
+        try:
+            active_deals = await get_user_active_deals(tg_id)
+            return len(active_deals)
+        except Exception as e:
+            print(f"Error getting deal time extension: {e}")
+            return 0

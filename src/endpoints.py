@@ -28,7 +28,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
                                 get_user_active_deals, get_user_completed_deals, get_pending_deals,
-                                get_user_reserved_deals, get_count_fav_add)
+                                get_user_reserved_deals, get_count_fav_add, get_user_active_deals_count)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -101,6 +101,7 @@ async def store(request: Request, session_token=Cookie(default=None)):
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "cats": cats,
@@ -109,7 +110,8 @@ async def store(request: Request, session_token=Cookie(default=None)):
                 "now": now,
                 "all_undread_count_message": all_undread_count_message,
                 "user_tg_id": payload.get("tg_id"),
-                "admin": admin_res
+                "admin": admin_res,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -131,6 +133,7 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "cats": cats,
@@ -138,7 +141,8 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
                 "products": products,
                 "now": now,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -157,11 +161,13 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
             categories = await get_all_categories()
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "categories": categories,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("add_product.html", context=context)
 
@@ -196,6 +202,7 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
                 "request": request,
@@ -204,7 +211,8 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
                 "archived_products": archived_products,
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "current_tab": tab  # Добавляем текущую вкладку в контекст
+                "current_tab": tab,  # Добавляем текущую вкладку в контекст
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("ads_review.html", context=context)
 
@@ -431,6 +439,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
             fav_count = await get_count_fav_add(product_id)
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "product_info": product_info,
@@ -442,7 +451,8 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
                 "user_info": user_info,
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "fav_count": fav_count
+                "fav_count": fav_count,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("ads.html", context=context)
 
@@ -465,11 +475,13 @@ async def favs(request: Request, session_token=Cookie(default=None)):
             products = [[prod[0], prod[1], prod[2], prod[3], prod[4], prod[5], prod[6]] for prod in all_products if prod[4] in all_favs]
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "products": products,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("favs.html", context=context)
 
@@ -536,6 +548,7 @@ async def profile(request: Request, session_token=Cookie(default=None)):
             admin_res = await is_admin(payload.get("tg_id"))
             referrals_count = await get_ref_count(payload.get("tg_id"))
             admin_crown = await is_admin(user_info[0])
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "reputation": reputation,
@@ -548,7 +561,8 @@ async def profile(request: Request, session_token=Cookie(default=None)):
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "referrals_count": referrals_count,
-                "admin_crown": admin_crown
+                "admin_crown": admin_crown,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -591,6 +605,7 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
             admin_crown = await is_admin(user_info[0])
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
                 "reputation": reputation,
@@ -604,7 +619,8 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "admin": admin_res,
                 "is_blocked": is_blocked,
                 "unblock_at": unblock_at,
-                "admin_crown": admin_crown
+                "admin_crown": admin_crown,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("profile.html", context=context)
 
@@ -626,12 +642,14 @@ async def chats(request: Request, session_token=Cookie(default=None)):
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
                 "request": request,
                 "chats": user_chats,  # Use the returned list directly
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("chats.html", context=context)
 
@@ -684,6 +702,7 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
             is_blocked = False
 
     all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+    active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
     context = {
         "request": request,
@@ -695,7 +714,8 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         "is_chat_page": True,
         "all_undread_count_message": all_undread_count_message,
         "is_blocked": is_blocked,
-        "unblock_at": unblock_at
+        "unblock_at": unblock_at,
+        "active_deals_count": active_deals_count
     }
     return templates.TemplateResponse("chat.html", context=context)
 
@@ -859,6 +879,7 @@ async def admin_chat_reports(
 
         # Получаем сделки, ожидающие отмены
         pending_deals = await get_pending_deals()
+        active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
         context = {
             "request": request,
@@ -869,7 +890,8 @@ async def admin_chat_reports(
             "users": users,
             "reviews": reviews,
             "pending_deals": pending_deals,  # Добавляем сделки в контекст
-            "active_tab": request.query_params.get("tab", "reports")
+            "active_tab": request.query_params.get("tab", "reports"),
+            "active_deals_count": active_deals_count
         }
         return templates.TemplateResponse("admin_chat_reports.html", context=context)
 
@@ -890,6 +912,7 @@ async def admin_chat_view(
             return RedirectResponse(url="/admin/chat_reports", status_code=303)
 
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+        active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
         context = {
             "request": request,
@@ -899,7 +922,8 @@ async def admin_chat_view(
             "other_user": chat_data["other_user"],
             "current_user": {"id": 0, "is_admin": True},
             "all_undread_count_message": all_undread_count_message,
-            "is_chat_page": True
+            "is_chat_page": True,
+            "active_deals_count": active_deals_count
         }
         return templates.TemplateResponse("chat.html", context=context)
 
@@ -1205,7 +1229,8 @@ async def blocked_page(request: Request, session_token=Cookie(default=None)):
     context = {
         "request": request,
         "all_undread_count_message": 0,
-        "is_chat_page": True
+        "is_chat_page": True,
+        "active_deals_count": 0
     }
     return templates.TemplateResponse("blocked.html", context=context)
 
@@ -1225,6 +1250,7 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
                 "request": request,
@@ -1233,7 +1259,8 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
                 "is_chat_page": True,
                 "tg_id": payload.get("tg_id"),
                 "recipient_address": settings.WALLET_ADDRESS,
-                "ton_manifest_url": settings.TON_MANIFEST_URL
+                "ton_manifest_url": settings.TON_MANIFEST_URL,
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("wallet.html", context=context)
 
@@ -1517,6 +1544,7 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
                 "request": request,
@@ -1526,7 +1554,8 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "current_tab": tab,
-                "user_tg_id": payload.get("tg_id")
+                "user_tg_id": payload.get("tg_id"),
+                "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("deals.html", context=context)
 
