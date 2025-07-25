@@ -808,6 +808,7 @@
     <div id="dealsTab" {% if active_tab != 'deals' %}class="hidden"{% endif %}>
         {% if pending_deals %}
             {% for deal in pending_deals %}
+            <!-- В разделе dealsTab, внутри цикла for deal in pending_deals -->
             <div class="deal-item" data-deal-id="{{ deal.id }}">
                 <div class="item-header">
                     <div>
@@ -822,8 +823,8 @@
                     <div><strong>Покупатель:</strong> {{ deal.buyer_first_name }} (ID: {{ deal.buyer_id }})</div>
                     <div><strong>Сумма:</strong> {{ deal.amount }} {{ deal.currency.upper() }}</div>
                     <div><strong>Статус:</strong> {{ deal.status }}</div>
-                    <div><strong>Запрос на отмену:</strong> {% if deal.pending_cancel %}Да{% else %}Нет{% endif %}</div>
-                    {% if deal.pending_cancel %}
+                    <div><strong>Тип оплаты:</strong> {% if deal.currency == 'meet' %}При встрече{% else %}Онлайн{% endif %}</div>
+                    {% if deal.currency != 'meet' %}
                         <div class="cancel-reason">
                             <strong>Причина отмены:</strong> {{ deal.cancel_reason }}
                         </div>
@@ -832,8 +833,12 @@
                 </div>
                 
                 <div class="item-actions">
-                    <!-- <button class="view-button" data-action="view-deal" data-id="{{ deal.id }}">Подробнее</button> -->
-                    <button class="actions-button" data-action="deal-actions" data-id="{{ deal.id }}">Действия</button>
+                    {% if deal.currency == 'meet' and deal.pending_cancel %}
+                        <button class="approve-button" data-action="confirm-meet-deal" data-id="{{ deal.id }}">Подтвердить</button>
+                        <button class="reject-button" data-action="cancel-meet-deal" data-id="{{ deal.id }}">Отменить</button>
+                    {% else %}
+                        <button class="actions-button" data-action="deal-actions" data-id="{{ deal.id }}">Действия</button>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -1575,6 +1580,62 @@
                     alert('Ошибка при обновлении сделки');
                 }
             });
+        });
+
+        document.addEventListener('click', async function(event) {
+            // Подтверждение сделки с оплатой при встрече
+            if (event.target.matches('[data-action="confirm-meet-deal"]')) {
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: 'confirm' })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const errorData = await response.json();
+                        alert(errorData.message || 'Ошибка при подтверждении сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при подтверждении сделки');
+                }
+            }
+            
+            // Отмена сделки с оплатой при встрече
+            if (event.target.matches('[data-action="cancel-meet-deal"]')) {
+                if (!confirm('Вы уверены, что хотите отменить сделку? Отзыв будет удалён.')) {
+                    return;
+                }
+                
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: 'cancel' })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const errorData = await response.json();
+                        alert(errorData.message || 'Ошибка при отмене сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при отмене сделки');
+                }
+            }
         });
     });
 </script>

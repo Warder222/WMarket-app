@@ -194,8 +194,7 @@ async def get_count_fav_add(product_id):
             q = select(Fav).filter_by(product_id=product_id)
             result = await db.execute(q)
             fav_count = result.scalars()
-            fav_arr = [fav for fav in fav_count]
-            print(fav_arr)
+            fav_arr = [fav.tg_id for fav in fav_count]
             return len(fav_arr)
         except Exception as exc:
             print(f"Error: {exc}")

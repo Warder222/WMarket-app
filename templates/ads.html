@@ -682,7 +682,7 @@
                     
                     <div class="payment-methods">
                         <button onclick="showPaymentDetails('meet')" class="payment-method-btn" style="width: 100%; padding: 12px; margin-bottom: 8px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-align: left; cursor: pointer;">
-                            Личная встреча (в разработке)
+                            Личная встреча
                         </button>
                         
                         <button onclick="showPaymentDetails('rub')" class="payment-method-btn" style="width: 100%; padding: 12px; margin-bottom: 8px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-align: left; cursor: pointer;">
@@ -706,6 +706,14 @@
                             <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Сумма к оплате: <span id="tonAmount">0</span> TON</p>
                             <button onclick="processPayment('ton')" class="payment-confirm-btn" style="width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">
                                 Оплатить
+                            </button>
+                        </div>
+                        
+                        <div id="meetDetails" style="display: none;">
+                            <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Оплата при личной встрече</p>
+                            <p style="margin-bottom: 16px;">Вы подтверждаете, что оплатите товар при личной встрече с продавцом.</p>
+                            <button onclick="processPayment('meet')" class="payment-confirm-btn" style="width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                                Подтвердить
                             </button>
                         </div>
                     </div>
@@ -1125,16 +1133,21 @@
                 if (method === 'rub') {
                     document.getElementById('rubDetails').style.display = 'block';
                     document.getElementById('tonDetails').style.display = 'none';
+                    document.getElementById('meetDetails').style.display = 'none';
                     confirmBtn.disabled = false;
                 } else if (method === 'ton') {
                     document.getElementById('rubDetails').style.display = 'none';
                     document.getElementById('tonDetails').style.display = 'block';
+                    document.getElementById('meetDetails').style.display = 'none';
                     confirmBtn.disabled = true;
                     confirmBtn.textContent = 'Загрузка курса...';
                     updateTonAmount();
-                } else {
-                    document.getElementById('paymentDetails').style.display = 'none';
-                    alert('Этот способ оплаты в разработке');
+                } else if (method === 'meet') {
+                    document.getElementById('rubDetails').style.display = 'none';
+                    document.getElementById('tonDetails').style.display = 'none';
+                    document.getElementById('meetDetails').style.display = 'block';
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Подтвердить';
                 }
             }
             
@@ -1171,6 +1184,37 @@
             }
             
             async function processPayment(method) {
+                if (method === 'meet') {
+                    try {
+                        const response = await fetch('/create_deal', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                product_id: {{ product_info[0] }},
+                                amount: 0,
+                                currency: 'meet'
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            alert('Сделка создана! Договоритесь с продавцом о встрече в чате Маркета.');
+                            window.location.href = '/deals';
+                        } else {
+                            alert('Ошибка при создании сделки: ' + (result.message || 'Неизвестная ошибка'));
+                        }
+                        
+                        closePaymentModal();
+                        return;
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Произошла ошибка при создании сделки');
+                        return;
+                    }
+                }
                 // Дополнительная проверка перед оплатой
                 if (method === 'ton') {
                     const amountElement = document.getElementById('tonAmount');

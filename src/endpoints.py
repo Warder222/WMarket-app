@@ -1601,24 +1601,26 @@ async def create_deal(
 
     async with async_session_maker() as session:
         try:
-            # Проверяем баланс и списываем средства
-            user = await session.execute(select(User).where(User.tg_id == buyer_id))
-            user = user.scalar_one_or_none()
+            # Для встречи не проверяем баланс
+            if currency != 'meet':
+                # Проверяем баланс и списываем средства
+                user = await session.execute(select(User).where(User.tg_id == buyer_id))
+                user = user.scalar_one_or_none()
 
-            if currency == 'rub':
-                if user.rub_balance < amount:
-                    return JSONResponse(
-                        {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
-                        status_code=400
-                    )
-                user.rub_balance -= amount
-            else:  # TON
-                if user.ton_balance < amount:
-                    return JSONResponse(
-                        {"status": "error", "message": "Недостаточно средств на TON балансе"},
-                        status_code=400
-                    )
-                user.ton_balance -= amount
+                if currency == 'rub':
+                    if user.rub_balance < amount:
+                        return JSONResponse(
+                            {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
+                            status_code=400
+                        )
+                    user.rub_balance -= amount
+                else:  # TON
+                    if user.ton_balance < amount:
+                        return JSONResponse(
+                            {"status": "error", "message": "Недостаточно средств на TON балансе"},
+                            status_code=400
+                        )
+                    user.ton_balance -= amount
 
             # Создаем сделку
             deal = Deal(
@@ -1634,15 +1636,39 @@ async def create_deal(
             session.add(deal)
             await session.commit()
 
+            # Получаем информацию о покупателе
+            buyer_info = await get_user_info(buyer_id)
+
             # Отправляем уведомление продавцу
-            await send_notification_to_user(
-                seller_id,
-                f"💰 Товар оплачен, и ждёт подтверждения!\n\n"
-                f"📌 Название: {product[2]}\n"
-                f"💰 Сумма: {amount} {currency.upper()}\n"
-                f"👤 Покупатель: {user.first_name or 'без username'}\n\n"
-                f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
-            )
+            if currency == 'meet':
+                await send_notification_to_user(
+                    seller_id,
+                    f"💰 Покупатель хочет встретиться для оплаты!\n\n"
+                    f"📌 Название: {product[2]}\n"
+                    f"💰 Сумма: {product[3]} ₽ (оплата при встрече)\n"
+                    f"👤 Покупатель: {buyer_info[1] or 'без username'}\n\n"
+                    f"Договоритесь о времени и месте встречи в чате."
+                )
+            else:
+                await send_notification_to_user(
+                    seller_id,
+                    f"💰 Товар оплачен, и ждёт подтверждения!\n\n"
+                    f"📌 Название: {product[2]}\n"
+                    f"💰 Сумма: {amount} {currency.upper()}\n"
+                    f"👤 Покупатель: {buyer_info[1] or 'без username'}\n\n"
+                    f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
+                )
+
+            # Отправляем уведомление покупателю
+            if currency == 'meet':
+                await send_notification_to_user(
+                    buyer_id,
+                    f"✅ Вы создали сделку с оплатой при встрече!\n\n"
+                    f"📌 Товар: {product[2]}\n"
+                    f"💰 Сумма: {product[3]} ₽\n"
+                    f"👤 Продавец: {product[1]}\n\n"
+                    f"Договоритесь о времени и месте встречи в чате."
+                )
 
             return JSONResponse({"status": "success"})
 
@@ -1654,10 +1680,11 @@ async def create_deal(
                 status_code=500
             )
 
+
 @wmarket_router.post("/confirm_deal")
 async def confirm_deal(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -1684,6 +1711,57 @@ async def confirm_deal(
                     status_code=403
                 )
 
+            # Проверяем статус сделки
+            if deal.status != "active":
+                return JSONResponse(
+                    {"status": "error", "message": "Deal is not active"},
+                    status_code=400
+                )
+
+            # Для сделок с личной встречей отправляем на модерацию
+            if deal.currency == 'meet':
+                deal.pending_cancel = True
+                deal.cancel_reason = "Ожидает подтверждения администратором (личная встреча)"
+                deal.cancel_request_by = payload.get("tg_id")
+
+                # Создаем отзыв (но не добавляем в репутацию пока)
+                review = Review(
+                    deal_id=deal.id,
+                    from_user_id=deal.buyer_id,
+                    to_user_id=deal.seller_id,
+                    product_id=deal.product_id,
+                    rating=rating,
+                    text=review_text,
+                    moderated=False  # Отзыв тоже на модерации
+                )
+                session.add(review)
+
+                await session.commit()
+
+                # Уведомления
+                buyer_info = await get_user_info(deal.buyer_id)
+                seller_info = await get_user_info(deal.seller_id)
+
+                # Уведомление продавцу
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"⚠️ Сделка по товару '{deal.product_name}' отправлена на модерацию.\n\n"
+                    f"Покупатель {buyer_info[1]} подтвердил получение товара при личной встрече.\n\n"
+                    f"Администратор проверит сделку и подтвердит её завершение.\n"
+                    f"По вопросам обращайтесь @wmarket_support"
+                )
+
+                # Уведомление покупателю
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"⚠️ Ваша сделка по товару '{deal.product_name}' отправлена на модерацию.\n\n"
+                    f"Для подтверждения сделки обратитесь к @wmarket_support\n"
+                    f"Администратор проверит факт передачи товара и подтвердит сделку."
+                )
+
+                return {"status": "success"}
+
+            # Для обычных сделок (rub/ton) завершаем автоматически
             # Рассчитываем сумму с учетом комиссии (7%)
             seller_amount = deal.amount * 0.93
             market_fee = deal.amount * 0.07
@@ -1698,17 +1776,15 @@ async def confirm_deal(
 
             # Добавляем баланс продавцу в зависимости от валюты сделки
             if deal.currency == 'rub':
-                # Инициализируем earned_rub если None
                 if seller.earned_rub is None:
                     seller.earned_rub = 0.0
                 seller.earned_rub += seller_amount
-                seller.rub_balance += seller_amount  # Добавляем на баланс
-            else:
-                # Инициализируем earned_ton если None
+                seller.rub_balance += seller_amount
+            else:  # TON
                 if seller.earned_ton is None:
                     seller.earned_ton = 0.0
                 seller.earned_ton += seller_amount
-                seller.ton_balance += seller_amount  # Добавляем на баланс
+                seller.ton_balance += seller_amount
 
             # Создаем отзыв
             review = Review(
@@ -1722,14 +1798,21 @@ async def confirm_deal(
             session.add(review)
 
             await session.commit()
+
+            # Архивируем товар
+            await archive_product_post(deal.product_id)
+
+            # Получаем информацию о пользователях
             buyer_info_arr = await get_user_info(deal.buyer_id)
+            seller_info_arr = await get_user_info(deal.seller_id)
+
             # Отправляем уведомление продавцу
             await send_notification_to_user(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
-                f"📌 Товар: {deal.product_name} был архивирован\n"
+                f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия: {market_fee:.2f})\n"
-                f"👤 {buyer_info_arr[1]} подтвердил получение товара и оставил отзыв.\n\n"
+                f"👤 {buyer_info_arr[1]} подтвердил получение товара.\n\n"
                 f"Средства зачислены на ваш баланс!"
             )
 
@@ -1739,13 +1822,11 @@ async def confirm_deal(
                 f"✅ Вы подтвердили сделку!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
-                f"👤 Продавец: {seller.first_name if seller else 'неизвестен'}\n\n"
+                f"👤 Продавец: {seller_info_arr[1] if seller_info_arr else 'неизвестен'}\n\n"
                 f"Ваш отзыв отправлен на модерацию."
             )
 
-            await archive_product_post(deal.product_id)
-            await session.commit()
-            return JSONResponse({"status": "success"})
+            return {"status": "success"}
 
         except Exception as e:
             await session.rollback()
@@ -2576,6 +2657,131 @@ async def cancel_reservation(
         except Exception as e:
             await session.rollback()
             print(f"Error canceling reservation: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.get("/api/deal_info/{deal_id}")
+async def get_deal_info(deal_id: int):
+    async with async_session_maker() as session:
+        result = await session.execute(select(Deal).where(Deal.id == deal_id))
+        deal = result.scalar_one_or_none()
+        if deal:
+            return {
+                "id": deal.id,
+                "product_name": deal.product_name,
+                "currency": deal.currency,
+                "amount": deal.amount,
+                "status": deal.status
+            }
+        return {"status": "error", "message": "Deal not found"}
+
+
+@wmarket_router.post("/admin/complete_meet_deal/{deal_id}")
+async def complete_meet_deal(
+    deal_id: int,
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
+
+    data = await request.json()
+    action = data.get("action")  # "confirm" или "cancel"
+
+    async with async_session_maker() as session:
+        try:
+            # Получаем сделку
+            result = await session.execute(
+                select(Deal)
+                .where(Deal.id == deal_id)
+                .where(Deal.currency == 'meet')
+                .where(Deal.pending_cancel == True)
+            )
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse(
+                    {"status": "error", "message": "Сделка не найдена или не требует подтверждения"},
+                    status_code=404
+                )
+
+            if action == "confirm":
+                # Подтверждаем сделку - только меняем статус, не трогая отзыв
+                deal.status = "completed"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.pending_cancel = False
+
+                await archive_product_post(deal.product_id)
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"✅ Администратор подтвердил сделку с оплатой при встрече!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} ₽\n"
+                    f"Покупатель: ID {deal.buyer_id}\n\n"
+                    f"Отзыв по сделке остаётся на модерации."
+                )
+
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"✅ Администратор подтвердил сделку с оплатой при встрече!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} ₽\n"
+                    f"Продавец: ID {deal.seller_id}\n\n"
+                    f"Отзыв по сделке остаётся на модерации."
+                )
+
+            elif action == "cancel":
+                # Отменяем сделку и удаляем отзыв
+                deal.status = "cancelled"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.pending_cancel = False
+
+                # Удаляем отзыв, если он есть
+                review = await session.execute(
+                    select(Review)
+                    .where(Review.deal_id == deal_id)
+                    .where(Review.moderated == False)
+                )
+                review = review.scalar_one_or_none()
+
+                if review:
+                    await session.delete(review)
+
+                # Отправляем уведомления
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"❌ Администратор отменил сделку с оплатой при встрече.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} ₽\n"
+                    f"Покупатель: ID {deal.buyer_id}\n\n"
+                    f"Отзыв по сделке был удалён."
+                )
+
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"❌ Администратор отменил сделку с оплатой при встрече.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Сумма: {deal.amount} ₽\n"
+                    f"Продавец: ID {deal.seller_id}\n\n"
+                    f"Отзыв по сделке был удалён."
+                )
+
+            await session.commit()
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error completing meet deal: {e}")
             return JSONResponse(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
