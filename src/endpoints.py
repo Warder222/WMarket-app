@@ -28,7 +28,7 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
                                 get_user_active_deals, get_user_completed_deals, get_pending_deals,
-                                get_user_reserved_deals)
+                                get_user_reserved_deals, get_count_fav_add)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -430,6 +430,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             reputation = positive_reviews - negative_reviews
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = await is_admin(payload.get("tg_id"))
+            fav_count = await get_count_fav_add(product_id)
             context = {
                 "request": request,
                 "product_info": product_info,
@@ -440,7 +441,8 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
                 "negative_reviews": negative_reviews,
                 "user_info": user_info,
                 "all_undread_count_message": all_undread_count_message,
-                "admin": admin_res
+                "admin": admin_res,
+                "fav_count": fav_count
             }
             return templates.TemplateResponse("ads.html", context=context)
 

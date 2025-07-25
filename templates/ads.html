@@ -532,6 +532,35 @@
         .reserved ~ .seller-info {
             display: none;
         }
+
+        .favorite-count-wrapper {
+            display: flex;
+            align-items: center;
+            margin-right: 8px;
+        }
+
+        .favorite-count-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .favorite-icon {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-color);
+            stroke: var(--text-color);
+            stroke-width: 1;
+            /* filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.5)); */
+        }
+
+        .favorite-count {
+            font-size: 12px;
+            color: var(--text-color);
+            font-weight: bold;
+            margin-top: 2px;
+        }
     </style>
 {% endblock %}
 
@@ -570,6 +599,16 @@
                         </button>
                     {% endif %}
                 {% else %}
+                    <!-- Кнопка с количеством добавлений в избранное -->
+                    <div class="favorite-count-wrapper">
+                        <div class="favorite-count-container">
+                            <svg class="favorite-icon" viewBox="0 0 24 24">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                            <span class="favorite-count">{{ fav_count if fav_count else 0 }}</span>
+                        </div>
+                    </div>
+                    
                     {% if not product_info.reserved %}
                     <button class="ad-edit" data-id="{{ product_info[0] }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

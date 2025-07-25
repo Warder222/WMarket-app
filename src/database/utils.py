@@ -188,6 +188,20 @@ async def get_all_products_from_category(category_name, tg_id):
             return []
 
 
+async def get_count_fav_add(product_id):
+    async with async_session_maker() as db:
+        try:
+            q = select(Fav).filter_by(product_id=product_id)
+            result = await db.execute(q)
+            fav_count = result.scalars()
+            fav_arr = [fav for fav in fav_count]
+            print(fav_arr)
+            return len(fav_arr)
+        except Exception as exc:
+            print(f"Error: {exc}")
+            return 0
+
+
 # В функции get_product_info убедитесь, что запрос включает все поля:
 async def get_product_info(product_id: int, user_tg_id: int | None):
     async with async_session_maker() as session:
