@@ -2748,6 +2748,18 @@ async def complete_meet_deal(
                 deal.completed_at = datetime.now(timezone.utc)
                 deal.pending_cancel = False
 
+                seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+                seller = seller.scalar_one_or_none()
+
+                # Рассчитываем сумму с учетом комиссии (7%)
+                seller_amount = deal.amount * 0.93
+                market_fee = deal.amount * 0.07
+
+                seller.rub_balance += seller_amount
+                if seller.earned_rub is None:
+                    seller.earned_rub = 0.0
+                seller.earned_rub += seller_amount
+
                 await archive_product_post(deal.product_id)
 
                 # Отправляем уведомления

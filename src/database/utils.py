@@ -768,7 +768,7 @@ async def report_chat(chat_id: int, reporter_id: int, reason: str):
 async def get_chat_reports(resolved: bool = False):
     async with async_session_maker() as db:
         try:
-            q = select(ChatReport).filter_by(resolved=resolved).order_by(asc(ChatReport.created_at))
+            q = select(ChatReport).filter_by(resolved=resolved).order_by(desc(ChatReport.created_at))
             result = await db.execute(q)
             return result.scalars().all()
         except Exception as exc:
