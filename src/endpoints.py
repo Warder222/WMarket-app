@@ -2815,3 +2815,20 @@ async def complete_meet_deal(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
             )
+
+
+@wmarket_router.get("/api/check_review_exists")
+async def check_review_exists(deal_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"exists": False}
+
+    payload = await decode_jwt(session_token)
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(func.count())
+            .select_from(Review)
+            .where(Review.deal_id == deal_id)
+            .where(Review.from_user_id == payload.get("tg_id"))
+        )
+        count = result.scalar()
+        return {"exists": count > 0}

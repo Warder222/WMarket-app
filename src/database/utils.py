@@ -1054,26 +1054,45 @@ async def get_user_active_deals(tg_id: int):
         return deals_with_users
 
 
-async def get_user_completed_deals(tg_id: int):
-    """Получаем завершенные сделки пользователя"""
+async def get_user_completed_deals(user_id: int, tg_id: int = None):
+    """Получаем завершенные сделки пользователя по user_id или tg_id"""
     async with async_session_maker() as session:
-        result = await session.execute(
-            select(Deal).where(
-                or_(
-                    Deal.seller_id == tg_id,
-                    Deal.buyer_id == tg_id
-                ),
-                Deal.status.in_(['completed', 'cancelled', 'completed_by_admin', 'cancelled_by_admin'])
-            ).order_by(Deal.created_at.desc()))
-        comp_deals = result.scalars().all()
+        # Определяем ID для поиска (если передан tg_id, находим соответствующий user_id)
+        query_user_id = user_id
+        if tg_id is not None:
+            user = await session.execute(select(User).where(User.tg_id == tg_id))
+            user = user.scalar_one_or_none()
+            if user:
+                query_user_id = user.id
 
-        comp_deals_with_users = []
-        for deal in comp_deals:
+        result = await session.execute(
+            select(Deal)
+            .where(
+                (Deal.seller_id == query_user_id) | (Deal.buyer_id == query_user_id),
+                Deal.status.in_(["completed", "completed_by_admin", "cancelled", "cancelled_by_admin"])
+            )
+            .order_by(desc(Deal.completed_at if Deal.completed_at is not None else Deal.created_at))
+        )
+        deals = result.scalars().all()
+
+        deal_list = []
+        for deal in deals:
+            # Для сделок с личной встречей показываем сумму в рублях
+            amount = deal.amount
+            if deal.currency == 'meet':
+                # Получаем информацию о продукте для суммы в рублях
+                product = await session.execute(select(Product).where(Product.id == deal.product_id))
+                product = product.scalar_one_or_none()
+                if product:
+                    amount = product.product_price
+
+            # Получаем информацию о пользователях
             seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
             seller = seller.scalar_one_or_none()
             buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
             buyer = buyer.scalar_one_or_none()
 
+            # Формируем текст статуса
             status_text = ""
             if deal.status == 'completed':
                 if deal.admin_decision == 'for_seller':
@@ -1086,23 +1105,25 @@ async def get_user_completed_deals(tg_id: int):
                 else:
                     status_text = "Отменена"
 
-            comp_deals_with_users.append({
+            deal_list.append({
                 "id": deal.id,
                 "product_name": deal.product_name,
                 "seller_id": deal.seller_id,
                 "buyer_id": deal.buyer_id,
                 "seller_username": seller.first_name if seller else "Unknown",
                 "buyer_username": buyer.first_name if buyer else "Unknown",
-                "amount": deal.amount,
                 "currency": deal.currency,
+                "amount": amount,
                 "status": deal.status,
                 "status_text": status_text,
-                "admin_decision": deal.admin_decision,
                 "created_at": deal.created_at,
-                "completed_at": deal.completed_at
+                "completed_at": deal.completed_at,
+                "is_reserved": deal.is_reserved,
+                "reservation_amount": deal.reservation_amount,
+                "admin_decision": deal.admin_decision
             })
 
-        return comp_deals_with_users
+        return deal_list
 
 
 async def create_review(deal_id: int, from_user_id: int, to_user_id: int, product_id: int, rating: int, text: str):
