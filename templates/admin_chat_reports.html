@@ -602,6 +602,10 @@
         border-radius: 4px;
         margin-bottom: 16px;
     }
+
+    .hidden {
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -951,7 +955,9 @@
 <div id="block-modal" class="modal">
     <div class="modal-content">
         <h3>Заблокировать пользователя</h3>
-        <div class="form-group">
+        
+        <!-- Блок выбора пользователя (будет скрыт при блокировке из вкладки пользователей) -->
+        <div id="user-selection-block" class="form-group hidden">
             <label for="block-user">Выберите пользователя:</label>
             <select id="block-user" class="form-select">
                 <option value="">-- Выберите пользователя --</option>
@@ -959,13 +965,22 @@
                 <option value="user2"><span id="user2-username"></span> (ID=<span id="user2-id"></span>)</option>
             </select>
         </div>
+        
+        <!-- Блок информации о пользователе (показывается при блокировке из вкладки пользователей) -->
+        <div id="user-info-block" class="form-group hidden">
+            <div><strong>Пользователь:</strong> <span id="selected-user-info"></span></div>
+            <input type="hidden" id="selected-user-id">
+        </div>
+        
         <div class="form-group">
             <label for="block-duration">Срок блокировки:</label>
             <select id="block-duration" class="form-select">
                 <option value="1h">1 час</option>
                 <option value="1d">1 день</option>
+                <option value="3d">3 дня</option>
                 <option value="7d">7 дней</option>
-                <option value="30d">30 дней</option>
+                <option value="30d">1 месяц</option>
+                <option value="90d">3 месяца</option>
                 <option value="365d">1 год</option>
                 <option value="permanent">Навсегда</option>
             </select>
@@ -1015,6 +1030,59 @@
             }
         });
 
+        // Обработчик поиска пользователей
+        document.getElementById('userSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const userItems = document.querySelectorAll('.user-item');
+            
+            userItems.forEach(item => {
+                const userName = item.querySelector('.item-id').textContent.toLowerCase();
+                const userId = item.querySelector('span:not(.item-id)').textContent.toLowerCase();
+                
+                if (userName.includes(searchTerm) || userId.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('.filter-button').forEach(button => {
+            button.addEventListener('click', function() {
+                // Удаляем класс active у всех кнопок
+                document.querySelectorAll('.filter-button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Добавляем класс active текущей кнопке
+                this.classList.add('active');
+                
+                const filter = this.dataset.filter;
+                filterUsers(filter);
+            });
+        });
+
+        // Функция фильтрации пользователей
+        function filterUsers(filter) {
+            const userItems = document.querySelectorAll('.user-item');
+            
+            userItems.forEach(item => {
+                const isBlocked = item.dataset.blocked === 'True';
+                
+                switch(filter) {
+                    case 'all':
+                        item.style.display = 'block';
+                        break;
+                    case 'blocked':
+                        item.style.display = isBlocked ? 'block' : 'none';
+                        break;
+                    case 'active':
+                        item.style.display = isBlocked ? 'none' : 'block';
+                        break;
+                }
+            });
+        }
+
         // Tab switching logic
         const tabs = document.querySelectorAll('.dropdown-tab');
         
@@ -1041,75 +1109,179 @@
                 // Update active tab in dropdown
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
+
+                window.location.href = `/admin/chat_reports?tab=${tabName}`;
             });
         });
 
-        // Handle pending deal actions
-        document.addEventListener('click', async function(event) {
-            if (event.target.matches('[data-action="approve-cancel"]')) {
-                const dealId = event.target.dataset.id;
+        // Функция для открытия модального окна блокировки
+        function openBlockModal(options = {}) {
+            const modal = document.getElementById('block-modal');
+            const userSelectionBlock = document.getElementById('user-selection-block');
+            const userInfoBlock = document.getElementById('user-info-block');
+            
+            // Сбрасываем предыдущие значения
+            document.getElementById('block-reason').value = '';
+            document.getElementById('block-duration').value = '1h';
+            
+            // Настройка отображения в зависимости от контекста
+            if (options.fromUsersTab) {
+                // Блокировка из вкладки пользователей
+                userSelectionBlock.classList.add('hidden');
+                userInfoBlock.classList.remove('hidden');
+                document.getElementById('selected-user-info').textContent = 
+                    `${options.userName} (ID: ${options.userId})`;
+                document.getElementById('selected-user-id').value = options.userId;
+            } else {
+                // Блокировка из чата
+                userSelectionBlock.classList.remove('hidden');
+                userInfoBlock.classList.add('hidden');
                 
-                try {
-                    const response = await fetch(`/admin/moderate_cancel_request/${dealId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ approve: true })
+                // Загружаем информацию о пользователях чата
+                fetch(`/admin/get_chat_info/${options.chatId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('user1-id').textContent = data.user1_id;
+                        document.getElementById('user2-id').textContent = data.user2_id;
+                        document.getElementById('user1-username').textContent = data.user1_username;
+                        document.getElementById('user2-username').textContent = data.user2_username;
+                        document.getElementById('block-user').dataset.chatId = options.chatId;
+                        document.getElementById('block-user').dataset.reportId = options.reportId;
                     });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.status === "success") {
-                            event.target.closest('.deal-item').remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
-                        }
-                    } else {
-                        alert('Ошибка при одобрении отмены сделки');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Ошибка при одобрении отмены сделки');
-                }
             }
             
-            if (event.target.matches('[data-action="reject-cancel"]')) {
-                const dealId = event.target.dataset.id;
+            modal.style.display = 'flex';
+        }
+
+        // Обработчик для кнопки блокировки из вкладки пользователей
+        document.addEventListener('click', function(event) {
+            if (event.target.matches('.block-user')) {
+                const userId = event.target.dataset.id;
+                const userName = event.target.closest('.user-item').querySelector('.item-id').textContent;
+                
+                openBlockModal({
+                    fromUsersTab: true,
+                    userId: userId,
+                    userName: userName
+                });
+            }
+        });
+
+        // Обработчик для кнопки блокировки из чата
+        document.addEventListener('click', function(event) {
+            if (event.target.matches('[data-action="block"]')) {
+                const reportId = event.target.dataset.id;
+                const chatId = event.target.closest('.report-item').querySelector('.item-id').textContent.replace('Чат #', '');
+                
+                openBlockModal({
+                    fromUsersTab: false,
+                    chatId: chatId,
+                    reportId: reportId
+                });
+            }
+        });
+
+        // Обработчик подтверждения блокировки
+        document.getElementById('confirm-block').addEventListener('click', async function() {
+            const modal = document.getElementById('block-modal');
+            const duration = document.getElementById('block-duration').value;
+            const reason = document.getElementById('block-reason').value;
+            
+            // Определяем ID пользователя в зависимости от контекста
+            let userId;
+            if (document.getElementById('user-selection-block').classList.contains('hidden')) {
+                // Блокировка из вкладки пользователей
+                userId = document.getElementById('selected-user-id').value;
+            } else {
+                // Блокировка из чата
+                const userSelect = document.getElementById('block-user');
+                userId = userSelect.value === 'user1' 
+                    ? parseInt(document.getElementById('user1-id').textContent)
+                    : parseInt(document.getElementById('user2-id').textContent);
+            }
+            
+            try {
+                const response = await fetch('/admin/block_user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        duration: duration,
+                        reason: reason
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === "success") {
+                        modal.style.display = 'none';
+                        window.location.reload();
+                    }
+                } else {
+                    alert('Ошибка при блокировке пользователя');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при блокировке пользователя');
+            }
+        });
+
+        // Обработчик отмены блокировки
+        document.getElementById('cancel-block').addEventListener('click', function() {
+            document.getElementById('block-modal').style.display = 'none';
+        });
+
+        // Обработчик разблокировки пользователя
+        // Улучшенный обработчик разблокировки пользователя
+        document.addEventListener('click', async function(event) {
+            if (event.target.closest('.unblock-user')) {
+                const button = event.target.closest('.unblock-user');
+                const userId = button.dataset.id;
                 
                 try {
-                    const response = await fetch(`/admin/moderate_cancel_request/${dealId}`, {
+                    const response = await fetch('/admin/block_user', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ approve: false })
+                        body: JSON.stringify({
+                            user_id: userId,
+                            block: false  // Важно: указываем, что это разблокировка
+                        })
                     });
 
                     if (response.ok) {
                         const data = await response.json();
                         if (data.status === "success") {
-                            event.target.closest('.deal-item').remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
+                            // Обновляем статус пользователя без перезагрузки страницы
+                            const userItem = button.closest('.user-item');
+                            userItem.dataset.blocked = 'False';
+                            
+                            // Обновляем меню действий
+                            const dropdownMenu = button.closest('.dropdown-menu');
+                            dropdownMenu.innerHTML = `
+                                <button class="dropdown-item block-user" data-id="${userId}">Заблокировать</button>
+                            `;
+                            
+                            // Если активен фильтр "Заблокированные", скрываем пользователя
+                            const activeFilter = document.querySelector('.filter-button.active').dataset.filter;
+                            if (activeFilter === 'blocked') {
+                                userItem.style.display = 'none';
+                            }
                         }
                     } else {
-                        alert('Ошибка при отклонении отмены сделки');
+                        alert('Ошибка при разблокировке пользователя');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при отклонении отмены сделки');
+                    alert('Ошибка при разблокировке пользователя');
                 }
             }
         });
-        
-        // Функция для проверки пустого контейнера
-        function checkEmptyContainer(containerId, message) {
-            const container = document.getElementById(containerId);
-            if (container.querySelectorAll('.report-item, .product-item, .review-item, .deal-item').length === 0) {
-                container.innerHTML = `<div class="no-items">${message}</div>`;
-            }
-        }
-        
-        // Обработка кнопок действий (решить/одобрить/отклонить)
+
+        // Остальные обработчики (для других вкладок админки)
         document.addEventListener('click', async function(event) {
             if (event.target.matches('[data-action="approve"]')) {
                 const productId = event.target.dataset.id;
@@ -1169,6 +1341,14 @@
             }
         });
 
+        // Функция для проверки пустого контейнера
+        function checkEmptyContainer(containerId, message) {
+            const container = document.getElementById(containerId);
+            if (container.querySelectorAll('.report-item, .product-item, .review-item, .deal-item').length === 0) {
+                container.innerHTML = `<div class="no-items">${message}</div>`;
+            }
+        }
+
         // Обработка модального окна отклонения
         document.getElementById('cancel-reject').addEventListener('click', function() {
             document.getElementById('reject-modal').style.display = 'none';
@@ -1213,165 +1393,7 @@
             }
         });
 
-        const blockButtons = document.querySelectorAll('.block-button');
-        const blockModal = document.getElementById('block-modal');
-        const cancelBlock = document.getElementById('cancel-block');
-        const confirmBlock = document.getElementById('confirm-block');
-
-        // Обработчик для кнопки блокировки
-        document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-action="block"]')) {
-                const reportId = e.target.dataset.id;
-                const chatId = e.target.closest('.report-item').querySelector('.item-id').textContent.replace('Чат #', '');
-                
-                // Загружаем информацию о чате
-                fetch(`/admin/get_chat_info/${chatId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        document.getElementById('user1-id').textContent = data.user1_id;
-                        document.getElementById('user2-id').textContent = data.user2_id;
-                        document.getElementById('user1-username').textContent = data.user1_username;
-                        document.getElementById('user2-username').textContent = data.user2_username;
-                        document.getElementById('block-user').dataset.chatId = chatId;
-                        document.getElementById('block-user').dataset.reportId = reportId;
-                        document.getElementById('block-modal').style.display = 'flex';
-                    });
-            }
-        });
-
-        // Обработчики для модального окна блокировки
-        document.getElementById('cancel-block').addEventListener('click', () => {
-            document.getElementById('block-modal').style.display = 'none';
-        });
-
-        document.getElementById('confirm-block').addEventListener('click', async () => {
-            const userSelect = document.getElementById('block-user');
-            const userId = userSelect.value === 'user1' 
-                ? parseInt(document.getElementById('user1-id').textContent)
-                : parseInt(document.getElementById('user2-id').textContent);
-            const duration = document.getElementById('block-duration').value;
-            const reason = document.getElementById('block-reason').value;
-            const chatId = userSelect.dataset.chatId;
-            const reportId = userSelect.dataset.reportId;
-
-            try {
-                const response = await fetch('/admin/block_user', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        user_id: userId,
-                        duration: duration,
-                        reason: reason,
-                        chat_id: chatId,
-                        report_id: reportId
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === "success") {
-                        alert('Пользователь успешно заблокирован');
-                        document.getElementById('block-modal').style.display = 'none';
-                        const item = document.querySelector(`.report-item[data-id="${reportId}"]`);
-                        if (item) {
-                            item.remove();
-                            checkEmptyContainer('reportsTab', 'Нет активных жалоб');
-                        }
-                    }
-                } else {
-                    alert('Ошибка при блокировке пользователя');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Ошибка при блокировке пользователя');
-            }
-        });
-
-        document.addEventListener('click', async function(event) {
-            // Обработка блокировки/разблокировки
-            if (event.target.matches('.block-user')) {
-                const userId = event.target.dataset.id;
-                await blockUser(userId, true);
-            }
-            
-            if (event.target.matches('.unblock-user')) {
-                const userId = event.target.dataset.id;
-                await blockUser(userId, false);
-            }
-            
-            // Фильтрация пользователей
-            if (event.target.matches('.filter-button')) {
-                document.querySelectorAll('.filter-button').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                event.target.classList.add('active');
-                
-                const filter = event.target.dataset.filter;
-                filterUsers(filter);
-            }
-        });
-
-        // Поиск пользователей
-        document.getElementById('userSearch').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            document.querySelectorAll('.user-item').forEach(user => {
-                const text = user.textContent.toLowerCase();
-                user.style.display = text.includes(searchTerm) ? 'block' : 'none';
-            });
-        });
-
-        async function blockUser(userId, block) {
-            try {
-                const response = await fetch('/admin/block_user', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        user_id: userId,
-                        block: block
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === "success") {
-                        const userItem = document.querySelector(`.user-item[data-user-id="${userId}"]`);
-                        if (userItem) {
-                            userItem.dataset.blocked = block ? "True" : "False";
-                            const blockBtn = userItem.querySelector('.block-user');
-                            const unblockBtn = userItem.querySelector('.unblock-user');
-                            if (blockBtn && unblockBtn) {
-                                blockBtn.textContent = block ? "Разблокировать" : "Заблокировать";
-                                blockBtn.classList.toggle('block-user', !block);
-                                blockBtn.classList.toggle('unblock-user', block);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        function filterUsers(filter) {
-            document.querySelectorAll('.user-item').forEach(user => {
-                const isBlocked = user.dataset.blocked === 'True';
-                
-                if (filter === 'all') {
-                    user.style.display = 'block';
-                } else if (filter === 'blocked' && isBlocked) {
-                    user.style.display = 'block';
-                } else if (filter === 'active' && !isBlocked) {
-                    user.style.display = 'block';
-                } else {
-                    user.style.display = 'none';
-                }
-            });
-        }
-
+        // Обработчики для других вкладок админки
         document.addEventListener('click', async function(event) {
             if (event.target.matches('[data-action="approve-review"]')) {
                 const reviewId = event.target.dataset.id;
@@ -1454,7 +1476,15 @@
             }
         });
 
-        // Открытие модального окна действий со сделкой
+        // Обработчики для вкладки сделок
+        document.addEventListener('click', function(event) {
+            if (event.target.matches('[data-action="deal-actions"]')) {
+                const dealId = event.target.dataset.id;
+                openDealActionsModal(dealId);
+            }
+        });
+
+        // Функция для открытия модального окна действий со сделкой
         function openDealActionsModal(dealId) {
             const modal = document.getElementById('deal-actions-modal');
             modal.style.display = 'flex';
@@ -1479,28 +1509,13 @@
                 });
         }
 
-        // Закрытие модального окна
-        function closeDealModal() {
+        // Закрытие модального окна сделок
+        document.getElementById('cancel-deal-action').addEventListener('click', function() {
             document.getElementById('deal-actions-modal').style.display = 'none';
-            document.getElementById('complete-reason').value = '';
-            document.getElementById('time-reason').value = '';
-            backToMainActions();
-        }
+        });
 
-        // Возврат к основным действиям
-        function backToMainActions() {
-            document.getElementById('complete-deal-actions').classList.add('hidden');
-            document.getElementById('give-time-actions').classList.add('hidden');
-            document.getElementById('main-actions').classList.remove('hidden');
-        }
-
-        // Обработчики кнопок
+        // Остальные обработчики для сделок
         document.addEventListener('click', function(event) {
-            if (event.target.matches('[data-action="deal-actions"]')) {
-                const dealId = event.target.dataset.id;
-                openDealActionsModal(dealId);
-            }
-            
             if (event.target.matches('.action-option')) {
                 const action = event.target.dataset.action;
                 document.getElementById('main-actions').classList.add('hidden');
@@ -1513,7 +1528,13 @@
             }
         });
 
-        document.getElementById('cancel-deal-action').addEventListener('click', closeDealModal);
+        // Возврат к основным действиям
+        function backToMainActions() {
+            document.getElementById('complete-deal-actions').classList.add('hidden');
+            document.getElementById('give-time-actions').classList.add('hidden');
+            document.getElementById('main-actions').classList.remove('hidden');
+        }
+
         document.getElementById('back-to-main-actions').addEventListener('click', backToMainActions);
         document.getElementById('back-to-main-actions-2').addEventListener('click', backToMainActions);
 
@@ -1540,7 +1561,7 @@
                 if (response.ok) {
                     const data = response.json();
                     if (data.status === "success") {
-                        closeDealModal();
+                        document.getElementById('deal-actions-modal').style.display = 'none';
                         const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
                         if (item) {
                             item.remove();
@@ -1576,7 +1597,7 @@
                 if (response.ok) {
                     const data = response.json();
                     if (data.status === "success") {
-                        closeDealModal();
+                        document.getElementById('deal-actions-modal').style.display = 'none';
                         const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
                         if (item) {
                             item.remove();
@@ -1608,7 +1629,7 @@
                 if (response.ok) {
                     const data = response.json();
                     if (data.status === "success") {
-                        closeDealModal();
+                        document.getElementById('deal-actions-modal').style.display = 'none';
                         const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
                         if (item) {
                             item.remove();
@@ -1619,70 +1640,6 @@
                     alert('Ошибка при обновлении сделки');
                 }
             });
-        });
-
-        document.addEventListener('click', async function(event) {
-            // Подтверждение сделки с оплатой при встрече
-            if (event.target.matches('[data-action="confirm-meet-deal"]')) {
-                const dealId = event.target.dataset.id;
-                
-                try {
-                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ action: 'confirm' })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.status === "success") {
-                            event.target.closest('.deal-item').remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
-                        }
-                    } else {
-                        const errorData = await response.json();
-                        alert(errorData.message || 'Ошибка при подтверждении сделки');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Ошибка при подтверждении сделки');
-                }
-            }
-            
-            // Отмена сделки с оплатой при встрече
-            if (event.target.matches('[data-action="cancel-meet-deal"]')) {
-                if (!confirm('Вы уверены, что хотите отменить сделку? Отзыв будет удалён.')) {
-                    return;
-                }
-                
-                const dealId = event.target.dataset.id;
-                
-                try {
-                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ action: 'cancel' })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.status === "success") {
-                            event.target.closest('.deal-item').remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
-                        }
-                    } else {
-                        const errorData = await response.json();
-                        alert(errorData.message || 'Ошибка при отмене сделки');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Ошибка при отмене сделки');
-                }
-            }
         });
     });
 </script>

@@ -18,10 +18,23 @@
         margin-bottom: 20px;
     }
     
+    .unblocked-icon {
+        font-size: 72px;
+        color: var(--success-color);
+        margin-bottom: 20px;
+    }
+    
     .blocked-title {
         font-size: 24px;
         font-weight: bold;
         margin-bottom: 16px;
+    }
+    
+    .unblocked-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 16px;
+        color: var(--success-color);
     }
     
     .blocked-message {
@@ -35,39 +48,77 @@
         margin-bottom: 32px;
     }
     
+    .unblocked-message {
+        font-weight: bold;
+        color: var(--success-color);
+        margin-bottom: 32px;
+    }
+    
     .blocked-contact {
         font-size: 14px;
         color: var(--secondary-text);
+    }
+    
+    .hidden {
+        display: none;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="blocked-container">
-    <div class="blocked-icon">🚫</div>
-    <div class="blocked-title">Ваш аккаунт заблокирован</div>
-    <div class="blocked-message">
-        Вы были заблокированы за нарушение правил маркета.
-        <br>
-        Если Вы считаете, что это ошибка,<br>свяжитесь с поддержкой:<br>@Wmarket_app (сообщение каналу) 
-        <br>или<br> 
-        @Wmarket_support
+    <!-- Блокированное состояние -->
+    <div id="blockedState">
+        <div class="blocked-icon">🚫</div>
+        <div class="blocked-title">Ваш аккаунт заблокирован</div>
+        <div class="blocked-message">
+            Вы были заблокированы за нарушение правил маркета.
+            <br>
+            Если Вы считаете, что это ошибка,<br>свяжитесь с поддержкой:<br>@Wmarket_app (сообщение каналу) 
+            <br>или<br> 
+            @Wmarket_support
+        </div>
+        <div class="blocked-until" id="blockedUntil">
+            Блокировка действует до: загрузка...
+        </div>
     </div>
-    <div class="blocked-until" id="blockedUntil">
-        Блокировка действует до: загрузка...
+    
+    <!-- Разблокированное состояние -->
+    <div id="unblockedState" class="hidden">
+        <div class="unblocked-icon">✅</div>
+        <div class="unblocked-title">Блокировка закончилась</div>
+        <div class="unblocked-message">
+            Теперь вы можете пользоваться Маркетом
+        </div>
+        <div class="blocked-message">
+            Пожалуйста, закройте и заново откройте миниапп
+        </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Получаем дату разблокировки из localStorage
-    const unblockDate = localStorage.getItem('unblockDate');
+    const blockedState = document.getElementById('blockedState');
+    const unblockedState = document.getElementById('unblockedState');
     const blockedUntil = document.getElementById('blockedUntil');
     
+    // Получаем дату разблокировки из localStorage
+    const unblockDate = localStorage.getItem('unblockDate');
+    
     if (unblockDate) {
+        const now = new Date();
         const date = new Date(unblockDate);
-        blockedUntil.textContent = `Блокировка действует до: ${date.toLocaleString()}`;
+        
+        if (now >= date) {
+            // Блокировка закончилась
+            blockedState.classList.add('hidden');
+            unblockedState.classList.remove('hidden');
+        } else {
+            // Блокировка еще действует
+            blockedUntil.textContent = `Блокировка действует до: ${date.toLocaleString()}`;
+        }
     } else {
+        // Перманентная блокировка
         blockedUntil.textContent = 'Блокировка действует: НАВСЕГДА';
     }
     

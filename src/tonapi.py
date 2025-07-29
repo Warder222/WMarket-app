@@ -108,7 +108,7 @@ async def withdraw_ton_request(wallet_address, amount):
         current_balance = balance / 1e9
 
         # Минимальная сумма для вывода с учетом комиссии
-        min_amount_with_fee = amount + 0.1
+        min_amount_with_fee = amount
 
         if current_balance < min_amount_with_fee:
             logger.warning(f"Insufficient wallet balance: {current_balance} < {min_amount_with_fee}")

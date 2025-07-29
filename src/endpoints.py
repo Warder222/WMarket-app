@@ -1129,52 +1129,54 @@ async def block_user(
 
     data = await request.json()
     user_id = data.get("user_id")
-    block = data.get("block")  # Новый параметр для простой блокировки/разблокировки
-    duration = data.get("duration")
+    block = data.get("block", True)  # По умолчанию блокируем
+    duration = data.get("duration", None)
     reason = data.get("reason", "")
-    chat_id = data.get("chat_id")
-    report_id = data.get("report_id")
 
-    # Определяем срок блокировки
-    if block is not None:
-        # Простая блокировка/разблокировка из списка пользователей
-        if block:
-            unblock_at = datetime.now(timezone.utc) + timedelta(days=30)  # Блокировка на 30 дней по умолчанию
-        else:
-            unblock_at = datetime.now(timezone.utc) - timedelta(days=1)  # Разблокировка
+    # Если это запрос на разблокировку
+    if not block:
+        await block_user_post(user_id, None, None, None, None)
+
+        message = (
+            f"✅ Ваш аккаунт был досрочно разблокирован администратором.\n\n"
+            f"⚠️ Пожалуйста, больше не нарушайте правила Маркета."
+        )
+
+        await send_notification_to_user(user_id, message)
+
+        return {"status": "success", "message": "User unblocked"}
+
+    # Определяем время разблокировки
+    if duration == "1h":
+        unblock_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    elif duration == "1d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=1)
+    elif duration == "3d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=3)
+    elif duration == "7d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=7)
+    elif duration == "30d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=30)
+    elif duration == "90d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=90)
+    elif duration == "365d":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=365)
+    elif duration == "permanent":
+        unblock_at = datetime.now(timezone.utc) + timedelta(days=365000)
     else:
-        # Старая логика из жалоб на чаты
-        if duration == "1h":
-            unblock_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        elif duration == "1d":
-            unblock_at = datetime.now(timezone.utc) + timedelta(days=1)
-        elif duration == "7d":
-            unblock_at = datetime.now(timezone.utc) + timedelta(days=7)
-        elif duration == "30d":
-            unblock_at = datetime.now(timezone.utc) + timedelta(days=30)
-        elif duration == "365d":
-            unblock_at = datetime.now(timezone.utc) + timedelta(days=365)
-        else:  # permanent
-            unblock_at = None
+        return {"status": "error", "message": "Invalid duration"}
 
     # Сохраняем блокировку в базе данных
-    await block_user_post(user_id, report_id, payload.get("tg_id"), reason, unblock_at)
+    await block_user_post(user_id, None, payload.get("tg_id"), reason, unblock_at)
 
-    # Отправляем уведомления (только для блокировки из жалоб)
-    if block is None or block:
-        await notify_user_blocked(user_id, duration or "30d", reason)
-        if report_id:
-            await notify_reporter_about_block(int(report_id), user_id)
-
-    return {"status": "success"}
-
-
-async def notify_user_blocked(user_id: int, duration: str, reason: str):
+    # Отправляем уведомление пользователю
     duration_text = {
         "1h": "1 час",
         "1d": "1 день",
+        "3d": "3 дня",
         "7d": "7 дней",
-        "30d": "30 дней",
+        "30d": "1 месяц",
+        "90d": "3 месяца",
         "365d": "1 год",
         "permanent": "навсегда"
     }.get(duration, duration)
@@ -1183,26 +1185,48 @@ async def notify_user_blocked(user_id: int, duration: str, reason: str):
         f"⛔ Ваш аккаунт был заблокирован администратором.\n\n"
         f"⌛ Срок блокировки: {duration_text}\n"
         f"📝 Причина: {reason or 'не указана'}\n\n"
-        f"Если Вы считаете, что это ошибка, свяжитесь с поддержкой - справа снизу "
-        f"@Wmarket_app (сообщение каналу) или @Wmarket_support"
+        f"Если Вы считаете, что это ошибка, свяжитесь с поддержкой."
     )
 
     await send_notification_to_user(user_id, message)
 
+    return {"status": "success"}
 
-async def notify_reporter_about_block(report_id: int, blocked_user_id: int):
-    report = await notify_reporter_about_block_post(int(report_id))
 
-    if report:
-        blocked_user = await get_user_info(blocked_user_id)
-        message = (
+# async def notify_user_blocked(user_id: int, duration: str, reason: str):
+#     duration_text = {
+#         "1h": "1 час",
+#         "1d": "1 день",
+#         "7d": "7 дней",
+#         "30d": "30 дней",
+#         "365d": "1 год",
+#         "permanent": "навсегда"
+#     }.get(duration, duration)
+#
+#     message = (
+#         f"⛔ Ваш аккаунт был заблокирован администратором.\n\n"
+#         f"⌛ Срок блокировки: {duration_text}\n"
+#         f"📝 Причина: {reason or 'не указана'}\n\n"
+#         f"Если Вы считаете, что это ошибка, свяжитесь с поддержкой - справа снизу "
+#         f"@Wmarket_app (сообщение каналу) или @Wmarket_support"
+#     )
+#
+#     await send_notification_to_user(user_id, message)
 
-            f"⚠️ Ваша жалоба была рассмотрена.\n\n"
-            f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил маркета.\n"
-            f"Спасибо за помощь в поддержании порядка на площадке! ❤️‍🔥"
-        )
 
-        await send_notification_to_user(report.reporter_id, message)
+# async def notify_reporter_about_block(report_id: int, blocked_user_id: int):
+#     report = await notify_reporter_about_block_post(int(report_id))
+#
+#     if report:
+#         blocked_user = await get_user_info(blocked_user_id)
+#         message = (
+#
+#             f"⚠️ Ваша жалоба была рассмотрена.\n\n"
+#             f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил маркета.\n"
+#             f"Спасибо за помощь в поддержании порядка на площадке! ❤️‍🔥"
+#         )
+#
+#         await send_notification_to_user(report.reporter_id, message)
 
 
 @wmarket_router.get("/check_user_block")
@@ -2504,8 +2528,8 @@ async def reserve_product(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
             )
-        
-        
+
+
 @wmarket_router.post("/complete_reservation")
 async def complete_reservation(
     request: Request,

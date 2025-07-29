@@ -876,40 +876,57 @@ async def block_user_post(user_id, report_id: int, admin_id, reason, unblock_at)
         # Преобразуем user_id в число
         user_id = int(user_id) if user_id else None
 
-        result = await check_user_blocked_post(user_id)
-        if not result["is_blocked"]:
-            # Добавляем запись о блокировке
+        # Если все параметры None - это запрос на разблокировку
+        if admin_id is None and reason is None and unblock_at is None:
+            # Удаляем запись о блокировке
             await session.execute(
-                insert(UserBlock).values(
-                    user_id=user_id,
-                    blocked_by=admin_id,
-                    reason=reason,
-                    unblock_at=unblock_at
-                )
+                delete(UserBlock)
+                .where(UserBlock.user_id == user_id)
+            )
+
+            # Восстанавливаем активные объявления пользователя
+            await session.execute(
+                update(Product)
+                .where(Product.tg_id == user_id)
+                .values(active=True)
             )
         else:
-            await session.execute(
-                update(UserBlock)
-                .where(UserBlock.user_id == user_id)
-                .values(
-                    blocked_by=admin_id,
-                    reason=reason,
-                    unblock_at=unblock_at
+            # Блокировка пользователя
+            result = await check_user_blocked_post(user_id)
+            if not result["is_blocked"]:
+                # Добавляем запись о блокировке
+                await session.execute(
+                    insert(UserBlock).values(
+                        user_id=user_id,
+                        blocked_by=admin_id,
+                        reason=reason,
+                        unblock_at=unblock_at
+                    )
                 )
-            )
-        # Архивируем все объявления пользователя
-        await session.execute(
-            update(Product)
-            .where(Product.tg_id == user_id)
-            .values(active=None)
-        )
+            else:
+                # Обновляем существующую блокировку
+                await session.execute(
+                    update(UserBlock)
+                    .where(UserBlock.user_id == user_id)
+                    .values(
+                        blocked_by=admin_id,
+                        reason=reason,
+                        unblock_at=unblock_at
+                    )
+                )
 
-        # Помечаем отчет как решенный
+            # Архивируем все объявления пользователя
+            await session.execute(
+                update(Product)
+                .where(Product.tg_id == user_id)
+                .values(active=None)
+            )
+
+        # Помечаем отчет как решенный, если он был передан
         if report_id:
             await resolve_chat_report(int(report_id), admin_id)
 
         await session.commit()
-
 
 async def get_all_users_info():
     async with async_session_maker() as session:
