@@ -675,6 +675,64 @@
             background-color: white;
             transform: scale(1.2);
         }
+
+        .fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            touch-action: none;
+        }
+
+        .fullscreen-image-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .fullscreen-image {
+            max-width: 100%;
+            max-height: 100%;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .close-fullscreen {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .close-fullscreen svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .gallery-slide {
+            cursor: pointer;
+        }
     </style>
 {% endblock %}
 
@@ -701,6 +759,17 @@
                 {% for image in images %}
                 <div class="gallery-dot {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}"></div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <div class="fullscreen-overlay" id="fullscreenOverlay">
+            <div class="fullscreen-image-container">
+                <button class="close-fullscreen" id="closeFullscreen">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+                <img class="fullscreen-image" id="fullscreenImage" src="" alt="">
             </div>
         </div>
 
@@ -1202,6 +1271,111 @@
                     galleryPrev.click();
                 }
             }
+
+            // Добавляем обработчики для полноэкранного просмотра изображений
+            const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+            const fullscreenImage = document.getElementById('fullscreenImage');
+            const closeFullscreen = document.getElementById('closeFullscreen');
+
+            // Открытие изображения в полноэкранном режиме
+            gallerySlides.forEach(slide => {
+                slide.addEventListener('click', () => {
+                    const activeImg = gallerySlides[currentSlide].querySelector('img');
+                    if (activeImg) {
+                        fullscreenImage.src = activeImg.src;
+                        fullscreenOverlay.style.display = 'flex';
+                        document.body.style.overflow = 'hidden';
+                        
+                        // Сброс масштаба при открытии
+                        currentScale = 1;
+                        fullscreenImage.style.transform = `scale(${currentScale})`;
+                    }
+                });
+            });
+
+            // Закрытие полноэкранного режима
+            closeFullscreen.addEventListener('click', () => {
+                fullscreenOverlay.style.display = 'none';
+                document.body.style.overflow = ''; // Восстанавливаем прокрутку страницы
+            });
+
+            // Закрытие при клике на оверлей (но не на само изображение)
+            fullscreenOverlay.addEventListener('click', (e) => {
+                if (e.target === fullscreenOverlay) {
+                    fullscreenOverlay.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // Масштабирование изображения (pinch zoom)
+            let currentScale = 1;
+            let initialDistance = 0;
+
+            fullscreenOverlay.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    initialDistance = getDistance(e.touches[0], e.touches[1]);
+                }
+            });
+
+            fullscreenOverlay.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                    const scale = currentDistance / initialDistance;
+                    currentScale = Math.max(1, Math.min(scale * currentScale, 5)); // Ограничиваем масштаб от 1x до 5x
+                    fullscreenImage.style.transform = `scale(${currentScale})`;
+                }
+            });
+
+            function getDistance(touch1, touch2) {
+                const dx = touch1.clientX - touch2.clientX;
+                const dy = touch1.clientY - touch2.clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // Перемещение изображения при масштабировании
+            let startX, startY, translateX = 0, translateY = 0;
+            let isDragging = false;
+
+            fullscreenImage.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1 && currentScale > 1) {
+                    e.preventDefault();
+                    isDragging = true;
+                    startX = e.touches[0].clientX - translateX;
+                    startY = e.touches[0].clientY - translateY;
+                }
+            });
+
+            fullscreenImage.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1 && currentScale > 1 && isDragging) {
+                    e.preventDefault();
+                    translateX = e.touches[0].clientX - startX;
+                    translateY = e.touches[0].clientY - startY;
+                    
+                    // Ограничиваем перемещение, чтобы изображение не уходило за границы
+                    const maxX = (fullscreenImage.offsetWidth * (currentScale - 1)) / 2;
+                    const maxY = (fullscreenImage.offsetHeight * (currentScale - 1)) / 2;
+                    
+                    translateX = Math.max(-maxX, Math.min(translateX, maxX));
+                    translateY = Math.max(-maxY, Math.min(translateY, maxY));
+                    
+                    fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+                }
+            });
+
+            fullscreenImage.addEventListener('touchend', () => {
+                isDragging = false;
+            });
+
+            // Закрытие по клавише ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && fullscreenOverlay.style.display === 'flex') {
+                    fullscreenOverlay.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+
             // Функции для работы с модальным окном бронирования
             let currentReserveCurrency = 'rub';
 
