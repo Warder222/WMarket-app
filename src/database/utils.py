@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone, timedelta
 
 from starlette.responses import JSONResponse
@@ -160,8 +161,14 @@ async def get_all_products(tg_id):
             products = result.scalars()
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-tg_id / 7-is_fav
             all_products = [[prod.product_name, prod.product_price,
-                             prod.product_description, prod.product_image_url,
+                             prod.product_description,prod.product_image_url,
                              prod.id, prod.created_at, prod.tg_id] for prod in products]
+
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+
             all_favs = await get_all_user_favs(tg_id)
             [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
             return all_products
@@ -178,10 +185,16 @@ async def get_all_products_from_category(category_name, tg_id):
             products = result.scalars()
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-tg_id / 7-is_fav
             all_products = [[prod.product_name, prod.product_price,
-                             prod.product_description, prod.product_image_url,
+                             prod.product_description, prod.product_image_url[0],
                              prod.id, prod.created_at, prod.tg_id] for prod in products]
             all_favs = await get_all_user_favs(tg_id)
-            [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            all_products = [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+
             return all_products
         except Exception as exc:
             print(f"Error: {exc}")
@@ -233,18 +246,58 @@ async def get_product_info(product_id: int, user_tg_id: int | None):
         if not product:
             return None
 
+        image_urls = json.loads(product[5]) if product[5] else []
+        first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+        product[5] = first_image
+
+        return product
+
+
+async def get_product_info_with_all_photos(product_id: int, user_tg_id: int | None):
+    async with async_session_maker() as session:
+        query = select(
+            Product.id,
+            Product.tg_id,
+            Product.product_name,
+            Product.product_price,
+            Product.product_description,
+            Product.product_image_url,
+            Product.category_name,
+            Product.created_at,
+            # Добавляем проверку на избранное
+            exists().where(
+                and_(
+                    Fav.tg_id == user_tg_id,
+                    Fav.product_id == Product.id
+                )
+            ).label("is_fav"),
+            Product.reserved,  # product_info[9]
+            Product.reserved_by,  # product_info[10]
+            Product.reserved_until,  # product_info[11]
+            Product.reservation_amount,  # product_info[12]
+            Product.reservation_currency  # product_info[13]
+        ).where(Product.id == product_id)
+
+        result = await session.execute(query)
+        product = result.first()
+
+        if not product:
+            return None
+
         return product
 
 
 async def add_new_product(product_data, tg_id):
     async with async_session_maker() as db:
         try:
-            product = Product(tg_id=tg_id,
-                              category_name=product_data.get("category_name"),
-                              product_name=product_data.get("product_name"),
-                              product_price=product_data.get("product_price"),
-                              product_description=product_data.get("product_description"),
-                              product_image_url=product_data.get("product_image_url"))
+            product = Product(
+                tg_id=tg_id,
+                category_name=product_data.get("category_name"),
+                product_name=product_data.get("product_name"),
+                product_price=product_data.get("product_price"),
+                product_description=product_data.get("product_description"),
+                product_image_url=product_data.get("product_image_url")  # Сохраняем как JSON строку
+            )
             db.add(product)
             await db.commit()
         except Exception as exc:
@@ -312,9 +365,14 @@ async def get_user_archived_products(tg_id):
             q = select(Product).filter_by(tg_id=tg_id, active=None).order_by(desc(Product.created_at))
             result = await db.execute(q)
             products = result.scalars()
-            return [[prod.product_name, prod.product_price,
+            all_products = [[prod.product_name, prod.product_price,
                      prod.product_description, prod.product_image_url,
                      prod.id, prod.created_at, prod.id] for prod in products]
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+            return all_products
         except Exception as exc:
             print(f"Error: {exc}")
             return []
@@ -352,6 +410,11 @@ async def get_user_active_products(tg_id: int, current_user_id: int):
                 product_list.append(True if product_list[4] in all_favs else False)
                 all_products.append(product_list)
 
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+
             return all_products
         except Exception as exc:
             print(f"Error in get_user_active_products: {exc}")
@@ -371,6 +434,12 @@ async def get_user_moderation_products(tg_id):
                              prod.id, prod.created_at, prod.category_name, prod.tg_id] for prod in products]
             # all_favs = await get_all_user_favs(tg_id)
             # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+
             return all_products
         except Exception as exc:
             print(f"Error: {exc}")
@@ -390,6 +459,12 @@ async def get_all_moderation_products():
                              prod.id, prod.created_at, prod.category_name, prod.tg_id] for prod in products]
             # all_favs = await get_all_user_favs(tg_id)
             # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+
+            for product in all_products:
+                image_urls = json.loads(product[3]) if product[3] else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+                product[3] = first_image
+
             return all_products
         except Exception as exc:
             print(f"Error: {exc}")
@@ -675,6 +750,11 @@ async def get_user_chats(user_id: int):
             last_message = last_message.first()
             if last_message:
                 last_message = last_message[0]  # Extract the Message object from the row
+
+
+            image_urls = json.loads(product.product_image_url) if product.product_image_url else []
+            first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+            product.product_image_url = first_image
 
             chats_with_info.append({
                 "id": chat.id,

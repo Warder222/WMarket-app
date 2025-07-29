@@ -53,14 +53,14 @@ class Product(Base):
     product_name = Column(String)
     product_price = Column(Integer)
     product_description = Column(String)
-    product_image_url = Column(String, unique=True)
+    product_image_url = Column(String)  # Изменено: теперь это будет JSON строка с массивом URL
     created_at = Column(DateTime(timezone=True), default=func.now())
     active = Column(Boolean, default=False)
-    reserved = Column(Boolean, default=False)  # New field
-    reserved_until = Column(DateTime(timezone=True), nullable=True)  # New field
-    reserved_by = Column(BigInteger, ForeignKey("users.tg_id", ondelete="SET NULL"), nullable=True)  # New field
-    reservation_amount = Column(Float, nullable=True)  # New field
-    reservation_currency = Column(String, nullable=True)  # New field
+    reserved = Column(Boolean, default=False)
+    reserved_until = Column(DateTime(timezone=True), nullable=True)
+    reserved_by = Column(BigInteger, ForeignKey("users.tg_id", ondelete="SET NULL"), nullable=True)
+    reservation_amount = Column(Float, nullable=True)
+    reservation_currency = Column(String, nullable=True)
 
 
 class Fav(Base):

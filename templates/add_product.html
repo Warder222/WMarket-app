@@ -64,12 +64,18 @@
         opacity: 0.9;
     }
 
-    .image-preview {
-        width: 100%;
-        max-height: 300px;
-        object-fit: contain;
-        border-radius: 8px;
+    .image-preview-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
         margin-top: 10px;
+    }
+
+    .image-preview {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 8px;
         border: 1px dashed var(--border-color);
         display: none;
     }
@@ -88,6 +94,27 @@
 
     .file-input-label:hover {
         background-color: var(--hover-color);
+    }
+
+    .remove-image-btn {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background-color: red;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        display: none;
+    }
+
+    .image-preview-wrapper {
+        position: relative;
+        margin-right: 10px;
+        margin-bottom: 10px;
     }
 </style>
 {% endblock %}
@@ -122,12 +149,12 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Изображение товара</label>
-                <label for="product_image" class="file-input-label">
-                    Выберите изображение
+                <label class="form-label">Изображения товара (до 10 штук)</label>
+                <label for="product_images" class="file-input-label">
+                    Выберите изображения
                 </label>
-                <input type="file" id="product_image" name="product_image" accept="image/*" style="display: none;" required>
-                <img id="image-preview" class="image-preview" alt="Предпросмотр изображения">
+                <input type="file" id="product_images" name="product_images" accept="image/*" multiple style="display: none;">
+                <div class="image-preview-container" id="image-preview-container"></div>
             </div>
 
             <button type="submit" class="submit-btn">Опубликовать</button>
@@ -139,19 +166,82 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const imageInput = document.getElementById('product_image');
-        const imagePreview = document.getElementById('image-preview');
+        const imageInput = document.getElementById('product_images');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const maxImages = 10;
+        let uploadedImages = [];
 
         imageInput.addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    imagePreview.style.display = 'block';
-                    imagePreview.src = event.target.result;
-                };
-                reader.readAsDataURL(e.target.files[0]);
+            if (e.target.files && e.target.files.length > 0) {
+                // Проверяем общее количество изображений
+                const totalImages = uploadedImages.length + e.target.files.length;
+                if (totalImages > maxImages) {
+                    alert(`Можно загрузить не более ${maxImages} изображений`);
+                    return;
+                }
+
+                // Обрабатываем каждое выбранное изображение
+                for (let i = 0; i < e.target.files.length; i++) {
+                    const file = e.target.files[i];
+                    const reader = new FileReader();
+
+                    reader.onload = function(event) {
+                        const imageId = 'image-' + Date.now() + '-' + i;
+                        const imageWrapper = document.createElement('div');
+                        imageWrapper.className = 'image-preview-wrapper';
+                        imageWrapper.dataset.id = imageId;
+
+                        const imagePreview = document.createElement('img');
+                        imagePreview.className = 'image-preview';
+                        imagePreview.src = event.target.result;
+                        imagePreview.style.display = 'block';
+
+                        const removeBtn = document.createElement('button');
+                        removeBtn.className = 'remove-image-btn';
+                        removeBtn.innerHTML = '×';
+                        removeBtn.onclick = function() {
+                            removeImage(imageId);
+                            return false;
+                        };
+
+                        imageWrapper.appendChild(imagePreview);
+                        imageWrapper.appendChild(removeBtn);
+                        imagePreviewContainer.appendChild(imageWrapper);
+
+                        // Показываем кнопку удаления при наведении
+                        imageWrapper.addEventListener('mouseenter', function() {
+                            removeBtn.style.display = 'block';
+                        });
+                        imageWrapper.addEventListener('mouseleave', function() {
+                            removeBtn.style.display = 'none';
+                        });
+
+                        // Добавляем информацию о файле в массив
+                        uploadedImages.push({
+                            id: imageId,
+                            file: file,
+                            previewElement: imageWrapper
+                        });
+                    };
+
+                    reader.readAsDataURL(file);
+                }
+                
+                // Сбрасываем значение input, чтобы можно было выбрать те же файлы снова
+                e.target.value = '';
             }
         });
+
+        function removeImage(imageId) {
+            // Удаляем из массива
+            uploadedImages = uploadedImages.filter(img => img.id !== imageId);
+            
+            // Удаляем из DOM
+            const elementToRemove = document.querySelector(`.image-preview-wrapper[data-id="${imageId}"]`);
+            if (elementToRemove) {
+                imagePreviewContainer.removeChild(elementToRemove);
+            }
+        }
 
         const priceInput = document.getElementById('product_price');
         priceInput.addEventListener('input', function(e) {
@@ -166,6 +256,14 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Публикация...';
             
+            // Удаляем старые файлы из FormData (если есть)
+            formData.delete('product_images');
+            
+            // Добавляем все выбранные файлы
+            uploadedImages.forEach(img => {
+                formData.append('product_images', img.file);
+            });
+
             try {
                 const response = await fetch('/add_product', {
                     method: 'POST',

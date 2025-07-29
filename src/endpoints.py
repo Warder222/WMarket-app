@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import List
 
 from fastapi import APIRouter, Request, Cookie, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
@@ -28,7 +29,8 @@ from src.database.utils import (get_all_users, add_user, update_token, get_all_c
                                 get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
                                 add_ton_balance, get_user_ton_transactions, create_ton_transaction,
                                 get_user_active_deals, get_user_completed_deals, get_pending_deals,
-                                get_user_reserved_deals, get_count_fav_add, get_user_active_deals_count)
+                                get_user_reserved_deals, get_count_fav_add, get_user_active_deals_count,
+                                get_product_info_with_all_photos)
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
 
@@ -37,7 +39,11 @@ wmarket_router = APIRouter(
     tags=["wmarket_router"]
 )
 
+def from_json(value):
+    return json.loads(value)
+
 templates = Jinja2Templates(directory="templates")
+templates.env.filters['from_json'] = from_json
 
 
 # auth__________________________________________________________________________________________________________________
@@ -194,7 +200,6 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
             # Загружаем только нужные данные в зависимости от выбранной вкладки
             if tab == 'active':
                 active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
-                print(active_products)
             elif tab == 'moderation':
                 moderation_products = await get_user_moderation_products(payload.get("tg_id"))
             elif tab == 'archived':
@@ -277,7 +282,7 @@ async def add_product_post(
         product_name: str = Form(),
         product_price: int = Form(),
         product_description: str = Form(),
-        product_image: UploadFile = File()
+        product_images: List[UploadFile] = File(...)  # Теперь принимаем список файлов
 ):
     if session_token:
         users = await get_all_users()
@@ -286,23 +291,32 @@ async def add_product_post(
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
-                file_content = await product_image.read()
-                file_ext = os.path.splitext(product_image.filename)[1]
-                if file_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
-                    raise HTTPException(status_code=400, detail="Неподдерживаемый формат изображения")
+                image_urls = []
 
-                filename = f"{uuid.uuid4()}{file_ext}"
-                file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                # Ограничиваем количество изображений до 10
+                if len(product_images) > 10:
+                    raise HTTPException(status_code=400, detail="Можно загрузить не более 10 изображений")
 
-                with open(file_path, "wb") as buffer:
-                    buffer.write(file_content)
+                for image in product_images:
+                    file_content = await image.read()
+                    file_ext = os.path.splitext(image.filename)[1]
+                    if file_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
+                        raise HTTPException(status_code=400, detail="Неподдерживаемый формат изображения")
+
+                    filename = f"{uuid.uuid4()}{file_ext}"
+                    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+
+                    with open(file_path, "wb") as buffer:
+                        buffer.write(file_content)
+
+                    image_urls.append(f"static/uploads/{filename}")
 
                 product_data = {
                     "category_name": category,
                     "product_name": product_name,
                     "product_price": product_price,
                     "product_description": product_description,
-                    "product_image_url": f"static/uploads/{filename}"
+                    "product_image_url": json.dumps(image_urls)  # Сохраняем как JSON строку
                 }
 
                 await add_new_product(product_data, payload.get("tg_id"))
@@ -313,7 +327,8 @@ async def add_product_post(
                     "✅ Ваше объявление отправлено на проверку\n\n"
                     f"📌 Название: {product_name}\n"
                     f"⚙️ Категория: {category}\n"
-                    f"💰 Цена: {product_price} ₽\n\n"
+                    f"💰 Цена: {product_price} ₽\n"
+                    f"📸 Фотографий: {len(image_urls)}\n\n"
                     "Обычно проверка занимает до 24 часов."
                 )
 
@@ -430,7 +445,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
             # 8-is_fav
-            product_info = await get_product_info(product_id, payload.get("tg_id"))
+            product_info = await get_product_info_with_all_photos(product_id, payload.get("tg_id"))
             categories = await get_all_not_digit_categories()
             user_info = await get_user_info(product_info[1])
             positive_reviews = user_info[3]
