@@ -733,6 +733,72 @@
         .gallery-slide {
             cursor: pointer;
         }
+
+        .image-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .gallery-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: var(--card-bg);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .remove-image-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .image-actions {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .move-left-btn, .move-right-btn {
+            background: none;
+            border: none;
+            color: white;
+            padding: 2px 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .move-left-btn:disabled, .move-right-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
     </style>
 {% endblock %}
 
@@ -993,12 +1059,27 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="editImage">Изображение</label>
-                    <label for="editImage" class="file-input-label">
-                        Выберите новое изображение (или оставьте старое)
+                    <label>Фотографии товара (максимум 10)</label>
+                    <div id="imageGallery" class="image-gallery">
+                        {% set images = product_info[5]|from_json %}
+                        {% for image in images %}
+                        <div class="gallery-item" data-image="{{ image }}">
+                            <img src="/{{ image }}" alt="Фото товара">
+                            <button type="button" class="remove-image-btn" data-index="{{ loop.index0 }}">×</button>
+                            <div class="image-actions">
+                                <button type="button" class="move-left-btn" {% if loop.first %}disabled{% endif %}>←</button>
+                                <button type="button" class="move-right-btn" {% if loop.last %}disabled{% endif %}>→</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <label for="addImages" class="file-input-label">
+                        Добавить фотографии (осталось: <span id="remainingSlots">{{ 10 - images|length }}</span>)
                     </label>
-                    <input type="file" id="editImage" name="image" accept="image/*" style="display: none;">
-                    <img id="edit-image-preview" class="edit-image-preview" src="/{{ product_info[5] }}" alt="Текущее изображение">
+                    <input type="file" id="addImages" name="new_images" accept="image/jpeg,image/png,image/gif" multiple style="display: none;">
+                    
+                    <input type="hidden" id="currentImages" name="current_images" value="{{ product_info[5] }}">
                 </div>
                 
                 <div class="modal-actions">
@@ -1126,7 +1207,116 @@
                 });
                 sellerInfo.style.cursor = 'pointer';
             };
-
+            
+            const imageGallery = document.getElementById('imageGallery');
+            const addImagesInput = document.getElementById('addImages');
+            const currentImagesInput = document.getElementById('currentImages');
+            const remainingSlotsSpan = document.getElementById('remainingSlots');
+            
+            // Функция для обновления списка изображений
+            function updateImagesList() {
+                const images = Array.from(imageGallery.querySelectorAll('.gallery-item')).map(item => {
+                    return item.dataset.image;
+                });
+                
+                currentImagesInput.value = JSON.stringify(images);
+                updateRemainingSlots();
+            }
+            
+            // Функция для обновления счетчика оставшихся слотов
+            function updateRemainingSlots() {
+                const currentCount = imageGallery.querySelectorAll('.gallery-item').length;
+                remainingSlotsSpan.textContent = 10 - currentCount;
+                addImagesInput.disabled = currentCount >= 10;
+            }
+            
+            // Удаление изображения
+            imageGallery.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-image-btn')) {
+                    e.target.closest('.gallery-item').remove();
+                    updateImagesList();
+                }
+            });
+            
+            // Перемещение изображений
+            imageGallery.addEventListener('click', (e) => {
+                const item = e.target.closest('.gallery-item');
+                if (!item) return;
+                
+                if (e.target.classList.contains('move-left-btn')) {
+                    const prevItem = item.previousElementSibling;
+                    if (prevItem) {
+                        item.parentNode.insertBefore(item, prevItem);
+                        updateImagesList();
+                        updateMoveButtons();
+                    }
+                } else if (e.target.classList.contains('move-right-btn')) {
+                    const nextItem = item.nextElementSibling;
+                    if (nextItem) {
+                        item.parentNode.insertBefore(nextItem, item);
+                        updateImagesList();
+                        updateMoveButtons();
+                    }
+                }
+            });
+            
+            // Обновление состояния кнопок перемещения
+            function updateMoveButtons() {
+                const items = imageGallery.querySelectorAll('.gallery-item');
+                items.forEach((item, index) => {
+                    const leftBtn = item.querySelector('.move-left-btn');
+                    const rightBtn = item.querySelector('.move-right-btn');
+                    
+                    if (leftBtn) leftBtn.disabled = index === 0;
+                    if (rightBtn) rightBtn.disabled = index === items.length - 1;
+                });
+            }
+            
+            // Добавление новых изображений
+            addImagesInput.addEventListener('change', (e) => {
+                const files = e.target.files;
+                const currentCount = imageGallery.querySelectorAll('.gallery-item').length;
+                const remainingSlots = 10 - currentCount;
+                
+                if (files.length > remainingSlots) {
+                    alert(`Можно добавить только ${remainingSlots} фотографий`);
+                    return;
+                }
+                
+                for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
+                    const file = files[i];
+                    const reader = new FileReader();
+                    
+                    reader.onload = (event) => {
+                        const imgUrl = event.target.result;
+                        const item = document.createElement('div');
+                        item.className = 'gallery-item';
+                        item.dataset.image = imgUrl;
+                        
+                        item.innerHTML = `
+                            <img src="${imgUrl}" alt="Новое фото">
+                            <button type="button" class="remove-image-btn" data-index="${currentCount + i}">×</button>
+                            <div class="image-actions">
+                                <button type="button" class="move-left-btn">←</button>
+                                <button type="button" class="move-right-btn">→</button>
+                            </div>
+                        `;
+                        
+                        imageGallery.appendChild(item);
+                        updateImagesList();
+                        updateMoveButtons();
+                    };
+                    
+                    reader.readAsDataURL(file);
+                }
+                
+                e.target.value = '';
+            });
+            
+            // Инициализация
+            updateMoveButtons();
+            updateRemainingSlots();
+            
             // Обработка формы редактирования
             const editForm = document.getElementById('editForm');
             if (editForm) {
@@ -1134,6 +1324,8 @@
                     e.preventDefault();
                     
                     const formData = new FormData(editForm);
+                    const currentImages = JSON.parse(currentImagesInput.value);
+                    formData.set('current_images', currentImagesInput.value);
                     
                     try {
                         const response = await fetch('/edit_product', {
@@ -1144,7 +1336,7 @@
                         const result = await response.json();
                         if (result.status === "success") {
                             alert('Объявление успешно обновлено и отправлено на проверку!');
-                            window.location.reload();
+                            window.location.href = '/ads_review?tab=moderation';
                         } else {
                             alert(result.message || 'Ошибка при обновлении объявления');
                         }

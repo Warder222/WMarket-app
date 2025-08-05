@@ -242,6 +242,7 @@ async def get_product_info(product_id: int, user_tg_id: int | None):
 
         result = await session.execute(query)
         product = result.first()
+        product = list(product)
 
         if not product:
             return None

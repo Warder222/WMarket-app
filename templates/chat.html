@@ -316,7 +316,8 @@
     <div class="product-info {% if not product.active %}disabled-product{% endif %}" 
     {% if product.active %}onclick="window.location.href='/ads/{{ product.id }}'"{% endif %}>
         <div class="product-image-container">
-            <img src="/{{ product.product_image_url }}" 
+            {% set images = product.product_image_url|from_json %}
+            <img src="/{{ images[0] }}" 
                 class="product-image {% if not product.active or product.active is none %}disabled{% endif %}" 
                 alt="{{ product.product_name }}">
             {% if product.active is none %}
