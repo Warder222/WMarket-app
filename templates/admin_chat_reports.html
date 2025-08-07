@@ -763,6 +763,33 @@
         height: 24px;
         fill: white;
     }
+
+    #cleanup-images-btn {
+        width: 100%;
+        margin-top: -10px;
+        padding: 8px 16px;
+        background-color: var(--primary-color);
+        color: var(--error-color);
+        border: 1px solid var(--error-color);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    #cleanup-images-btn:hover {
+        background-color: rgba(231, 76, 60, 0.1);
+    }
+
+    #cleanup-images-btn svg {
+        width: 16px;
+        height: 16px;
+        fill: var(--error-color);
+    }
 </style>
 {% endblock %}
 
@@ -874,6 +901,12 @@
 
     <!-- Секция модерации объявлений -->
     <div id="moderationTab" {% if active_tab != 'moderation' %}class="hidden"{% endif %}>
+        <button id="cleanup-images-btn">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12z"/>
+            </svg>
+            Удалить неиспользуемые фото
+        </button>
         {% if moderation_products %}
             {% for product in moderation_products %}
             <div class="product-item" data-product-id="{{ product[4] }}">
@@ -1906,6 +1939,32 @@
             if (e.key === 'Escape' && document.getElementById('productFullscreenOverlay').style.display === 'flex') {
                 document.getElementById('productFullscreenOverlay').style.display = 'none';
                 document.body.style.overflow = '';
+            }
+        });
+
+        // В блоке scripts добавим обработчик для новой кнопки
+        document.getElementById('cleanup-images-btn')?.addEventListener('click', async function() {
+            if (!confirm('Вы уверены, что хотите удалить все неиспользуемые изображения?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/cleanup_unused_images', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Удалено ${data.deleted_count} неиспользуемых изображений. Освобождено ${data.freed_space_mb.toFixed(2)} MB.`);
+                } else {
+                    alert('Ошибка при удалении изображений');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при удалении изображений');
             }
         });
     });

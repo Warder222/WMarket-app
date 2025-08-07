@@ -1129,6 +1129,70 @@ async def notify_product_rejected(product_id: int, reason: str = None):
         print(f"Error in notify_product_rejected: {e}", exc_info=True)
 
 
+@wmarket_router.post("/admin/cleanup_unused_images")
+async def cleanup_unused_images(session_token=Cookie(default=None)):
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    payload = await decode_jwt(session_token)
+    admin_res = await is_admin(payload.get("tg_id"))
+    if not admin_res:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    try:
+        # Получаем все используемые изображения из базы данных
+        async with async_session_maker() as session:
+            result = await session.execute(select(Product.product_image_url))
+            products = result.scalars().all()
+
+        # Собираем все используемые изображения
+        used_images = set()
+        for product in products:
+            if product:
+                try:
+                    images = json.loads(product)
+                    for img in images:
+                        if img.startswith('static/uploads/'):
+                            used_images.add(img.split('/')[-1])  # сохраняем только имя файла
+                except json.JSONDecodeError:
+                    continue
+
+        # Получаем список всех файлов в директории
+        all_files = set()
+        for root, dirs, files in os.walk(settings.UPLOAD_DIR):
+            for file in files:
+                all_files.add(file)
+
+        # Находим неиспользуемые файлы
+        unused_files = all_files - used_images
+
+        # Удаляем файлы и подсчитываем освобожденное место
+        deleted_count = 0
+        freed_space = 0
+
+        for file in unused_files:
+            file_path = os.path.join(settings.UPLOAD_DIR, file)
+            try:
+                file_size = os.path.getsize(file_path)
+                os.remove(file_path)
+                deleted_count += 1
+                freed_space += file_size
+            except Exception as e:
+                print(f"Error deleting file {file}: {e}")
+
+        freed_space_mb = freed_space / (1024 * 1024)
+
+        return {
+            "status": "success",
+            "deleted_count": deleted_count,
+            "freed_space_mb": freed_space_mb
+        }
+
+    except Exception as e:
+        print(f"Error in cleanup_unused_images: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @wmarket_router.post("/admin/approve_product/{product_id}")
 async def approve_product(product_id: int, session_token=Cookie(default=None)):
     if not session_token:
