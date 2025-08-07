@@ -393,109 +393,107 @@ async def edit_product_post(
         category: str = Form(),
         description: str = Form(),
         current_images: str = Form(),
-        new_images: List[UploadFile] = File(None)):
-    if session_token:
-        users = await get_all_users()
-        payload = await decode_jwt(session_token)
+        product_images: List[UploadFile] = File(None)
+):
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Неавторизованный запрос")
 
-        if (payload.get("tg_id") in users
-                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            product = await get_product_info(product_id, payload.get("tg_id"))
-            if not product or product[1] != payload.get("tg_id"):
-                return JSONResponse({"status": "error", "message": "Недостаточно прав"}, status_code=403)
+    payload = await decode_jwt(session_token)
+    print(f"Editing product {product_id} for user {payload.get('tg_id')}")  # Debug
 
+    product = await get_product_info(product_id, payload.get("tg_id"))
+    if not product or product[1] != payload.get("tg_id"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+
+    try:
+        # Debug current images
+        print(f"Raw current_images: {current_images}")  # Debug
+
+        # Process existing images
+        existing_images = []
+        if current_images:
             try:
-                # Обрабатываем текущие изображения
-                existing_images = json.loads(current_images) if current_images else []
+                temp_images = json.loads(current_images)
+                print(f"Parsed current images: {temp_images}")  # Debug
+                existing_images = [img for img in temp_images if
+                                   img and isinstance(img, str) and img.startswith('static/uploads/')]
+            except json.JSONDecodeError as e:
+                print(f"Error parsing current_images: {e}")  # Debug
+                existing_images = []
 
-                # Обрабатываем новые изображения
-                new_image_urls = []
-                if new_images:
-                    # Ограничиваем количество изображений до 10
-                    if len(existing_images) + len(new_images) > 10:
-                        raise HTTPException(status_code=400, detail="Можно загрузить не более 10 изображений")
+        print(f"Filtered existing images: {existing_images}")  # Debug
 
-                    for image in new_images:
-                        try:
-                            # Проверяем тип содержимого файла
-                            content_type = image.content_type
-                            if content_type not in ['image/jpeg', 'image/png', 'image/gif']:
-                                raise HTTPException(status_code=400,
-                                                    detail=f"Неподдерживаемый формат изображения: {content_type}")
+        # Process new images
+        new_image_urls = []
+        if product_images:
+            print(f"Processing {len(product_images)} new images")  # Debug
+            for image in product_images:
+                try:
+                    print(f"Processing image: {image.filename}")  # Debug
+                    file_content = await image.read()
+                    if not file_content:
+                        print("Empty file content, skipping")  # Debug
+                        continue
 
-                            file_content = await image.read()
+                    file_ext = os.path.splitext(image.filename)[1].lower()
+                    if file_ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                        print(f"Invalid file extension: {file_ext}, skipping")  # Debug
+                        continue
 
-                            # Проверяем сигнатуры файлов для дополнительной валидации
-                            if len(file_content) < 12:  # Минимальный размер для проверки сигнатур
-                                raise HTTPException(status_code=400, detail="Файл слишком мал для изображения")
+                    filename = f"{uuid.uuid4()}{file_ext}"
+                    file_path = os.path.join(settings.UPLOAD_DIR, filename)
 
-                            # Проверка сигнатур популярных форматов
-                            if (file_content.startswith(b'\xFF\xD8\xFF') or  # JPEG
-                                    file_content.startswith(b'\x89PNG\r\n\x1a\n') or  # PNG
-                                    file_content.startswith(b'GIF87a') or  # GIF
-                                    file_content.startswith(b'GIF89a')):
-                                pass  # Valid image
-                            else:
-                                raise HTTPException(status_code=400, detail="Файл не является допустимым изображением")
+                    with open(file_path, "wb") as buffer:
+                        buffer.write(file_content)
 
-                            file_ext = os.path.splitext(image.filename)[1].lower()
-                            if file_ext not in ['.jpg', '.jpeg', '.png', '.gif']:
-                                file_ext = '.jpg'  # Default extension if not provided or invalid
+                    new_url = f"static/uploads/{filename}"
+                    new_image_urls.append(new_url)
+                    print(f"Saved new image: {new_url}")  # Debug
+                except Exception as e:
+                    print(f"Error processing image: {str(e)}")  # Debug
+                    continue
 
-                            filename = f"{uuid.uuid4()}{file_ext}"
-                            file_path = os.path.join(settings.UPLOAD_DIR, filename)
+        # Combine images
+        all_images = existing_images + new_image_urls
+        print(f"Final image list: {all_images}")  # Debug
 
-                            with open(file_path, "wb") as buffer:
-                                buffer.write(file_content)
+        if not all_images:
+            raise HTTPException(status_code=400, detail="Должна быть хотя бы одна фотография")
 
-                            new_image_urls.append(f"static/uploads/{filename}")
-                        except Exception as e:
-                            print(f"Error processing image {image.filename}: {str(e)}")
-                            continue  # Пропускаем проблемные файлы вместо падения всего запроса
+        # Update product data
+        update_data = {
+            "product_name": title,
+            "product_price": price,
+            "category_name": category,
+            "product_description": description,
+            "product_image_url": json.dumps(all_images),
+            "active": False  # Send back to moderation
+        }
 
-                # Объединяем существующие и новые изображения
-                all_images = existing_images + new_image_urls
+        print(f"Updating product with data: {update_data}")  # Debug
+        update_res = await update_product_post(product_id, update_data)
 
-                if not all_images:
-                    raise HTTPException(status_code=400, detail="Должна быть хотя бы одна фотография")
+        if update_res:
+            print("Product updated successfully")  # Debug
+            await send_notification_to_user(
+                payload.get("tg_id"),
+                "✅ Ваше объявление обновлено и отправлено на проверку"
+            )
 
-                # Обновляем данные
-                update_data = {
-                    "product_name": title,
-                    "product_price": price,
-                    "category_name": category,
-                    "product_description": description,
-                    "product_image_url": json.dumps(all_images),
-                    "active": False  # Отправляем на модерацию
-                }
+            return JSONResponse({
+                "status": "success",
+                "redirect": "/ads_review?tab=moderation"
+            })
+        else:
+            print("Failed to update product")  # Debug
+            raise HTTPException(status_code=500, detail="Ошибка при обновлении товара")
 
-                update_res = await update_product_post(product_id, update_data)
-                if update_res:
-                    # Отправляем уведомление пользователю
-                    await send_notification_to_user(
-                        payload.get("tg_id"),
-                        "✅ Ваше объявление отправлено на проверку\n\n"
-                        f"📌 Название: {title}\n"
-                        f"⚙️ Категория: {category}\n"
-                        f"💰 Цена: {price} ₽\n"
-                        f"📸 Фотографий: {len(all_images)}\n\n"
-                        "Обычно проверка занимает до 24 часов."
-                    )
-
-                    return JSONResponse({
-                        "status": "success",
-                        "redirect": "/ads_review?tab=moderation"
-                    })
-                else:
-                    return JSONResponse({"status": "error", "message": "Ошибка обновления"}, status_code=500)
-
-            except HTTPException as he:
-                raise he
-            except Exception as e:
-                print(str(e))
-                raise HTTPException(status_code=500, detail="Ошибка при обновлении товара")
-
-    return JSONResponse({"status": "error", "message": "Неавторизованный запрос"}, status_code=401)
+    except HTTPException as he:
+        print(f"HTTPException: {he}")  # Debug
+        raise he
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")  # Debug
+        raise HTTPException(status_code=500, detail="Ошибка при обновлении товара")
 
 
 @wmarket_router.get('/ads/{product_id}')

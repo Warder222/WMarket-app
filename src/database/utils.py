@@ -461,11 +461,6 @@ async def get_all_moderation_products():
             # all_favs = await get_all_user_favs(tg_id)
             # [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
 
-            for product in all_products:
-                image_urls = json.loads(product[3]) if product[3] else []
-                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
-                product[3] = first_image
-
             return all_products
         except Exception as exc:
             print(f"Error: {exc}")

@@ -1226,15 +1226,18 @@
             // Функция для обновления счетчика оставшихся слотов
             function updateRemainingSlots() {
                 const currentCount = imageGallery.querySelectorAll('.gallery-item').length;
-                remainingSlotsSpan.textContent = 10 - currentCount;
-                addImagesInput.disabled = currentCount >= 10;
+                const remaining = 10 - currentCount;
+                remainingSlotsSpan.textContent = remaining;
+                addImagesInput.disabled = remaining <= 0;
+                console.log(`Remaining image slots: ${remaining}`); // Debug
             }
             
             // Удаление изображения
             imageGallery.addEventListener('click', (e) => {
                 if (e.target.classList.contains('remove-image-btn')) {
+                    console.log('Removing image'); // Debug
                     e.target.closest('.gallery-item').remove();
-                    updateImagesList();
+                    updateRemainingSlots();
                 }
             });
             
@@ -1247,14 +1250,12 @@
                     const prevItem = item.previousElementSibling;
                     if (prevItem) {
                         item.parentNode.insertBefore(item, prevItem);
-                        updateImagesList();
                         updateMoveButtons();
                     }
                 } else if (e.target.classList.contains('move-right-btn')) {
                     const nextItem = item.nextElementSibling;
                     if (nextItem) {
                         item.parentNode.insertBefore(nextItem, item);
-                        updateImagesList();
                         updateMoveButtons();
                     }
                 }
@@ -1273,79 +1274,129 @@
             }
             
             // Добавление новых изображений
-            addImagesInput.addEventListener('change', (e) => {
+            addImagesInput.addEventListener('change', async (e) => {
                 const files = e.target.files;
                 const currentCount = imageGallery.querySelectorAll('.gallery-item').length;
                 const remainingSlots = 10 - currentCount;
-                
+
                 if (files.length > remainingSlots) {
                     alert(`Можно добавить только ${remainingSlots} фотографий`);
                     return;
                 }
-                
+
                 for (let i = 0; i < Math.min(files.length, remainingSlots); i++) {
                     const file = files[i];
                     const reader = new FileReader();
+                    const item = document.createElement('div');
+                    item.className = 'gallery-item';
                     
-                    reader.onload = (event) => {
-                        const imgUrl = event.target.result;
-                        const item = document.createElement('div');
-                        item.className = 'gallery-item';
-                        item.dataset.image = imgUrl;
-                        
-                        item.innerHTML = `
-                            <img src="${imgUrl}" alt="Новое фото">
-                            <button type="button" class="remove-image-btn" data-index="${currentCount + i}">×</button>
-                            <div class="image-actions">
-                                <button type="button" class="move-left-btn">←</button>
-                                <button type="button" class="move-right-btn">→</button>
-                            </div>
-                        `;
-                        
-                        imageGallery.appendChild(item);
-                        updateImagesList();
-                        updateMoveButtons();
-                    };
+                    // Генерируем уникальный ID для изображения
+                    const imageId = 'img-' + Date.now() + '-' + i;
+                    item.dataset.image = imageId;
+                    item.dataset.id = imageId;
+
+                    const img = document.createElement('img');
+                    img.file = file; // Сохраняем ссылку на файл
+                    item.appendChild(img);
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'remove-image-btn';
+                    removeBtn.textContent = '×';
+                    item.appendChild(removeBtn);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'image-actions';
                     
+                    const leftBtn = document.createElement('button');
+                    leftBtn.type = 'button';
+                    leftBtn.className = 'move-left-btn';
+                    leftBtn.textContent = '←';
+                    actions.appendChild(leftBtn);
+                    
+                    const rightBtn = document.createElement('button');
+                    rightBtn.type = 'button';
+                    rightBtn.className = 'move-right-btn';
+                    rightBtn.textContent = '→';
+                    actions.appendChild(rightBtn);
+                    
+                    item.appendChild(actions);
+                    imageGallery.appendChild(item);
+
+                    reader.onload = (function(aImg) {
+                        return function(e) {
+                            aImg.src = e.target.result;
+                        };
+                    })(img);
                     reader.readAsDataURL(file);
                 }
-                
-                e.target.value = '';
+
+                updateRemainingSlots();
+                e.target.value = ''; // Reset input
             });
+
+            function removeImage(imageId) {
+                // Удаляем из массива
+                uploadedImages = uploadedImages.filter(img => img.id !== imageId);
+                
+                // Удаляем из DOM
+                const elementToRemove = document.querySelector(`.gallery-item[data-id="${imageId}"]`);
+                if (elementToRemove) {
+                    imageGallery.removeChild(elementToRemove);
+                }
+                updateRemainingSlots();
+            }
             
             // Инициализация
             updateMoveButtons();
             updateRemainingSlots();
             
             // Обработка формы редактирования
-            const editForm = document.getElementById('editForm');
-            if (editForm) {
-                editForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const formData = new FormData(editForm);
-                    const currentImages = JSON.parse(currentImagesInput.value);
-                    formData.set('current_images', currentImagesInput.value);
-                    
-                    try {
-                        const response = await fetch('/edit_product', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const result = await response.json();
-                        if (result.status === "success") {
-                            alert('Объявление успешно обновлено и отправлено на проверку!');
-                            window.location.href = '/ads_review?tab=moderation';
-                        } else {
-                            alert(result.message || 'Ошибка при обновлении объявления');
-                        }
-                    } catch (error) {
-                        console.error('Ошибка:', error);
-                        alert('Произошла ошибка при отправке данных');
+            editForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                
+                // Добавляем текстовые поля
+                formData.append('product_id', document.querySelector('input[name="product_id"]').value);
+                formData.append('title', document.getElementById('editTitle').value);
+                formData.append('price', document.getElementById('editPrice').value);
+                formData.append('category', document.getElementById('editCategory').value);
+                formData.append('description', document.getElementById('editDescription').value);
+                
+                // Собираем все изображения (и существующие, и новые)
+                const imageItems = Array.from(imageGallery.querySelectorAll('.gallery-item'));
+                const currentImages = imageItems.map(item => item.dataset.image);
+                
+                // Добавляем текущие изображения как JSON
+                formData.append('current_images', JSON.stringify(currentImages));
+                
+                // Добавляем новые файлы (те, которые загружены пользователем)
+                imageItems.forEach(item => {
+                    const img = item.querySelector('img');
+                    if (img.file) { // Если есть file - это новое изображение
+                        formData.append('product_images', img.file);
                     }
                 });
-            }
+                
+                try {
+                    const response = await fetch('/edit_product', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    if (result.status === "success") {
+                        alert('Объявление успешно обновлено!');
+                        window.location.href = result.redirect || '/ads_review?tab=moderation';
+                    } else {
+                        alert(result.message || 'Ошибка при обновлении объявления');
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при отправке данных');
+                }
+            });
             
             // Проверка существования чата
             async function checkChatExists() {
