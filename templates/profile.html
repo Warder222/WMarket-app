@@ -805,42 +805,49 @@
             e.stopPropagation();
             dropdownMenu.classList.remove('show');
             
-            // Формируем реферальную ссылку
             const referralLink = `https://t.me/test_tma8_bot?startapp=ref_{{ user_info[0] }}`;
             const message = `Покупай и продавай прямо в Телеграмме:\n\n${referralLink}`;
             
+            console.log('Share button clicked'); // Для отладки
+            
             // Проверяем, работает ли в Telegram WebApp
             if (window.Telegram && window.Telegram.WebApp) {
-                // В Telegram WebApp используем метод shareTelegram
-                if (window.Telegram.WebApp.shareTelegram) {
+                console.log('Telegram WebApp detected');
+                
+                // Пробуем разные методы поделиться
+                if (window.Telegram.WebApp.openTelegramLink) {
+                    window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
+                } else if (window.Telegram.WebApp.shareTelegram) {
                     window.Telegram.WebApp.shareTelegram({
                         text: message,
                         url: referralLink
                     });
-                } else {
-                    // Если метод shareTelegram недоступен, используем sendData
+                } else if (window.Telegram.WebApp.sendData) {
                     window.Telegram.WebApp.sendData(JSON.stringify({
                         action: 'share_referral',
                         text: message,
                         url: referralLink
                     }));
+                } else {
+                    fallbackShare(message);
                 }
             } else {
-                // В браузере - копируем в буфер обмена
-                try {
-                    navigator.clipboard.writeText(message).then(function() {
-                        const profileUrl = window.location.href;
-                        
-                        // Открываем Telegram с подготовленным сообщением
-                        window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, '_blank');
-                    }).catch(function() {
-                        prompt('Скопируйте реферальную ссылку:', message);
-                    });
-                } catch (e) {
-                    prompt('Скопируйте реферальную ссылку:', message);
-                }
+                fallbackShare(message);
             }
         });
+
+        function fallbackShare(message) {
+            try {
+                navigator.clipboard.writeText(message).then(function() {
+                    alert('Реферальная ссылка скопирована в буфер обмена!');
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, '_blank');
+                }).catch(function() {
+                    prompt('Скопируйте реферальную ссылку:', message);
+                });
+            } catch (e) {
+                prompt('Скопируйте реферальную ссылку:', message);
+            }
+        }
     });
 </script>
 {% endblock %}
