@@ -182,22 +182,35 @@ async def get_all_products_from_category(category_name, tg_id):
         try:
             q = select(Product).filter_by(category_name=category_name, active=True).order_by(desc(Product.created_at))
             result = await db.execute(q)
-            products = result.scalars()
-            # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-tg_id / 7-is_fav
-            all_products = [[prod.product_name, prod.product_price,
-                             prod.product_description, prod.product_image_url[0],
-                             prod.id, prod.created_at, prod.tg_id] for prod in products]
-            all_favs = await get_all_user_favs(tg_id)
-            all_products = [prod.append(True) if prod[4] in all_favs else prod.append(False) for prod in all_products]
+            products = result.scalars().all()
 
-            for product in all_products:
-                image_urls = json.loads(product[3]) if product[3] else []
+            if not products:
+                return []
+
+            all_favs = await get_all_user_favs(tg_id)
+
+            all_products = []
+            for prod in products:
+                image_urls = json.loads(prod.product_image_url) if prod.product_image_url else []
                 first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
-                product[3] = first_image
+
+                # Проверяем, что пользователь не автор товара
+                is_fav = prod.id in all_favs if prod.tg_id != tg_id else False
+
+                all_products.append([
+                    prod.product_name,
+                    prod.product_price,
+                    prod.product_description,
+                    first_image,
+                    prod.id,
+                    prod.created_at,
+                    prod.tg_id,
+                    is_fav
+                ])
 
             return all_products
         except Exception as exc:
-            print(f"Error: {exc}")
+            print(f"Error in get_all_products_from_category: {exc}")
             return []
 
 

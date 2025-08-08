@@ -146,6 +146,7 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
                 "dig_cats": dig_cats,
                 "products": products,
                 "now": now,
+                "user_tg_id": payload.get("tg_id"),
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
                 "active_deals_count": active_deals_count
