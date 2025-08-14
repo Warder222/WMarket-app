@@ -300,19 +300,27 @@
     <script>
     // Сохранение позиции прокрутки перед обновлением страницы
         window.addEventListener('beforeunload', function() {
-            sessionStorage.setItem('scrollPosition', window.scrollY);
+            // Сохраняем позицию только если это список объявлений или магазин
+            const path = window.location.pathname;
+            if (path === '/' || path === '/ads_review' || path === '/favs' || path === '/deals') {
+                sessionStorage.setItem('scrollPosition', window.scrollY);
+            }
         });
 
         // Восстановление позиции прокрутки после загрузки страницы
         document.addEventListener('DOMContentLoaded', function() {
-            // Ждём немного, чтобы контент успел загрузиться
-            setTimeout(function() {
-                const savedPosition = sessionStorage.getItem('scrollPosition');
-                if (savedPosition) {
+            const savedPosition = sessionStorage.getItem('scrollPosition');
+            
+            // Восстанавливаем позицию ТОЛЬКО если мы на той же странице (например, после refresh)
+            const path = window.location.pathname;
+            if ((path === '/' || path === '/ads_review' || path === '/favs' || path === '/deals') && savedPosition) {
+                // Задержка, чтобы контент успел загрузиться
+                setTimeout(() => {
                     window.scrollTo(0, parseInt(savedPosition));
                     sessionStorage.removeItem('scrollPosition');
-                }
-            }, 100);
+                }, 50);
+            }
+            // ⚠️ На страницах вроде /ads/123 — НЕ восстанавливаем
         });
     </script>
     <script>

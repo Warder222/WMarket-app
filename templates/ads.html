@@ -235,16 +235,6 @@
             align-items: center;
         }
 
-        .modal-content {
-            background-color: var(--bg-color);
-            padding: 20px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
         .modal-title {
             font-size: 20px;
             font-weight: bold;
@@ -1434,6 +1424,14 @@
             const galleryNext = document.querySelector('.gallery-next');
             const galleryDots = document.querySelectorAll('.gallery-dot');
             let currentSlide = 0;
+
+            if (gallerySlides.length <= 1) {
+                galleryPrev.style.display = 'none';
+                galleryNext.style.display = 'none';
+            } else {
+                galleryPrev.style.display = 'flex';
+                galleryNext.style.display = 'flex';
+            }
 
             // В обработчике изменения слайдов добавьте:
             function showSlide(index) {
