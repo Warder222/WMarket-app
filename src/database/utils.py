@@ -177,11 +177,19 @@ async def get_all_products(tg_id):
             return []
 
 
-async def get_all_products_from_category(category_name, tg_id):
+async def get_all_products_from_category(category_name: str, tg_id: int, limit: int = None, offset: int = None):
     async with async_session_maker() as db:
         try:
-            q = select(Product).filter_by(category_name=category_name, active=True).order_by(desc(Product.created_at))
-            result = await db.execute(q)
+            query = select(Product) \
+                .filter_by(category_name=category_name, active=True) \
+                .order_by(desc(Product.created_at))
+
+            if limit is not None:
+                query = query.limit(limit)
+            if offset is not None:
+                query = query.offset(offset)
+
+            result = await db.execute(query)
             products = result.scalars().all()
 
             if not products:
@@ -194,7 +202,6 @@ async def get_all_products_from_category(category_name, tg_id):
                 image_urls = json.loads(prod.product_image_url) if prod.product_image_url else []
                 first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
 
-                # Проверяем, что пользователь не автор товара
                 is_fav = prod.id in all_favs if prod.tg_id != tg_id else False
 
                 all_products.append([
@@ -203,7 +210,7 @@ async def get_all_products_from_category(category_name, tg_id):
                     prod.product_description,
                     first_image,
                     prod.id,
-                    prod.created_at,
+                    prod.created_at,  # Оставляем как datetime объект
                     prod.tg_id,
                     is_fav
                 ])

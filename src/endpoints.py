@@ -157,6 +157,62 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
     return response
 
 
+@wmarket_router.get("/api/products")
+async def get_products(
+        request: Request,
+        page: int = 1,
+        category: str = None,
+        search: str = None,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    per_page = 20  # Количество товаров на странице
+
+    try:
+        if category:
+            products = await get_all_products_from_category(category, payload.get("tg_id"))
+        else:
+            products = await get_all_products(payload.get("tg_id"))
+
+        # Фильтрация по поисковому запросу
+        if search:
+            search_lower = search.lower()
+            products = [p for p in products if search_lower in p[0].lower()]
+
+        # Пагинация
+        total = len(products)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_products = products[start:end]
+
+        # Преобразуем даты в строки и добавляем флаг "новый"
+        now = datetime.now(timezone.utc)
+        formatted_products = []
+        for product in paginated_products:
+            # Преобразуем datetime в строку
+            created_at_str = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else product[
+                5]
+            is_new = (now - product[5]).total_seconds() < 86400 if isinstance(product[5], datetime) else False
+
+            # Создаем новый список с преобразованными данными
+            formatted_product = list(product)
+            formatted_product[5] = created_at_str
+            formatted_product.append(is_new)
+            formatted_products.append(formatted_product)
+
+        return JSONResponse({
+            "status": "success",
+            "products": formatted_products,
+            "total": total
+        })
+    except Exception as e:
+        print(f"Error in get_products: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 @wmarket_router.get('/add_product')
 async def add_product(request: Request, session_token=Cookie(default=None)):
     if session_token:
@@ -505,9 +561,10 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            # 0-product_id / 1-tg_id / 2-name / 3-price / 4-description / 5-image_url / 6-category_name / 7-created_at
-            # 8-is_fav
             product_info = await get_product_info_with_all_photos(product_id, payload.get("tg_id"))
+            if not product_info:
+                return RedirectResponse(url="/store", status_code=303)
+
             categories = await get_all_not_digit_categories()
             user_info = await get_user_info(product_info[1])
             positive_reviews = user_info[3]
@@ -517,6 +574,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             admin_res = await is_admin(payload.get("tg_id"))
             fav_count = await get_count_fav_add(product_id)
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+
             context = {
                 "request": request,
                 "product_info": product_info,
@@ -533,8 +591,7 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             }
             return templates.TemplateResponse("ads.html", context=context)
 
-    response = RedirectResponse(url="/store", status_code=303)
-    return response
+    return RedirectResponse(url="/store", status_code=303)
 
 
 # fav___________________________________________________________________________________________________________________
@@ -569,41 +626,31 @@ async def favs(request: Request, session_token=Cookie(default=None)):
 @wmarket_router.post("/add_fav")
 async def fav_add_post(request: Request, session_token=Cookie(default=None)):
     if session_token:
-        users = await get_all_users()
         payload = await decode_jwt(session_token)
+        form_data = await request.form()
+        product_id = form_data.get("fav_id")
+        await add_fav(payload.get("tg_id"), int(product_id))
 
-        if (payload.get("tg_id") in users
-                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JSONResponse({"status": "success"})
 
-            form_data = await request.form()
-            product_id = form_data.get("fav_id")
-            await add_fav(payload.get("tg_id"), int(product_id))
-
-            referer = request.headers.get("referer", "/store")
-            return RedirectResponse(url=referer, status_code=303)
-
-    response = RedirectResponse(url="/store", status_code=303)
-    return response
+        return RedirectResponse(url=request.headers.get("referer", "/store"), status_code=303)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @wmarket_router.post("/del_fav")
 async def fav_dell_post(request: Request, session_token=Cookie(default=None)):
     if session_token:
-        users = await get_all_users()
         payload = await decode_jwt(session_token)
+        form_data = await request.form()
+        product_id = form_data.get("fav_id")
+        await del_fav(payload.get("tg_id"), int(product_id))
 
-        if (payload.get("tg_id") in users
-                and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JSONResponse({"status": "success"})
 
-            form_data = await request.form()
-            product_id = form_data.get("fav_id")
-            await del_fav(payload.get("tg_id"), int(product_id))
-
-            referer = request.headers.get("referer", "/store")
-            return RedirectResponse(url=referer, status_code=303)
-
-    response = RedirectResponse(url="/store", status_code=303)
-    return response
+        return RedirectResponse(url=request.headers.get("referer", "/store"), status_code=303)
+    return RedirectResponse(url="/", status_code=303)
 
 
 # profile_______________________________________________________________________________________________________________
