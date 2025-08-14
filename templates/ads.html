@@ -789,6 +789,48 @@
             opacity: 0.3;
             cursor: not-allowed;
         }
+
+        .ad-favorite, .ad-favorite-del {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            transform-origin: center;
+        }
+
+        .ad-favorite svg {
+            fill: none;
+            stroke: currentColor;
+            transition: all 0.3s ease;
+        }
+
+        .ad-favorite-del svg {
+            fill: currentColor;
+            stroke: currentColor;
+            animation: pulse 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* Остальные существующие стили остаются без изменений */
+        .ad-container {
+            padding: 16px;
+            padding-bottom: 80px;
+            position: relative;
+        }
+
+        .ad-image {
+            height: 50vh;
+            width: 100%;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+        }
+
+        /* ... остальные стили ... */
     </style>
 {% endblock %}
 
@@ -1123,24 +1165,63 @@
             }
 
             // Обработка кнопок избранного и жалоб
-            document.body.addEventListener('click', (e) => {
+            document.body.addEventListener('click', async (e) => {
                 const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+                
                 if (favBtn) {
                     e.preventDefault();
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
+                    e.stopPropagation();
                     
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'fav_id';
-                    input.value = favBtn.dataset.id;
+                    const productId = favBtn.dataset.id;
+                    const isFavorite = favBtn.classList.contains('ad-favorite-del');
+                    const action = isFavorite ? '/del_fav' : '/add_fav';
                     
-                    form.appendChild(input);
-                    document.body.appendChild(form);
-                    form.submit();
+                    try {
+                        // Сохраняем позицию скролла
+                        const scrollPosition = window.scrollY;
+                        
+                        // Показываем анимацию
+                        favBtn.style.transform = 'scale(1.2)';
+                        setTimeout(() => {
+                            favBtn.style.transform = 'scale(1)';
+                        }, 300);
+                        
+                        const response = await fetch(action, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: `fav_id=${productId}`
+                        });
+                        
+                        if (response.ok) {
+                            // Обновляем иконку без перезагрузки страницы
+                            if (isFavorite) {
+                                favBtn.innerHTML = `
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                `;
+                                favBtn.classList.remove('ad-favorite-del');
+                                favBtn.classList.add('ad-favorite');
+                            } else {
+                                favBtn.innerHTML = `
+                                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                `;
+                                favBtn.classList.remove('ad-favorite');
+                                favBtn.classList.add('ad-favorite-del');
+                            }
+                            
+                            // Восстанавливаем позицию скролла
+                            window.scrollTo(0, scrollPosition);
+                        }
+                    } catch (error) {
+                        console.error('Error updating favorite:', error);
+                    }
                 }
-
+                
                 const reportBtn = e.target.closest('.ad-report');
                 if (reportBtn) {
                     e.preventDefault();
