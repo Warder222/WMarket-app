@@ -320,6 +320,41 @@
     .toast.show {
         opacity: 1;
     }
+
+    /* Добавляем стили для избранного */
+    .ad-favorite, .ad-favorite-del {
+        float: right;
+        position: relative;
+        top: 20px;
+        z-index: 2;
+        pointer-events: auto;
+    }
+
+    .ad-favorite svg {
+        fill: none;
+        stroke: currentColor;
+        transition: all 0.3s ease;
+    }
+
+    .ad-favorite-del svg {
+        fill: currentColor;
+        stroke: currentColor;
+        animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.3); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    .loading-indicator {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 20px;
+        color: #999;
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -337,122 +372,30 @@
     <main class="main-content" id="mainContent">
         <!-- Активные объявления -->
         <div class="tab-content" id="activeTab">
-            {% if active_products %}
-                <div class="ads-grid">
-                    {% for prod in active_products %}
-                        <div class="ad-card {% if prod[7] %}reserved{% endif %}" data-id="{{ prod[6] }}">
-                            {% if prod[7] %}
-                                <div class="reserved-badge">Забронировано</div>
-                            {% endif %}
-                            <img src="/{{ prod[3] }}" class="ad-image">
-                            <div class="ad-details">
-                                <div class="ad-title">{{ prod[0] }}</div>
-                                <div class="ad-price">{{ prod[1] }} ₽</div>
-                                <div class="ad-description">
-                                    <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
-                                </div>
-                            </div>
-                            {% if not prod[7] %}
-                                <div class="ad-actions">
-                                    <div class="action-group archive-group">
-                                        <button class="ad-action-btn archive-btn" data-id="{{ prod[6] }}" title="В архив">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                                                <rect x="1" y="3" width="22" height="5"></rect>
-                                                <line x1="10" y1="12" x2="14" y2="12"></line>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div class="action-group">
-                                        <button class="ad-action-btn delete-btn" data-id="{{ prod[6] }}" title="Удалить">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="no-ads-container">
-                    <div class="no-ads">Нет активных объявлений</div>
-                </div>
-            {% endif %}
+            <div class="ads-grid" id="activeAdsGrid"></div>
+            <div class="no-ads-container" id="activeNoAds" style="display: none;">
+                <div class="no-ads">Нет активных объявлений</div>
+            </div>
         </div>
 
         <!-- Объявления на проверке -->
         <div class="tab-content" id="moderationTab" style="display: none;">
-            {% if moderation_products %}
-                <div class="ads-grid">
-                    {% for prod in moderation_products %}
-                        <div class="ad-card moderation" data-id="{{ prod[6] }}">
-                            <div class="moderation-badge">На проверке</div>
-                            <img src="/{{ prod[3] }}" class="ad-image">
-                            <div class="ad-details">
-                                <div class="ad-title">{{ prod[0] }}</div>
-                                <div class="ad-price">{{ prod[1] }} ₽</div>
-                                <div class="ad-description">
-                                    <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="no-ads-container">
-                    <div class="no-ads">Нет объявлений на проверке</div>
-                </div>
-            {% endif %}
+            <div class="ads-grid" id="moderationAdsGrid"></div>
+            <div class="no-ads-container" id="moderationNoAds" style="display: none;">
+                <div class="no-ads">Нет объявлений на проверке</div>
+            </div>
         </div>
 
         <!-- Архивные объявления -->
         <div class="tab-content" id="archivedTab" style="display: none;">
-            {% if archived_products %}
-                <div class="ads-grid">
-                    {% for prod in archived_products %}
-                        <div class="ad-card archived" data-id="{{ prod[6] }}">
-                            <div class="archived-badge">В архиве</div>
-                            <img src="/{{ prod[3] }}" class="ad-image">
-                            <div class="ad-details">
-                                <div class="ad-title">{{ prod[0] }}</div>
-                                <div class="ad-price">{{ prod[1] }} ₽</div>
-                                <div class="ad-description">
-                                    <b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}
-                                </div>
-                            </div>
-                            <div class="ad-actions">
-                                <div class="action-group archive-group">
-                                    <button class="ad-action-btn restore-btn" data-id="{{ prod[6] }}" title="Восстановить">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <div class="action-group">
-                                    <button class="ad-action-btn delete-btn" data-id="{{ prod[6] }}" title="Удалить">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="no-ads-container">
-                    <div class="no-ads">Нет архивных объявлений</div>
-                </div>
-            {% endif %}
+            <div class="ads-grid" id="archivedAdsGrid"></div>
+            <div class="no-ads-container" id="archivedNoAds" style="display: none;">
+                <div class="no-ads">Нет архивных объявлений</div>
+            </div>
+        </div>
+
+        <div class="loading-indicator" id="loadingIndicator">
+            Загрузка товаров...
         </div>
     </main>
 
@@ -469,15 +412,17 @@
 {% block scripts %}
 <script src="/static/js/price_conv.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Устанавливаем активную вкладку на основе параметра URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTab = urlParams.get('tab') || 'active';
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Инициализация переменных для пагинации
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+        let currentTab = "{{ request.query_params.get('tab', 'active') }}";
         
-        // Удаляем класс active у всех вкладок и добавляем только активной
+        // Устанавливаем активную вкладку
         document.querySelectorAll('.tab').forEach(tab => {
             tab.classList.remove('active');
-            if (tab.dataset.tab === activeTab) {
+            if (tab.dataset.tab === currentTab) {
                 tab.classList.add('active');
             }
         });
@@ -486,19 +431,158 @@
         document.querySelectorAll('.tab-content').forEach(content => {
             content.style.display = 'none';
         });
-        document.getElementById(`${activeTab}Tab`).style.display = 'block';
+        document.getElementById(`${currentTab}Tab`).style.display = 'block';
 
         // Обработчики кликов по вкладкам
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
                 const tabName = tab.dataset.tab;
-                // Перенаправляем на ту же страницу с параметром tab
-                window.location.href = `?tab=${tabName}`;
+                currentTab = tabName;
+                currentPage = 1;
+                hasMore = true;
+                
+                // Обновляем UI
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+                document.getElementById(`${tabName}Tab`).style.display = 'block';
+                
+                // Очищаем предыдущие товары и загружаем новые
+                document.getElementById(`${tabName}AdsGrid`).innerHTML = '';
+                document.getElementById(`${tabName}NoAds`).style.display = 'none';
+                
+                // Обновляем URL без перезагрузки страницы
+                history.pushState(null, '', `?tab=${tabName}`);
+                
+                loadProducts(currentPage, tabName);
             });
         });
 
-        // Остальной код обработчиков кнопок остается без изменений
+        // Функция для загрузки товаров
+        async function loadProducts(page, tab = 'active') {
+            if (isLoading || !hasMore) return;
+            
+            isLoading = true;
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/user_review_products?page=${page}&tab=${tab}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+                
+                if (data.products.length === 0) {
+                    hasMore = false;
+                    
+                    // Показываем сообщение "Нет объявлений", если это первая страница
+                    if (page === 1) {
+                        document.getElementById(`${tab}NoAds`).style.display = 'block';
+                    }
+                } else {
+                    renderProducts(data.products, tab);
+                    currentPage = page;
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+            } finally {
+                isLoading = false;
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        // Функция для форматирования даты
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const [datePart, timePart] = dateString.split(' ');
+            const [year, month, day] = datePart.split('-');
+            return `${day}.${month}.${year.slice(2)}`;
+        }
+
+        // Функция для отрисовки товаров
+        function renderProducts(products, tab) {
+            const grid = document.getElementById(`${tab}AdsGrid`);
+            
+            products.forEach(product => {
+                const isReserved = product[9] || false;
+                const isModeration = tab === 'moderation';
+                const isArchived = tab === 'archived';
+                
+                const productHtml = `
+                    <div class="ad-card ${isReserved ? 'reserved' : ''} ${isModeration ? 'moderation' : ''} ${isArchived ? 'archived' : ''}" data-id="${product[4]}">
+                        ${isReserved ? '<div class="reserved-badge">Забронировано</div>' : ''}
+                        ${isModeration ? '<div class="moderation-badge">На проверке</div>' : ''}
+                        ${isArchived ? '<div class="archived-badge">В архиве</div>' : ''}
+                        
+                        <img src="/${product[3]}" class="ad-image">
+                        <div class="ad-details">
+                            <div class="ad-title">${product[0]}</div>
+                            <div class="ad-price">${product[1]} ₽</div>
+                            <div class="ad-description">
+                                <b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}
+                            </div>
+                        </div>
+                        
+                        ${!isModeration ? `
+                            <div class="ad-actions">
+                                ${tab === 'active' && !isReserved ? `
+                                    <div class="action-group archive-group">
+                                        <button class="ad-action-btn archive-btn" data-id="${product[4]}" title="В архив">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                                                <rect x="1" y="3" width="22" height="5"></rect>
+                                                <line x1="10" y1="12" x2="14" y2="12"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                
+                                ${tab === 'archived' ? `
+                                    <div class="action-group archive-group">
+                                        <button class="ad-action-btn restore-btn" data-id="${product[4]}" title="Восстановить">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="action-group">
+                                    <button class="ad-action-btn delete-btn" data-id="${product[4]}" title="Удалить">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                grid.insertAdjacentHTML('beforeend', productHtml);
+            });
+            
+            // После отрисовки товаров устанавливаем обработчики событий
+            setupProductClickHandlers();
+        }
+
+        // Обработчик скролла для бесконечной подгрузки
+        window.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            
+            if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading && hasMore) {
+                loadProducts(currentPage + 1, currentTab);
+            }
+        });
+
+        // Обработчики действий с объявлениями
         document.addEventListener('click', async (e) => {
             // Удаление объявления
             if (e.target.closest('.delete-btn')) {
@@ -515,15 +599,11 @@
                             showToast('Объявление удалено');
                             btn.closest('.ad-card').remove();
                             
-                            // Обновляем счетчики, если нет объявлений в текущей вкладке
+                            // Проверяем, остались ли еще объявления
                             const currentTab = document.querySelector('.tab.active').dataset.tab;
-                            const container = document.getElementById(`${currentTab}Tab`);
-                            if (container.querySelectorAll('.ad-card').length === 0) {
-                                container.innerHTML = `
-                                    <div class="no-ads-container">
-                                        <div class="no-ads">Нет ${getTabName(currentTab)} объявлений</div>
-                                    </div>
-                                `;
+                            const grid = document.getElementById(`${currentTab}AdsGrid`);
+                            if (grid.children.length === 0) {
+                                document.getElementById(`${currentTab}NoAds`).style.display = 'block';
                             }
                         } else {
                             showToast('Ошибка при удалении', 'error');
@@ -548,14 +628,10 @@
                         showToast('Объявление отправлено в архив');
                         btn.closest('.ad-card').remove();
                         
-                        // Обновляем активные объявления, если их не осталось
-                        const activeTab = document.getElementById('activeTab');
-                        if (activeTab.querySelectorAll('.ad-card').length === 0) {
-                            activeTab.innerHTML = `
-                                <div class="no-ads-container">
-                                    <div class="no-ads">Нет активных объявлений</div>
-                                </div>
-                            `;
+                        // Проверяем, остались ли еще активные объявления
+                        const activeGrid = document.getElementById('activeAdsGrid');
+                        if (activeGrid.children.length === 0) {
+                            document.getElementById('activeNoAds').style.display = 'block';
                         }
                     } else {
                         showToast('Ошибка при архивировании', 'error');
@@ -579,14 +655,10 @@
                         showToast('Объявление восстановлено');
                         btn.closest('.ad-card').remove();
                         
-                        // Обновляем архивные объявления, если их не осталось
-                        const archivedTab = document.getElementById('archivedTab');
-                        if (archivedTab.querySelectorAll('.ad-card').length === 0) {
-                            archivedTab.innerHTML = `
-                                <div class="no-ads-container">
-                                    <div class="no-ads">Нет архивных объявлений</div>
-                                </div>
-                            `;
+                        // Проверяем, остались ли еще архивные объявления
+                        const archivedGrid = document.getElementById('archivedAdsGrid');
+                        if (archivedGrid.children.length === 0) {
+                            document.getElementById('archivedNoAds').style.display = 'block';
                         }
                     } else {
                         showToast('Ошибка при восстановлении', 'error');
@@ -597,38 +669,23 @@
             }
         });
 
-        function getTabName(tabKey) {
-            const names = {
-                'active': 'активных',
-                'moderation': 'на проверке',
-                'archived': 'архивных'
-            };
-            return names[tabKey] || '';
+        function setupProductClickHandlers() {
+            document.addEventListener('click', (e) => {
+                // Обработка клика по карточке (но игнорируем клики по кнопкам)
+                const card = e.target.closest('.ad-card');
+                if (card && !e.target.closest('.ad-actions') && 
+                    !e.target.closest('.archive-btn') && 
+                    !e.target.closest('.delete-btn') && 
+                    !e.target.closest('.restore-btn')) {
+                    
+                    const productId = card.dataset.id;
+                    window.location.href = `/ads/${productId}`;
+                }
+            });
         }
 
-        document.querySelectorAll('.ad-card:not(.moderation):not(.reserved)').forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (e.target.closest('.ad-actions') || 
-                    e.target.closest('.archive-btn') || 
-                    e.target.closest('.delete-btn') || 
-                    e.target.closest('.restore-btn')) {
-                    return;
-                }
-                
-                const adId = card.dataset.id;
-                window.location.href = `/ads/${adId}`;
-            });
-        });
-
-        // Для объявлений на модерации - полная блокировка
-        document.querySelectorAll('.ad-card.moderation, .ad-card.reserved').forEach(card => {
-            card.style.pointerEvents = 'none';
-            card.querySelectorAll('*').forEach(el => {
-                el.style.pointerEvents = 'none';
-            });
-        });
-
         // Показ уведомления о проверке после добавления товара
+        const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('moderation') === 'true') {
             showToast('Товар отправлен на проверку');
             history.replaceState(null, '', window.location.pathname);
@@ -643,6 +700,9 @@
                 toast.classList.remove('show');
             }, 3000);
         }
+
+        // Загружаем первую страницу товаров
+        loadProducts(currentPage, currentTab);
     });
 </script>
 {% endblock %}

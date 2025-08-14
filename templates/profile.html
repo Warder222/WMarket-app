@@ -496,6 +496,37 @@
         padding: 40px 20px;
         color: var(--secondary-text);
     }
+    
+    .loading-indicator {
+        text-align: center;
+        padding: 20px;
+        color: #999;
+        display: none;
+    }
+
+    .ad-favorite, .ad-favorite-del {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        transform-origin: center;
+    }
+
+    .ad-favorite svg {
+        fill: none;
+        stroke: currentColor;
+        transition: all 0.3s ease;
+    }
+
+    .ad-favorite-del svg {
+        fill: currentColor;
+        stroke: currentColor;
+        animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.3); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+    }
 </style>
 {% endblock %}
 
@@ -596,40 +627,11 @@
         {% if user_info[0] != user_tg_id %}
         <div class="ads-section">
             <div class="ads-section-title">Объявления</div>
-            <div class="ads-grid">
-                {% if user_products %}
-                    {% for prod in user_products %}
-                        <div class="ad-card">
-                            {% if (now - prod[5]).total_seconds() < 86400 %}
-                                <div class="ad-new-badge">Новое</div>
-                            {% endif %}
-                            <img src="/{{ prod[3] }}" class="ad-image">
-                            <div class="ad-details">
-                                <div class="ad-title">{{ prod[0] }}</div>
-                                {% if user_info[0] != user_tg_id %}
-                                    {% if prod[8] == True %}
-                                        <div class="ad-favorite-del" data-id="{{ prod[4] }}">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                            </svg>
-                                        </div>
-                                    {% else %}
-                                        <div class="ad-favorite" data-id="{{ prod[4] }}">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                            </svg>
-                                        </div>
-                                    {% endif %}
-                                {% endif %}
-                                <div class="ad-price">{{ prod[1] }} ₽</div>
-                                <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>
-                            </div>
-                            <a href="/ads/{{ prod[4] }}" class="ad-link" style="display: none;"></a>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="no-results">Нет объявлений</div>
-                {% endif %}
+            <div class="ads-grid" id="adsGrid">
+                <!-- Товары будут загружаться динамически -->
+            </div>
+            <div class="loading-indicator" id="loadingIndicator">
+                Загрузка товаров {{ user_info[1] }}...
             </div>
         </div>
         {% endif %}
@@ -670,6 +672,171 @@
             });
         {% endif %}
 
+        // Инициализация переменных для пагинации
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+        const sellerId = {{ user_info[0] }};
+        const currentUserId = {{ user_tg_id }};
+
+        // Функция для загрузки товаров
+        async function loadProducts(page) {
+            if (isLoading || !hasMore) return;
+            
+            isLoading = true;
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/user_products?user_id=${sellerId}&page=${page}`);
+                const data = await response.json();
+                
+                if (data.products.length === 0) {
+                    hasMore = false;
+                } else {
+                    renderProducts(data.products);
+                    currentPage = page;
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+                document.getElementById('adsGrid').innerHTML = `
+                    <div class="no-results">
+                        Ошибка загрузки товаров. Пожалуйста, попробуйте позже.
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        // Функция для форматирования даты
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const [datePart, timePart] = dateString.split(' ');
+            const [year, month, day] = datePart.split('-');
+            return `${day}.${month}.${year.slice(2)}`;
+        }
+
+        // Функция для отрисовки товаров
+        function renderProducts(products) {
+            const adsGrid = document.getElementById('adsGrid');
+            
+            products.forEach(product => {
+                const isNew = (new Date() - new Date(product[5])) / (1000 * 60 * 60 * 24) < 1;
+                const isFavorite = product[8]; // Индекс 7 - это флаг избранного
+                
+                const productHtml = `
+                    <div class="ads-container">
+                        <div class="ad-card" data-id="${product[4]}">
+                            ${isNew ? '<div class="ad-new-badge">Новое</div>' : ''}
+                            <img src="/${product[3]}" class="ad-image">
+                            <div class="ad-details">
+                                <div class="ad-title">${product[0]}</div>
+                                ${sellerId !== currentUserId ? 
+                                (isFavorite ?
+                                `<div class="ad-favorite-del" data-id="${product[4]}">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>` : 
+                                `<div class="ad-favorite" data-id="${product[4]}">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>`) : ''}
+                                <div class="ad-price">${product[1]} ₽</div>
+                                <div class="ad-description"><b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                adsGrid.insertAdjacentHTML('beforeend', productHtml);
+            });
+            
+            // Устанавливаем обработчики событий для новых товаров
+            setupProductClickHandlers();
+        }
+
+        // Функция для обновления состояния избранного
+        function updateFavoriteIcon(button, isFavorite) {
+            if (isFavorite) {
+                button.innerHTML = `
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                `;
+                button.classList.remove('ad-favorite');
+                button.classList.add('ad-favorite-del');
+            } else {
+                button.innerHTML = `
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                `;
+                button.classList.remove('ad-favorite-del');
+                button.classList.add('ad-favorite');
+            }
+        }
+
+        // Установка обработчиков событий для товаров
+        function setupProductClickHandlers() {
+            document.addEventListener('click', async (e) => {
+                // Обработка избранного
+                const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+                
+                if (favBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const productId = favBtn.dataset.id;
+                    const isFavorite = favBtn.classList.contains('ad-favorite-del');
+                    const action = isFavorite ? '/del_fav' : '/add_fav';
+                    
+                    try {
+                        // Показываем анимацию
+                        favBtn.style.transform = 'scale(1.2)';
+                        setTimeout(() => {
+                            favBtn.style.transform = 'scale(1)';
+                        }, 300);
+                        
+                        const response = await fetch(action, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: `fav_id=${productId}`
+                        });
+                        
+                        if (response.ok) {
+                            updateFavoriteIcon(favBtn, !isFavorite);
+                        }
+                    } catch (error) {
+                        console.error('Error updating favorite:', error);
+                    }
+                }
+                
+                // Обработка клика по карточке товара
+                const card = e.target.closest('.ad-card');
+                if (card && !e.target.closest('.ad-favorite, .ad-favorite-del')) {
+                    const productId = card.dataset.id;
+                    window.location.href = `/ads/${productId}`;
+                }
+            });
+        }
+
+        // Обработчик скролла для бесконечной подгрузки
+        window.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            
+            if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading && hasMore) {
+                loadProducts(currentPage + 1);
+            }
+        });
+
+        // Загружаем первую страницу товаров
+        loadProducts(1);
+
         // Обработчик клика на контейнер репутации
         const reputationContainer = document.getElementById('reputationContainer');
         const reviewsModal = document.getElementById('reviewsModal');
@@ -678,7 +845,6 @@
 
         // Открытие модального окна
         reputationContainer.addEventListener('click', async function(e) {
-            // Проверяем, что клик не был по дочерним элементам, которые не должны открывать модальное окно
             if (e.target.closest('.reputation-value') || e.target.closest('.reputation-labels')) {
                 return;
             }
@@ -687,18 +853,14 @@
             reviewsModal.classList.add('show');
             
             try {
-                // Загружаем отзывы с сервера
                 const response = await fetch(`/api/user_reviews/{{ user_info[0] }}`);
                 const reviews = await response.json();
                 
                 if (reviews.length > 0) {
-                    // Очищаем список
                     reviewsList.innerHTML = '';
                     
-                    // Сортируем отзывы по дате (новые сверху)
                     reviews.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                     
-                    // Добавляем отзывы в список
                     reviews.forEach(review => {
                         const reviewItem = document.createElement('div');
                         reviewItem.className = 'review-item';
@@ -737,49 +899,10 @@
             reviewsModal.classList.remove('show');
         });
 
-        // Закрытие при клике вне окна
         reviewsModal.addEventListener('click', function(e) {
             if (e.target === reviewsModal) {
                 reviewsModal.classList.remove('show');
             }
-        });
-    });
-</script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Обработка кликов по избранному
-        document.body.addEventListener('click', function(e) {
-            const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
-            if (favBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = favBtn.classList.contains('ad-favorite') ? '/add_fav' : '/del_fav';
-                
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'fav_id';
-                input.value = favBtn.dataset.id;
-                
-                form.appendChild(input);
-                document.body.appendChild(form);
-                form.submit();
-            }
-        });
-        
-        // Обработка кликов по карточкам объявлений
-        document.querySelectorAll('.ad-card').forEach(function(card) {
-            card.addEventListener('click', function(e) {
-                const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
-                if (!isFavoriteClick) {
-                    const adLink = card.querySelector('.ad-link');
-                    if (adLink) {
-                        window.location.href = adLink.href;
-                    }
-                }
-            });
         });
 
         // Обработка выпадающего меню
@@ -787,20 +910,17 @@
         const dropdownMenu = document.getElementById('dropdownMenu');
         const shareReferral = document.getElementById('shareReferral');
 
-        // Открытие/закрытие меню
         menuButton.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownMenu.classList.toggle('show');
         });
 
-        // Закрытие меню при клике вне его
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.header-icon') && !e.target.closest('.dropdown-menu')) {
                 dropdownMenu.classList.remove('show');
             }
         });
 
-        // Обработка клика на "Поделиться реферальной ссылкой"
         shareReferral.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownMenu.classList.remove('show');
@@ -808,13 +928,7 @@
             const referralLink = `https://t.me/test_tma8_bot?startapp=ref_{{ user_info[0] }}`;
             const message = `Покупай и продавай прямо в Телеграмме:\n\n${referralLink}`;
             
-            console.log('Share button clicked'); // Для отладки
-            
-            // Проверяем, работает ли в Telegram WebApp
             if (window.Telegram && window.Telegram.WebApp) {
-                console.log('Telegram WebApp detected');
-                
-                // Пробуем разные методы поделиться
                 if (window.Telegram.WebApp.openTelegramLink) {
                     window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(message)}`);
                 } else if (window.Telegram.WebApp.shareTelegram) {

@@ -282,6 +282,51 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
     return response
 
 
+@wmarket_router.get("/api/user_review_products")
+async def get_user_review_products(
+        request: Request,
+        page: int = 1,
+        tab: str = 'active',
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    per_page = 20  # Количество товаров на странице
+
+    try:
+        if tab == 'active':
+            products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+        elif tab == 'moderation':
+            products = await get_user_moderation_products(payload.get("tg_id"))
+        elif tab == 'archived':
+            products = await get_user_archived_products(payload.get("tg_id"))
+        else:
+            return JSONResponse({"status": "error", "message": "Invalid tab"}, status_code=400)
+
+        # Пагинация
+        total = len(products)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_products = products[start:end]
+
+        # Форматирование дат
+        formatted_products = []
+        for product in paginated_products:
+            formatted_product = list(product)
+            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else product[5]
+            formatted_products.append(formatted_product)
+
+        return JSONResponse({
+            "status": "success",
+            "products": formatted_products,
+            "total": total
+        })
+    except Exception as e:
+        print(f"Error in get_user_products: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 @wmarket_router.post("/delete_product/{product_id}")
 async def delete_product(product_id: int, session_token=Cookie(default=None)):
     if session_token:
@@ -623,6 +668,50 @@ async def favs(request: Request, session_token=Cookie(default=None)):
     return response
 
 
+@wmarket_router.get("/api/favorites")
+async def get_favorites(
+        request: Request,
+        page: int = 1,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    per_page = 20  # Количество товаров на странице
+
+    try:
+        # Получаем все избранные товары пользователя
+        all_favs = await get_all_user_favs(payload.get("tg_id"))
+        all_products = await get_all_products(payload.get("tg_id"))
+
+        # Фильтруем только избранные товары
+        products = [prod for prod in all_products if prod[4] in all_favs]
+
+        # Пагинация
+        total = len(products)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_products = products[start:end]
+
+        # Преобразуем даты в строки
+        formatted_products = []
+        for product in paginated_products:
+            formatted_product = list(product)
+            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else \
+            product[5]
+            formatted_products.append(formatted_product)
+
+        return JSONResponse({
+            "status": "success",
+            "products": formatted_products,
+            "total": total
+        })
+    except Exception as e:
+        print(f"Error in get_favorites: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 @wmarket_router.post("/add_fav")
 async def fav_add_post(request: Request, session_token=Cookie(default=None)):
     if session_token:
@@ -750,6 +839,49 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
 
     response = RedirectResponse(url="/", status_code=303)
     return response
+
+
+@wmarket_router.get("/api/user_products")
+async def get_user_products(
+        request: Request,
+        user_id: int,
+        page: int = 1,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    per_page = 20  # Количество товаров на странице
+
+    try:
+        products = await get_user_active_products(user_id, payload.get("tg_id"))
+
+        # Пагинация
+        total = len(products)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_products = products[start:end]
+
+        # Форматирование дат
+        formatted_products = []
+        for product in paginated_products:
+            formatted_product = list(product)
+            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else \
+            product[5]
+            formatted_product.append(
+                (datetime.now(timezone.utc) - product[5]).total_seconds() < 86400 if isinstance(product[5],
+                                                                                                datetime) else False)
+            formatted_products.append(formatted_product)
+
+        return JSONResponse({
+            "status": "success",
+            "products": formatted_products,
+            "total": total
+        })
+    except Exception as e:
+        print(f"Error in get_user_products: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 # chat__________________________________________________________________________________________________________________
@@ -1379,42 +1511,6 @@ async def block_user(
     await send_notification_to_user(user_id, message)
 
     return {"status": "success"}
-
-
-# async def notify_user_blocked(user_id: int, duration: str, reason: str):
-#     duration_text = {
-#         "1h": "1 час",
-#         "1d": "1 день",
-#         "7d": "7 дней",
-#         "30d": "30 дней",
-#         "365d": "1 год",
-#         "permanent": "навсегда"
-#     }.get(duration, duration)
-#
-#     message = (
-#         f"⛔ Ваш аккаунт был заблокирован администратором.\n\n"
-#         f"⌛ Срок блокировки: {duration_text}\n"
-#         f"📝 Причина: {reason or 'не указана'}\n\n"
-#         f"Если Вы считаете, что это ошибка, свяжитесь с поддержкой - справа снизу "
-#         f"@Wmarket_app (сообщение каналу) или @Wmarket_support"
-#     )
-#
-#     await send_notification_to_user(user_id, message)
-
-
-# async def notify_reporter_about_block(report_id: int, blocked_user_id: int):
-#     report = await notify_reporter_about_block_post(int(report_id))
-#
-#     if report:
-#         blocked_user = await get_user_info(blocked_user_id)
-#         message = (
-#
-#             f"⚠️ Ваша жалоба была рассмотрена.\n\n"
-#             f"Пользователь {blocked_user[1]} был заблокирован за нарушение правил маркета.\n"
-#             f"Спасибо за помощь в поддержании порядка на площадке! ❤️‍🔥"
-#         )
-#
-#         await send_notification_to_user(report.reporter_id, message)
 
 
 @wmarket_router.get("/check_user_block")

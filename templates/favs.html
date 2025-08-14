@@ -119,6 +119,14 @@
             z-index: 2;
             pointer-events: auto;
         }
+
+        .loading-indicator {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            display: none;
+        }
     </style>
 {% endblock %}
 
@@ -127,88 +135,189 @@
         <div class="page-title">Избранное</div>
     </header>
 
+    <div class="loading-indicator" id="loadingIndicator">
+        Загрузка избранных вами товаров...
+    </div>
+    
+    <div class="empty-favorites" id="emptyFavorites" style="display: none;">
+        В избранном пока ничего нет<br>
+        Добавляйте товары, нажимая на 
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        в карточках
+    </div>
+    
     <main class="main-content" id="mainContent">
-        {% for prod in products %}
-            <div class="ads-container">
-                <div class="ad-card" data-title="{{ prod[0] }}" data-description="{{ prod[2] }}" data-id="{{ prod[4] }}">
-                    <img src="/{{ prod[3] }}" class="ad-image">
-                    <div class="ad-details">
-                        <div class="ad-title">{{ prod[0] }}</div>
-                        <div class="ad-favorite-del" data-id="{{ prod[4] }}">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                            </svg>
-                        </div>
-                        <div class="ad-price">{{ prod[1] }} ₽</div>
-                        <div class="ad-description"><b>{{ prod[5].strftime('%d.%m.%y') }}</b> {{ prod[5].strftime('%H:%M') }}</div>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-        
-        <div class="empty-favorites" id="emptyFavorites" style="display: none;">
-            В избранном пока ничего нет<br>
-            Добавляйте товары, нажимая на 
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-            в карточках
-        </div>
+        <!-- Товары будут загружаться динамически -->
     </main>
+    
 {% endblock %}
 
 {% block scripts %}
     <script src="/static/js/price_conv.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            let currentPage = 1;
+            let isLoading = false;
+            let hasMore = true;
             const mainContent = document.getElementById('mainContent');
             const emptyFavorites = document.getElementById('emptyFavorites');
+            const loadingIndicator = document.getElementById('loadingIndicator');
             
-            function checkEmptyFavorites() {
-                const favoriteItems = document.querySelectorAll('.ad-card');
-                if (favoriteItems.length === 0) {
-                    emptyFavorites.style.display = 'block';
-                } else {
-                    emptyFavorites.style.display = 'none';
+            async function loadFavorites(page) {
+                if (isLoading || !hasMore) return;
+                
+                isLoading = true;
+                loadingIndicator.style.display = 'block';
+                
+                try {
+                    const response = await fetch(`/api/favorites?page=${page}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+                    
+                    if (data.products.length === 0) {
+                        hasMore = false;
+                        if (page === 1) {
+                            emptyFavorites.style.display = 'block';
+                            mainContent.innerHTML = '';
+                        }
+                    } else {
+                        renderProducts(data.products);
+                        currentPage = page;
+                    }
+                } catch (error) {
+                    console.error('Error loading favorites:', error);
+                } finally {
+                    isLoading = false;
+                    loadingIndicator.style.display = 'none';
                 }
             }
 
-            // Обработчик для кнопки удаления из избранного
-            document.querySelectorAll('.ad-favorite-del').forEach(fav => {
-                fav.addEventListener('click', function(e) {
-                    e.stopPropagation(); // Останавливаем всплытие события
-                    const form = document.createElement('form');
-                    form.method = "POST";
-                    form.action = "/del_fav";
+            function formatDate(dateString) {
+                if (!dateString) return '';
+                const [datePart, timePart] = dateString.split(' ');
+                const [year, month, day] = datePart.split('-');
+                return `${day}.${month}.${year.slice(2)}`;
+            }
 
-                    const input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = "fav_id";
-                    input.value = this.dataset.id;
-
-                    form.appendChild(input);
-                    document.body.appendChild(form);
-                    form.submit();
+            function renderProducts(products) {
+                products.forEach(product => {
+                    const productHtml = `
+                        <div class="ads-container">
+                            <div class="ad-card" data-title="${product[0]}" data-description="${product[2]}" data-id="${product[4]}">
+                                <img src="/${product[3]}" class="ad-image">
+                                <div class="ad-details">
+                                    <div class="ad-title">${product[0]}</div>
+                                    <div class="ad-favorite-del" data-id="${product[4]}">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                        </svg>
+                                    </div>
+                                    <div class="ad-price">${product[1]} ₽</div>
+                                    <div class="ad-description"><b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    mainContent.insertAdjacentHTML('beforeend', productHtml);
                 });
-            });
-            
-            checkEmptyFavorites();
+                
+                setupProductClickHandlers();
+            }
 
-            // Обработчик для клика по карточке объявления
-            document.querySelectorAll('.ad-card').forEach(card => {
-                card.addEventListener('click', function(e) {
-                    // Проверяем, был ли клик по кнопке избранного
-                    if (e.target.closest('.ad-favorite-del')) {
-                        return;
+            function updateFavoriteIcon(button, isFavorite) {
+                if (isFavorite) {
+                    button.innerHTML = `
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    `;
+                    button.classList.remove('ad-favorite');
+                    button.classList.add('ad-favorite-del');
+                } else {
+                    button.innerHTML = `
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    `;
+                    button.classList.remove('ad-favorite-del');
+                    button.classList.add('ad-favorite');
+                }
+            }
+            
+            function setupProductClickHandlers() {
+                document.addEventListener('click', async (e) => {
+                    const favBtn = e.target.closest('.ad-favorite-del');
+                    
+                    if (favBtn) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const productId = favBtn.dataset.id;
+                        const isFavorite = favBtn.classList.contains('ad-favorite-del');
+                        
+                        try {
+                            // Сохраняем позицию скролла
+                            const scrollPosition = window.scrollY;
+                            
+                            // Показываем анимацию
+                            favBtn.style.transform = 'scale(1.2)';
+                            setTimeout(() => {
+                                favBtn.style.transform = 'scale(1)';
+                            }, 300);
+                            
+                            const response = await fetch('/del_fav', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                },
+                                body: `fav_id=${productId}`
+                            });
+                            
+                            if (response.ok) {
+                                // Удаляем карточку из DOM
+                                const card = favBtn.closest('.ads-container');
+                                if (card) {
+                                    card.remove();
+                                }
+                                
+                                // Проверяем, остались ли еще товары
+                                const remainingCards = document.querySelectorAll('.ads-container');
+                                if (remainingCards.length === 0) {
+                                    emptyFavorites.style.display = 'block';
+                                }
+                                
+                                // Восстанавливаем позицию скролла
+                                window.scrollTo(0, scrollPosition);
+                            }
+                        } catch (error) {
+                            console.error('Error updating favorite:', error);
+                        }
                     }
                     
-                    // Получаем ID объявления из data-атрибута карточки
-                    const adId = this.dataset.id;
-                    if (adId) {
-                        window.location.href = `/ads/${adId}`;
+                    // Обработка клика по карточке (но игнорируем клики по звезде)
+                    const card = e.target.closest('.ad-card');
+                    if (card && !e.target.closest('.ad-favorite-del')) {
+                        const productId = card.dataset.id;
+                        window.location.href = `/ads/${productId}`;
                     }
                 });
+            }
+
+            // Обработчик скролла для бесконечной подгрузки
+            window.addEventListener('scroll', () => {
+                const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading && hasMore) {
+                    loadFavorites(currentPage + 1);
+                }
             });
+            
+            // Загружаем первую страницу избранных товаров
+            loadFavorites(1);
         });
     </script>
 {% endblock %}
