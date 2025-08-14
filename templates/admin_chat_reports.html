@@ -1967,6 +1967,63 @@
                 alert('Ошибка при удалении изображений');
             }
         });
+
+        // Обработчики для сделок с личной встречей
+        document.addEventListener('click', async function(event) {
+            if (event.target.matches('[data-action="confirm-meet-deal"]')) {
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: "confirm" })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.status === "success") {
+                            event.target.closest('.deal-item').remove();
+                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
+                        }
+                    } else {
+                        alert('Ошибка при подтверждении сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при подтверждении сделки');
+                }
+            }
+            
+            if (event.target.matches('[data-action="cancel-meet-deal"]')) {
+                const dealId = event.target.dataset.id;
+                
+                try {
+                    const response = await fetch(`/admin/complete_meet_deal/${dealId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ action: "cancel" })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.status === "success") {
+                            event.target.closest('.deal-item').remove();
+                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
+                        }
+                    } else {
+                        alert('Ошибка при отмене сделки');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при отмене сделки');
+                }
+            }
+        });
     });
 </script>
 {% endblock %}

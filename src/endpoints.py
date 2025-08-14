@@ -2111,17 +2111,17 @@ async def confirm_deal(
             seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
             seller = seller.scalar_one_or_none()
 
-            # Добавляем баланс продавцу в зависимости от валюты сделки
-            if deal.currency == 'rub':
-                if seller.earned_rub is None:
-                    seller.earned_rub = 0.0
-                seller.earned_rub += seller_amount
-                seller.rub_balance += seller_amount
-            else:  # TON
-                if seller.earned_ton is None:
-                    seller.earned_ton = 0.0
-                seller.earned_ton += seller_amount
-                seller.ton_balance += seller_amount
+            if deal.currency != 'meet':
+                if deal.currency == 'rub':
+                    if seller.earned_rub is None:
+                        seller.earned_rub = 0.0
+                    seller.earned_rub += seller_amount
+                    seller.rub_balance += seller_amount
+                else:  # TON
+                    if seller.earned_ton is None:
+                        seller.earned_ton = 0.0
+                    seller.earned_ton += seller_amount
+                    seller.ton_balance += seller_amount
 
             # Создаем отзыв
             review = Review(
