@@ -1442,11 +1442,11 @@
                         window.location.reload();
                     }
                 } else {
-                    alert('Ошибка при блокировке пользователя');
+                    showNotification('Ошибка при блокировке пользователя', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка при блокировке пользователя');
+                showNotification('Ошибка при блокировке пользователя', 'error');
             }
         });
 
@@ -1494,11 +1494,11 @@
                             }
                         }
                     } else {
-                        alert('Ошибка при разблокировке пользователя');
+                        showNotification('Ошибка при разблокировке пользователя', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при разблокировке пользователя');
+                    showNotification('Ошибка при разблокировке пользователя', 'error');
                 }
             }
         });
@@ -1523,11 +1523,11 @@
                             checkEmptyContainer('moderationTab', 'Нет объявлений на модерации');
                         }
                     } else {
-                        alert('Ошибка при одобрении объявления');
+                        showNotification('Ошибка при одобрении объявления', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при одобрении объявления');
+                    showNotification('Ошибка при одобрении объявления', 'error');
                 }
             }
             
@@ -1548,11 +1548,11 @@
                             checkEmptyContainer('reportsTab', 'Нет активных жалоб');
                         }
                     } else {
-                        alert('Ошибка при обработке запроса');
+                        showNotification('Ошибка при обработке запроса', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при обработке запроса');
+                    showNotification('Ошибка при обработке запроса', 'error');
                 }
             }
             
@@ -1582,7 +1582,7 @@
             const reason = document.getElementById('reject-reason').value.trim();
             
             if (!reason) {
-                alert('Пожалуйста, укажите причину отклонения');
+                showNotification('Пожалуйста, укажите причину отклонения', 'info');
                 return;
             }
 
@@ -1607,11 +1607,11 @@
                         }
                     }
                 } else {
-                    alert('Ошибка при отклонении объявления');
+                    showNotification('Ошибка при отклонении объявления', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка при отклонении объявления');
+                showNotification('Ошибка при отклонении объявления', 'error');
             }
         });
 
@@ -1636,11 +1636,11 @@
                             checkEmptyContainer('reviewsTab', 'Нет отзывов на модерации');
                         }
                     } else {
-                        alert('Ошибка при одобрении отзыва');
+                        showNotification('Ошибка при одобрении отзыва', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при одобрении отзыва');
+                    showNotification('Ошибка при одобрении отзыва', 'error');
                 }
             }
             
@@ -1662,7 +1662,7 @@
             const reason = document.getElementById('reject-review-reason').value.trim();
             
             if (!reason) {
-                alert('Пожалуйста, укажите причину отклонения');
+                showNotification('Пожалуйста, укажите причину отклонения', 'info');
                 return;
             }
 
@@ -1690,11 +1690,11 @@
                         }
                     }
                 } else {
-                    alert('Ошибка при отклонении отзыва');
+                    showNotification('Ошибка при отклонении отзыва', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка при отклонении отзыва');
+                showNotification('Ошибка при отклонении отзыва', 'error');
             }
         });
 
@@ -1766,7 +1766,7 @@
             const reason = document.getElementById('complete-reason').value.trim();
             
             if (!reason) {
-                alert('Пожалуйста, укажите причину решения');
+                showNotification('Пожалуйста, укажите причину решения', 'info');
                 return;
             }
             
@@ -1791,7 +1791,7 @@
                         }
                     }
                 } else {
-                    alert('Ошибка при завершении сделки');
+                    showNotification('Ошибка при завершении сделки', 'error');
                 }
             });
         });
@@ -1802,7 +1802,7 @@
             const reason = document.getElementById('complete-reason').value.trim();
             
             if (!reason) {
-                alert('Пожалуйста, укажите причину решения');
+                showNotification('Пожалуйста, укажите причину решения', 'info');
                 return;
             }
             
@@ -1827,7 +1827,7 @@
                         }
                     }
                 } else {
-                    alert('Ошибка при завершении сделки');
+                    showNotification('Ошибка при завершении сделки', 'error');
                 }
             });
         });
@@ -1859,7 +1859,7 @@
                         }
                     }
                 } else {
-                    alert('Ошибка при обновлении сделки');
+                    showNotification('Ошибка при обновлении сделки', 'error');
                 }
             });
         });
@@ -1958,13 +1958,13 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    alert(`Удалено ${data.deleted_count} неиспользуемых изображений. Освобождено ${data.freed_space_mb.toFixed(2)} MB.`);
+                    showNotification(`Удалено ${data.deleted_count} неиспользуемых изображений. Освобождено ${data.freed_space_mb.toFixed(2)} MB.`, 'info');
                 } else {
-                    alert('Ошибка при удалении изображений');
+                    showNotification('Ошибка при удалении изображений', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка при удалении изображений');
+                showNotification('Ошибка при удалении изображений', 'error');
             }
         });
 
@@ -1989,11 +1989,11 @@
                             checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
                         }
                     } else {
-                        alert('Ошибка при подтверждении сделки');
+                        showNotification('Ошибка при подтверждении сделки', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при подтверждении сделки');
+                    showNotification('Ошибка при подтверждении сделки', 'error');
                 }
             }
             
@@ -2016,11 +2016,11 @@
                             checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
                         }
                     } else {
-                        alert('Ошибка при отмене сделки');
+                        showNotification('Ошибка при отмене сделки', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Ошибка при отмене сделки');
+                    showNotification('Ошибка при отмене сделки', 'error');
                 }
             }
         });

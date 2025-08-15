@@ -176,7 +176,7 @@
                 // Проверяем общее количество изображений
                 const totalImages = uploadedImages.length + e.target.files.length;
                 if (totalImages > maxImages) {
-                    alert(`Можно загрузить не более ${maxImages} изображений`);
+                    showNotification(`Можно загрузить не более ${maxImages} изображений`, 'info');
                     return;
                 }
 
@@ -281,7 +281,7 @@
                 
             } catch (error) {
                 const errorMessage = error.message.replace(/<[^>]*>?/gm, '');
-                alert(`Ошибка: ${errorMessage}`);
+                showNotification('Произошла ошибка при добавлении товара', 'error');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Опубликовать';
             }
