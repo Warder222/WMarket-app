@@ -748,13 +748,13 @@
                 const result = await response.json();
                 
                 if (result.status !== 'active') {
-                    alert('Сделка уже завершена или отменена');
+                    showNotification('Сделка уже завершена или отменена', 'info');
                     window.location.reload();
                     return;
                 }
                 
                 if (result.pending_cancel) {
-                    alert('Запрос на отмену уже отправлен на модерацию');
+                    showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
                     window.location.reload();
                     return;
                 }
@@ -781,7 +781,7 @@
             const cancelReason = document.getElementById('cancelText').value.trim();
             
             if (!cancelReason) {
-                alert('Пожалуйста, укажите причину отмены');
+                showNotification('Пожалуйста, укажите причину отмены', 'info');
                 return;
             }
             
@@ -799,16 +799,16 @@
                 
                 const result = await response.json();
                 if (result.status === 'success') {
-                    alert('Запрос на отмену сделки отправлен на модерацию');
+                    showNotification('Запрос на отмену сделки отправлен на модерацию', 'info');
                     document.getElementById('cancelModal').style.display = 'none';
                     document.getElementById('cancelText').value = '';
                     window.location.reload();
                 } else {
-                    alert('Ошибка: ' + result.message);
+                    showNotification('Произошла непредвиденная ошибка', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Произошла ошибка при отправке запроса');
+                showNotification('Произошла ошибка при отправке запроса', 'error');
             }
         });
         
@@ -832,19 +832,19 @@
                 
                 // Проверяем истекло ли время расширения
                 if (result.time_extension_until && new Date(result.time_extension_until) < new Date()) {
-                    alert('Время на завершение сделки истекло. Сделка отправлена на модерацию.');
+                    showNotification('Время на завершение сделки истекло. Сделка отправлена на модерацию', 'info');
                     window.location.reload();
                     return;
                 }
                 
                 if (result.status !== 'active') {
-                    alert('Сделка уже завершена или отменена');
+                    showNotification('Сделка уже завершена или отменена', 'info');
                     window.location.reload();
                     return;
                 }
                 
                 if (result.pending_cancel) {
-                    alert('Запрос на отмену уже отправлен на модерацию');
+                    showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
                     window.location.reload();
                     return;
                 }
@@ -895,7 +895,7 @@
                 const checkResult = await checkResponse.json();
                 
                 if (checkResult.exists) {
-                    alert('Вы уже оставили отзыв по этой сделке. Нельзя отправить повторный отзыв.');
+                    showNotification('Вы уже оставили отзыв по этой сделке. Нельзя отправить повторный отзыв', 'info');
                     return;
                 }
 
@@ -918,17 +918,17 @@
                 const result = await response.json();
                 if (result.status === 'success') {
                     if (isMeetType) {
-                        alert('Сделка и ваш отзыв отправлены на модерацию администратору. Мы уведомим вас о результате проверки.');
+                        showNotification('Сделка и ваш отзыв отправлены на модерацию администратору. Мы уведомим вас о результате проверки', 'success');
                     } else {
-                        alert('Сделка подтверждена! Отзыв отправлен на модерацию.');
+                        showNotification('Сделка подтверждена! Отзыв отправлен на модерацию', 'success');
                     }
                     window.location.reload();
                 } else {
-                    alert('Ошибка: ' + result.message);
+                    showNotification('Произошла непредвиденная ошибка', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Произошла ошибка при подтверждении сделки');
+                showNotification('Произошла ошибка при подтверждении сделки', 'error');
             }
         });
 
@@ -995,14 +995,14 @@
                     
                     const result = await response.json();
                     if (result.status === 'success') {
-                        alert('Товар успешно выкуплен!');
+                        showNotification('Товар успешно выкуплен!', 'success');
                         window.location.reload();
                     } else {
-                        alert('Ошибка: ' + result.message);
+                        showNotification('Произошла непредвиденная ошибка', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Произошла ошибка при выкупе товара');
+                    showNotification('Произошла ошибка при выкупе товара', 'error');
                 }
             });
         });
@@ -1024,14 +1024,14 @@
                         
                         const result = await response.json();
                         if (result.status === 'success') {
-                            alert(`Бронь отменена. Вам возвращено ${result.refunded_amount} ${result.currency}`);
+                            showNotification(`Бронь отменена. Вам возвращено ${result.refunded_amount} ${result.currency}`, 'success');
                             window.location.reload();
                         } else {
-                            alert('Ошибка: ' + result.message);
+                            showNotification('Произошла непредвиденная ошибка', 'error');
                         }
                     } catch (error) {
                         console.error('Error:', error);
-                        alert('Произошла ошибка при отмене брони');
+                        showNotification('Произошла ошибка при отмене брони', 'error');
                     }
                 }
             });

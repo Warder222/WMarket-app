@@ -1238,14 +1238,14 @@
                         .then(response => response.json())
                         .then(data => {
                             if (data.status === 'success') {
-                                alert('Объявление отправлено на повторную проверку');
+                                showNotification('Объявление отправлено на повторную проверку', 'info');
                             } else {
-                                alert(data.message || 'Произошла ошибка при отправке жалобы.');
+                                showNotification('Произошла ошибка при отправке жалобы', 'error');
                             }
                         })
                         .catch(error => {
                             console.error('Error:', error);
-                            alert('Произошла ошибка при отправке жалобы.');
+                            showNotification('Произошла ошибка при отправке жалобы', 'error');
                         });
                     }
                 }
@@ -1351,7 +1351,7 @@
                 const remainingSlots = 10 - currentCount;
 
                 if (files.length > remainingSlots) {
-                    alert(`Можно добавить только ${remainingSlots} фотографий`);
+                    showNotification(`Можно добавить только ${remainingSlots} фотографий`, 'info');
                     return;
                 }
 
@@ -1458,14 +1458,14 @@
                     
                     const result = await response.json();
                     if (result.status === "success") {
-                        alert('Объявление успешно обновлено!');
+                        showNotification(`Объявление успешно обновлено!`, 'success');
                         window.location.href = result.redirect || '/ads_review?tab=moderation';
                     } else {
-                        alert(result.message || 'Ошибка при обновлении объявления');
+                        showNotification(`Ошибка при обновлении объявления`, 'error');
                     }
                 } catch (error) {
                     console.error('Ошибка:', error);
-                    alert('Произошла ошибка при отправке данных');
+                    showNotification(`Произошла ошибка при отправке данных`, 'error');
                 }
             });
             
@@ -1485,7 +1485,7 @@
             document.getElementById('payButton')?.addEventListener('click', async () => {
                 const chatExists = await checkChatExists();
                 if (!chatExists) {
-                    alert('Перед покупкой сначала напишите продавцу');
+                    showNotification(`Перед покупкой сначала напишите продавцу`, 'info');
                     return;
                 }
                 openPaymentModal();
@@ -1494,7 +1494,7 @@
             document.getElementById('reserveButton')?.addEventListener('click', async () => {
                 const chatExists = await checkChatExists();
                 if (!chatExists) {
-                    alert('Перед бронированием сначала напишите продавцу');
+                    showNotification(`Перед покупкой сначала напишите продавцу`, 'info');
                     return;
                 }
                 openReservationModal();
@@ -1748,7 +1748,7 @@
                         amountElement.textContent = `Сумма бронирования: ${rubAmount.toFixed(2)} ₽`;
                         currentReserveCurrency = 'rub';
                         selectReserveCurrency('rub');
-                        alert('Не удалось получить курс TON. Используйте RUB.');
+                        showNotification(`Не удалось получить курс TON. Используйте RUB`, 'error');
                         confirmBtn.textContent = 'Подтвердить бронирование';
                     }
                 }
@@ -1768,7 +1768,7 @@
                         amount = roundUp(rubAmount / rate, 4); // Округляем TON до сотых в большую сторону
                     } catch (error) {
                         console.error('Ошибка при получении курса TON:', error);
-                        alert('Не удалось получить курс TON. Пожалуйста, попробуйте снова или используйте RUB.');
+                        showNotification('Не удалось получить курс TON. Пожалуйста, попробуйте снова или используйте RUB', 'error');
                         return;
                     }
                 }
@@ -1778,12 +1778,12 @@
                     const balanceData = await balanceResponse.json();
                     
                     if (currency === 'rub' && balanceData.rub_balance < amount) {
-                        alert(`Недостаточно средств на рублёвом балансе. Требуется: ${amount.toFixed(2)} ₽, доступно: ${balanceData.rub_balance.toFixed(2)} ₽`);
+                        showNotification(`Недостаточно средств на рублёвом балансе. Требуется: ${amount.toFixed(2)} ₽, доступно: ${balanceData.rub_balance.toFixed(2)} ₽`, 'error');
                         return;
                     }
                     
                     if (currency === 'ton' && balanceData.ton_balance < amount) {
-                        alert(`Недостаточно средств на TON балансе. Требуется: ${amount.toFixed(4)} TON, доступно: ${balanceData.ton_balance.toFixed(4)} TON`);
+                        showNotification(`Недостаточно средств на TON балансе. Требуется: ${amount.toFixed(4)} TON, доступно: ${balanceData.ton_balance.toFixed(4)} TON`, 'error');
                         return;
                     }
                     
@@ -1802,15 +1802,15 @@
                     const result = await response.json();
                     
                     if (result.status === 'success') {
-                        alert('Товар успешно забронирован на 48 часов!');
+                        showNotification('Товар успешно забронирован на 48 часов!', 'success');
                         closeReservationModal();
                         window.location.href = '/deals'; // Перенаправляем в раздел сделок
                     } else {
-                        alert(result.message || 'Ошибка при бронировании');
+                        showNotification('Ошибка при бронировании', 'error');
                     }
                 } catch (error) {
                     console.error('Ошибка:', error);
-                    alert('Произошла ошибка при бронировании');
+                    showNotification('Произошла ошибка при бронировании', 'error');
                 }
             });
 
@@ -1889,7 +1889,7 @@
                     confirmBtn.disabled = true;
                     confirmBtn.textContent = 'Ошибка загрузки курса';
                     
-                    alert('Не удалось получить актуальный курс TON. Пожалуйста, попробуйте позже или используйте RUB.');
+                    showNotification('Не удалось получить актуальный курс TON. Пожалуйста, попробуйте позже или используйте RUB', 'error');
                     return false;
                 }
             }
@@ -1912,17 +1912,17 @@
                         const result = await response.json();
                         
                         if (result.status === 'success') {
-                            alert('Сделка создана! Договоритесь с продавцом о встрече в чате Маркета.');
+                            showNotification('Сделка создана! Договоритесь с продавцом о встрече в чате Маркета', 'success');
                             window.location.href = '/deals';
                         } else {
-                            alert('Ошибка при создании сделки: ' + (result.message || 'Неизвестная ошибка'));
+                            showNotification('Произошла ошибка при создании сделки', 'error');
                         }
                         
                         closePaymentModal();
                         return;
                     } catch (error) {
                         console.error('Error:', error);
-                        alert('Произошла ошибка при создании сделки');
+                        showNotification('Произошла ошибка при создании сделки', 'error');
                         return;
                     }
                 }
@@ -1932,7 +1932,7 @@
                     const tonAmount = parseFloat(amountElement.textContent);
                     
                     if (isNaN(tonAmount) || tonAmount <= 0) {
-                        alert('Неверная сумма для оплаты. Пожалуйста, обновите курс TON.');
+                        showNotification('Неверная сумма для оплаты. Пожалуйста, обновите курс TON', 'error');
                         return;
                     }
                 }
@@ -1944,12 +1944,12 @@
                     const balanceData = await balanceResponse.json();
                     
                     if (method === 'rub' && balanceData.rub_balance < amount) {
-                        alert(`Недостаточно средств на рублёвом балансе. Требуется: ${amount} ₽, доступно: ${balanceData.rub_balance} ₽`);
+                        showNotification('Недостаточно средств на рублёвом балансе', 'error');
                         return;
                     }
                     
                     if (method === 'ton' && balanceData.ton_balance < amount) {
-                        alert(`Недостаточно средств на TON балансе. Требуется: ${amount} TON, доступно: ${balanceData.ton_balance} TON`);
+                        showNotification(`Недостаточно средств на TON балансе`, 'error');
                         return;
                     }
                     
@@ -1968,16 +1968,16 @@
                     const result = await response.json();
                     
                     if (result.status === 'success') {
-                        alert('Оплата прошла успешно! Сделка создана.');
+                        showNotification('Оплата прошла успешно! Сделка создана', 'success');
                         window.location.href = '/deals';
                     } else {
-                        alert('Ошибка при создании сделки: ' + (result.message || 'Неизвестная ошибка'));
+                        showNotification('Произошла ошибка при создании сделки', 'error');
                     }
                     
                     closePaymentModal();
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Произошла ошибка при обработке платежа');
+                    showNotification('Произошла ошибка при обработке платежа', 'error');
                 }
             }
 

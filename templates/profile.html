@@ -953,7 +953,7 @@
         function fallbackShare(message) {
             try {
                 navigator.clipboard.writeText(message).then(function() {
-                    alert('Реферальная ссылка скопирована в буфер обмена!');
+                    showNotification('Реферальная ссылка скопирована в буфер обмена!', 'info');
                     window.open(`https://t.me/share/url?url=${encodeURIComponent(message)}`, '_blank');
                 }).catch(function() {
                     prompt('Скопируйте реферальную ссылку:', message);

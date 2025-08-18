@@ -531,7 +531,7 @@
         submitReport.addEventListener('click', async () => {
             const reason = reportReason.value.trim();
             if (!reason) {
-                alert('Пожалуйста, укажите причину жалобы');
+                showNotification('Пожалуйста, укажите причину жалобы', 'info');
                 return;
             }
 
@@ -545,14 +545,14 @@
                 });
 
                 if (response.ok) {
-                    alert('Жалоба отправлена администратору, обнови страницу');
+                    showNotification('Жалоба отправлена администратору, обнови страницу', 'success');
                     closeReportModal();
                 } else {
-                    alert('Ошибка при отправке жалобы');
+                    showNotification('Ошибка при отправке жалобы', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка при отправке жалобы');
+                showNotification('Ошибка при отправке жалобы', 'error');
             }
         });
 

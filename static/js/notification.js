@@ -5,6 +5,18 @@ function showNotification(message, type = 'info', duration = 5000) {
     notification.textContent = message;
     document.body.appendChild(notification);
     
+    // Позиционируем уведомление по центру экрана
+    notification.style.top = '50%';
+    notification.style.left = '50%';
+    notification.style.transform = 'translate(-50%, -150%)';
+    notification.style.opacity = '0';
+    
+    // Запускаем анимацию появления
+    requestAnimationFrame(() => {
+        notification.style.transform = 'translate(-50%, -50%)';
+        notification.style.opacity = '1';
+    });
+    
     setTimeout(() => {
         notification.style.opacity = '0';
         setTimeout(() => notification.remove(), 300);
@@ -15,9 +27,8 @@ function showNotification(message, type = 'info', duration = 5000) {
 const notificationStyles = `
 .notification {
     position: fixed;
-    top: 20px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
     background-color: var(--primary-color);
     color: white;
     padding: 12px 24px;
@@ -27,9 +38,10 @@ const notificationStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    max-width: 90%;
+    max-width: 80%;
     text-align: center;
-    animation: fadeIn 0.3s ease-out;
+    transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s ease-out;
+    will-change: transform, opacity;
 }
 
 .notification.error {
@@ -38,11 +50,6 @@ const notificationStyles = `
 
 .notification.success {
     background-color: #4CAF50;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; top: 0; }
-    to { opacity: 1; top: 20px; }
 }
 `;
 

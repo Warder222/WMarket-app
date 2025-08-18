@@ -1785,6 +1785,7 @@
                     if (data.status === "success") {
                         document.getElementById('deal-actions-modal').style.display = 'none';
                         const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
+                        window.location.reload();
                         if (item) {
                             item.remove();
                             checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');

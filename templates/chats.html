@@ -302,10 +302,8 @@
 
         document.querySelectorAll('.leave-chat-button').forEach(button => {
             button.addEventListener('click', function(e) {
-                alert("Функция удаления чата будет доступна позже")
+                showNotification('Функция удаления чата будет доступна позже', 'info');
                 e.stopPropagation();
-                // currentChatIdToLeave = this.dataset.chatid;
-                // confirmationModal.style.display = 'flex';
             });
         });
 
@@ -333,11 +331,11 @@
                     // Полностью перезагружаем страницу после успешного выхода
                     window.location.reload();
                 } else {
-                    alert(data.message || 'Ошибка при выходе из чата');
+                    showNotification('Ошибка при выходе из чата', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Ошибка соединения');
+                showNotification('Ошибка соединения', 'error');
             } finally {
                 confirmationModal.style.display = 'none';
                 currentChatIdToLeave = null;
