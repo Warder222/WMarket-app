@@ -852,7 +852,7 @@
 
 <main class="content-container">
     <!-- Секция управления админами -->
-    <div id="adminsTab" {% if active_tab != 'admins' %}class="hidden"{% endif %}>
+    <div id="adminsTab" {% if active_tab != 'admins' or admin_role != 'founder' %}class="hidden"{% endif %}>
         <div style="margin-bottom: 20px;">
             <h3 style="margin-bottom: 16px;">Управление администраторами</h3>
             
@@ -904,11 +904,11 @@
                     </div>
                     <div class="item-actions">
                         {% if admin.role != 'founder' %}
-                        <button class="reject-button remove-admin-btn" data-id="{{ admin.user_id }}" data-role="{{ admin.role }}">
+                        <button class="reject-button remove-admin-btn" data-id="{{ admin.tg_id }}" data-role="{{ admin.role }}">
                             Удалить
                         </button>
                         {% endif %}
-                        <a href="/profile/{{ admin.user_id }}" class="view-button">Профиль</a>
+                        <a href="/profile/{{ admin.tg_id }}" class="view-button">Профиль</a>
                     </div>
                 </div>
             </div>
@@ -917,8 +917,9 @@
             <div class="no-items">Нет администраторов</div>
         {% endif %}
     </div>
+
     <!-- Секция жалоб на чаты -->
-    <div id="reportsTab" {% if active_tab != 'reports' %}class="hidden"{% endif %}>
+     <div id="reportsTab" {% if (active_tab != 'reports' and admin_role == 'founder') or (admin_role != 'chat_moderator' and admin_role != 'founder') %}class="hidden"{% endif %}>
         {% if reports %}
             {% for report in reports %}
             <div class="report-item">
@@ -946,7 +947,7 @@
         {% endif %}
     </div>
 
-    <div id="usersTab" {% if active_tab != 'users' %}class="hidden"{% endif %}>
+    <div id="usersTab" {% if active_tab != 'users' or admin_role != 'founder' %}class="hidden"{% endif %}>
         <div class="search-container" style="margin-bottom: 16px;">
             <input type="text" id="userSearch" placeholder="Поиск пользователей..." style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
         </div>
@@ -999,7 +1000,7 @@
     </div>
 
     <!-- Секция модерации объявлений -->
-    <div id="moderationTab" {% if active_tab != 'moderation' %}class="hidden"{% endif %}>
+    <div id="moderationTab" {% if (active_tab != 'moderation' and admin_role == 'founder') or (admin_role != 'product_moderator' and admin_role != 'founder') %}class="hidden"{% endif %}>
         <button id="cleanup-images-btn">
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19 4h-3.5l-1-1h-5l-1 1H5v2h14M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12z"/>
@@ -1071,7 +1072,7 @@
     </div>
 
     <!-- Секция модерации отзывов -->
-    <div id="reviewsTab" {% if active_tab != 'reviews' %}class="hidden"{% endif %}>
+    <div id="reviewsTab" {% if (active_tab != 'reviews' and admin_role == 'founder') or (admin_role != 'review_moderator' and admin_role != 'founder') %}class="hidden"{% endif %}>
         {% if reviews %}
             {% for review in reviews %}
             <div class="review-item">
@@ -1137,7 +1138,7 @@
         {% endif %}
     </div>
 
-    <div id="dealsTab" {% if active_tab != 'deals' %}class="hidden"{% endif %}>
+    <div id="dealsTab" {% if (active_tab != 'deals' and admin_role == 'founder') or (admin_role != 'deal_moderator' and admin_role != 'founder') %}class="hidden"{% endif %}>
         {% if pending_deals %}
             {% for deal in pending_deals %}
             <!-- В разделе dealsTab, внутри цикла for deal in pending_deals -->
@@ -1554,7 +1555,7 @@
                 const userId = event.target.dataset.id;
                 const role = event.target.dataset.role;
                 
-                if (!confirm(`Вы уверены, что хотите удалить администратора ID ${userId} (${role})?`)) {
+                if (!confirm(`Вы уверены, что хотите снять с должности администратора ID ${userId} (${role})?`)) {
                     return;
                 }
 
@@ -1565,7 +1566,7 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            user_id: parseInt(userId)
+                            user_id: parseInt(userId)  // Используем внутренний user_id
                         })
                     });
 
