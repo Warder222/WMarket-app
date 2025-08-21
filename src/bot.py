@@ -6,11 +6,11 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, BotCommand
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from src.config import settings
-from src.database.utils import get_user_info, get_product_info, get_all_users
+from src.database.methods import get_user_info, get_product_info, get_all_users
 import asyncio
 import logging
 
-from src.utils import is_admin
+from src.utils import is_admin_new
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -85,7 +85,11 @@ class BroadcastState(StatesGroup):
 # Обработчик команды /broadcast
 @dp.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext):
-    if not await is_admin(message.from_user.id):
+    admin_res = False
+    admin_role = await is_admin_new(message.from_user.id)
+    if admin_role:
+        admin_res = True
+    if not admin_res:
         await message.answer("❌ У вас нет прав для этой команды")
         return
 

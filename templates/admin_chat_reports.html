@@ -75,6 +75,13 @@
 
     .item-id {
         font-weight: bold;
+        font-size: 14px;
+        color: var(--primary-color);
+    }
+
+    .item-username {
+        font-weight: bold;
+        font-size: 14px;
         color: var(--primary-color);
     }
 
@@ -800,24 +807,116 @@
     <!-- Changed tabs header to dropdown -->
     <div class="tabs-dropdown">
         <button class="tabs-dropdown-btn">
-            {% if active_tab == 'reports' %}Жалобы на чаты
-            {% elif active_tab == 'moderation' %}Модерация объявлений
-            {% elif active_tab == 'users' %}Пользователи
-            {% elif active_tab == 'reviews' %}Отзывы
-            {% elif active_tab == 'deals' %}Сделки
-            {% else %}Жалобы на чаты{% endif %}
+            {% if admin_role == "founder" %}
+                {% if active_tab == 'reports' %}Жалобы на чаты
+                {% elif active_tab == 'moderation' %}Модерация объявлений
+                {% elif active_tab == 'users' %}Пользователи
+                {% elif active_tab == 'reviews' %}Отзывы
+                {% elif active_tab == 'deals' %}Сделки
+                {% elif active_tab == 'admins' %}Админы
+                {% else %}Жалобы на чаты{% endif %}
+            {% else %}
+                {% if admin_role == "chat_moderator" %}
+                    Жалобы на чаты
+                {% elif admin_role == "product_moderator" %}
+                    Модерация объявлений
+                {% elif admin_role == "review_moderator" %}
+                    Отзывы
+                {% elif admin_role == "deal_moderator" %}
+                    Сделки
+                {% endif %}
+            {% endif %}
         </button>
         <div class="tabs-dropdown-content" id="tabsDropdown">
-            <div class="dropdown-tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
-            <div class="dropdown-tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
-            <div class="dropdown-tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
-            <div class="dropdown-tab {% if active_tab == 'reviews' %}active{% endif %}" data-tab="reviews">Отзывы</div>
-            <div class="dropdown-tab {% if active_tab == 'deals' %}active{% endif %}" data-tab="deals">Сделки</div>
+            {% if admin_role == "founder" %}
+                <div class="dropdown-tab {% if active_tab == 'reports' %}active{% endif %}" data-tab="reports">Жалобы на чаты</div>
+                <div class="dropdown-tab {% if active_tab == 'moderation' %}active{% endif %}" data-tab="moderation">Модерация объявлений</div>
+                <div class="dropdown-tab {% if active_tab == 'users' %}active{% endif %}" data-tab="users">Пользователи</div>
+                <div class="dropdown-tab {% if active_tab == 'reviews' %}active{% endif %}" data-tab="reviews">Отзывы</div>
+                <div class="dropdown-tab {% if active_tab == 'deals' %}active{% endif %}" data-tab="deals">Сделки</div>
+                <div class="dropdown-tab {% if active_tab == 'admins' %}active{% endif %}" data-tab="admins">Админы</div>
+            {% else %}
+                {% if admin_role == "chat_moderator" %}
+                    <div class="dropdown-tab active" data-tab="reports">Жалобы на чаты</div>
+                {% elif admin_role == "product_moderator" %}
+                    <div class="dropdown-tab active" data-tab="moderation">Модерация объявлений</div>
+                {% elif admin_role == "review_moderator" %}
+                    <div class="dropdown-tab active" data-tab="reviews">Отзывы</div>
+                {% elif admin_role == "deal_moderator" %}
+                    <div class="dropdown-tab active" data-tab="deals">Сделки</div>
+                {% endif %}
+            {% endif %}
         </div>
     </div>
 </header>
 
 <main class="content-container">
+    <!-- Секция управления админами -->
+    <div id="adminsTab" {% if active_tab != 'admins' %}class="hidden"{% endif %}>
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 16px;">Управление администраторами</h3>
+            
+            <!-- Форма добавления нового админа -->
+            <div class="user-item" style="background-color: var(--bg-color);">
+                <h4 style="margin-top: 0; margin-bottom: 12px;">Добавить администратора</h4>
+                
+                <!-- Поле поиска по username -->
+                <div class="form-group">
+                    <input type="text" id="admin-search" placeholder="Введите username пользователя..." 
+                        style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 12px;">
+                    <div id="search-results" style="display: none; position: absolute; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; width: calc(100% - 32px);"></div>
+                </div>
+                
+                <div class="form-group">
+                    <select id="new-admin-role" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                        <option value="chat_moderator">Модератор чатов</option>
+                        <option value="product_moderator">Модератор объявлений</option>
+                        <option value="review_moderator">Модератор отзывов</option>
+                        <option value="deal_moderator">Модератор сделок</option>
+                    </select>
+                </div>
+                
+                <input type="hidden" id="selected-user-id">
+                
+                <button id="add-admin-btn" class="approve-button" style="width: 100%;" disabled>Добавить администратора</button>
+            </div>
+        </div>
+
+        <!-- Остальной код остается без изменений -->
+        <h4 style="margin-bottom: 16px;">Текущие администраторы</h4>
+        
+         {% if admins %}
+            {% for admin in admins %}
+            <div class="user-item admin-item" data-admin-id="{{ admin.user_id }}">
+                <div class="item-header">
+                    <div>
+                        <span class="item-id">ID: {{ admin.tg_id }}</span>
+                        <span class="item-username">{{ admin.username }}</span>
+                        <span style="display: block; margin-top: 4px;">
+                            <strong>Роль:</strong> 
+                            {% if admin.role == 'founder' %}Основатель
+                            {% elif admin.role == 'chat_moderator' %}Модератор чатов
+                            {% elif admin.role == 'product_moderator' %}Модератор объявлений
+                            {% elif admin.role == 'review_moderator' %}Модератор отзывов
+                            {% elif admin.role == 'deal_moderator' %}Модератор сделок
+                            {% else %}{{ admin.role }}{% endif %}
+                        </span>
+                    </div>
+                    <div class="item-actions">
+                        {% if admin.role != 'founder' %}
+                        <button class="reject-button remove-admin-btn" data-id="{{ admin.user_id }}" data-role="{{ admin.role }}">
+                            Удалить
+                        </button>
+                        {% endif %}
+                        <a href="/profile/{{ admin.user_id }}" class="view-button">Профиль</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-items">Нет администраторов</div>
+        {% endif %}
+    </div>
     <!-- Секция жалоб на чаты -->
     <div id="reportsTab" {% if active_tab != 'reports' %}class="hidden"{% endif %}>
         {% if reports %}
@@ -1305,13 +1404,32 @@
             });
         }
 
+        function hasAccessToTab(tabName, userRole) {
+            const accessRules = {
+                'reports': ['founder', 'chat_moderator'],
+                'moderation': ['founder', 'product_moderator'],
+                'users': ['founder'],
+                'reviews': ['founder', 'review_moderator'],
+                'deals': ['founder', 'deal_moderator'],
+                'admins': ['founder']
+            };
+            
+            return accessRules[tabName]?.includes(userRole) || false;
+        }
+
         // Tab switching logic
         const tabs = document.querySelectorAll('.dropdown-tab');
-        
+
         tabs.forEach(tab => {
             tab.addEventListener('click', (e) => {
-                e.preventDefault();
                 const tabName = tab.dataset.tab;
+                const currentRole = "{{ admin_role }}"; // Передаем роль из бэкенда
+                
+                // Проверяем доступ к вкладке
+                if (!hasAccessToTab(tabName, currentRole)) {
+                    showNotification('У вас нет доступа к этой вкладке', 'error');
+                    return;
+                }
                 
                 // Update URL without reload
                 const url = new URL(window.location.href);
@@ -1334,6 +1452,148 @@
 
                 window.location.href = `/admin/chat_reports?tab=${tabName}`;
             });
+        });
+
+        document.getElementById('admin-search')?.addEventListener('input', async function(e) {
+            const searchTerm = e.target.value.trim();
+            const resultsContainer = document.getElementById('search-results');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.style.display = 'none';
+                resultsContainer.innerHTML = '';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/search_users?q=${encodeURIComponent(searchTerm)}`);
+                const users = await response.json();
+                
+                resultsContainer.innerHTML = '';
+                
+                if (users.length === 0) {
+                    resultsContainer.innerHTML = '<div style="padding: 8px; color: var(--secondary-text);">Пользователи не найдены</div>';
+                } else {
+                    users.forEach(user => {
+                        const userElement = document.createElement('div');
+                        userElement.style.padding = '8px';
+                        userElement.style.cursor = 'pointer';
+                        userElement.style.borderBottom = '1px solid var(--border-color)';
+                        userElement.innerHTML = `
+                            <strong>${user.first_name}</strong> (ID: ${user.tg_id})
+                        `;
+                        
+                        userElement.addEventListener('click', () => {
+                            document.getElementById('admin-search').value = user.first_name;
+                            document.getElementById('selected-user-id').value = user.tg_id;
+                            document.getElementById('add-admin-btn').disabled = false;
+                            resultsContainer.style.display = 'none';
+                        });
+                        
+                        resultsContainer.appendChild(userElement);
+                    });
+                }
+                
+                resultsContainer.style.display = 'block';
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        });
+
+        // Закрытие выпадающего списка при клике вне его
+        document.addEventListener('click', function(e) {
+            const searchContainer = document.getElementById('search-results');
+            const searchInput = document.getElementById('admin-search');
+            
+            if (searchContainer && searchInput && 
+                !searchContainer.contains(e.target) && 
+                e.target !== searchInput) {
+                searchContainer.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('add-admin-btn')?.addEventListener('click', async function() {
+            const userId = document.getElementById('selected-user-id').value;
+            const role = document.getElementById('new-admin-role').value;
+            
+            if (!userId) {
+                showNotification('Выберите пользователя из списка', 'info');
+                return;
+            }
+
+            // Остальной код обработчика остается без изменений
+            try {
+                const response = await fetch('/admin/add_admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: parseInt(userId),
+                        role: role
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    showNotification('Администратор успешно добавлен', 'success');
+                    // Перезагружаем страницу для обновления списка
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showNotification(data.message || 'Ошибка при добавлении администратора', 'error');
+                }
+            } catch (error) {
+                alert(`${error}`);
+                showNotification('Ошибка при добавлении администратора', 'error');
+            }
+        });
+
+        // Обработчик удаления админа
+        document.addEventListener('click', async function(event) {
+            if (event.target.matches('.remove-admin-btn')) {
+                const userId = event.target.dataset.id;
+                const role = event.target.dataset.role;
+                
+                if (!confirm(`Вы уверены, что хотите удалить администратора ID ${userId} (${role})?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/admin/remove_admin', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            user_id: parseInt(userId)
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.status === "success") {
+                        showNotification('Администратор успешно удален', 'success');
+                        // Удаляем элемент из списка
+                        event.target.closest('.admin-item').remove();
+                        
+                        // Проверяем, не пустой ли список
+                        const adminsTab = document.getElementById('adminsTab');
+                        const adminItems = adminsTab.querySelectorAll('.admin-item');
+                        if (adminItems.length === 0) {
+                            adminsTab.querySelector('.no-items')?.remove();
+                            const noItems = document.createElement('div');
+                            noItems.className = 'no-items';
+                            noItems.textContent = 'Нет администраторов';
+                            adminsTab.appendChild(noItems);
+                        }
+                    } else {
+                        showNotification(data.message || 'Ошибка при удалении администратора', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Ошибка при удалении администратора', 'error');
+                }
+            }
         });
 
         // Функция для открытия модального окна блокировки

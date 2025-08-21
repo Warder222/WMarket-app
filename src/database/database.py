@@ -182,3 +182,12 @@ class Review(Base):
     text = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     moderated = Column(Boolean, default=False)
+
+
+class AdminRole(Base):
+    __tablename__ = "admin_roles"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"), unique=True)
+    role = Column(String)  # founder, chat_moderator, product_moderator, review_moderator, deal_moderator
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())

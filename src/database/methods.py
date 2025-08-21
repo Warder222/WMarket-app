@@ -4,9 +4,11 @@ from datetime import datetime, timezone, timedelta
 from starlette.responses import JSONResponse
 
 from .database import async_session_maker, User, Category, Product, Fav, Chat, ChatParticipant, Message, ChatReport, \
-    Referral, UserBlock, TonTransaction, Deal, Review
+    Referral, UserBlock, TonTransaction, Deal, Review, AdminRole
 from sqlalchemy.future import select
 from sqlalchemy import update, desc, asc, func, and_, delete, or_, insert, bindparam, Integer, exists
+
+from ..config import settings
 
 
 # auth&users_utils______________________________________________________________________________________________________
@@ -1320,3 +1322,51 @@ async def get_user_active_deals_count(tg_id: int):
         except Exception as e:
             print(f"Error getting deal time extension: {e}")
             return 0
+
+
+async def get_all_admins():
+    """Получить всех админов с их ролями"""
+    async with async_session_maker() as session:
+        result = await session.execute(select(AdminRole))
+        admins = result.scalars().all()
+        users_info = []
+        for admin in admins:
+            user = await session.execute(select(User).where(User.tg_id == admin.user_id))
+            user = user.scalar_one_or_none()
+            users_info.append({
+                "tg_id": admin.user_id,
+                "first_name": user.first_name if user else "Неизвестно",
+                "username": user.username if user else "Нет",
+                "role": admin.role,
+                "assigned_at": admin.assigned_at.strftime("%d.%m.%Y %H:%M")
+            })
+        return users_info
+
+
+async def add_admin(user_id: int, role: str):
+    """Назначить пользователя админом"""
+    user_id = int(user_id)
+    async with async_session_maker() as session:
+        # Проверяем, не founder ли он (из .env)
+        if str(user_id) in [admin.strip() for admin in settings.ADMINS.split(",")]:
+            return False  # нельзя изменять founder через UI
+
+        # Удаляем старую роль, если есть
+        await session.execute(delete(AdminRole).where(AdminRole.user_id == user_id))
+        # Назначаем новую
+        session.add(AdminRole(user_id=user_id, role=role))
+        await session.commit()
+        return True
+
+
+async def remove_admin(user_id: int):
+    """Убрать пользователя из админов"""
+    user_id = int(user_id)
+    # Нельзя убрать founder из .env
+    if str(user_id) in [admin.strip() for admin in settings.ADMINS.split(",")]:
+        return False
+
+    async with async_session_maker() as session:
+        await session.execute(delete(AdminRole).where(AdminRole.user_id == user_id))
+        await session.commit()
+        return True

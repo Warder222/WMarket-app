@@ -14,25 +14,26 @@ from src.bot import send_notification_to_user
 from src.config import settings, manager
 from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal, Review, \
     Product
-from src.database.utils import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
-                                get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
-                                add_new_product, get_product_info, get_user_active_products,
-                                get_user_moderation_products, create_chat, get_chat_messages, report_message,
-                                send_message, get_chat_participants,
-                                get_user_chats, all_count_unread_messages, get_all_digit_categories,
-                                get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
-                                user_exists, record_referral, get_ref_count, get_chat_part_info,
-                                get_user_archived_products, delete_product_post, archive_product_post,
-                                restore_product_post, update_product_post, get_all_moderation_products,
-                                leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
-                                notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
-                                get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
-                                add_ton_balance, get_user_ton_transactions, create_ton_transaction,
-                                get_user_active_deals, get_user_completed_deals, get_pending_deals,
-                                get_user_reserved_deals, get_count_fav_add, get_user_active_deals_count,
-                                get_product_info_with_all_photos)
+from src.database.methods import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
+                                  get_all_products_from_category, add_fav, get_all_user_favs, del_fav, get_user_info,
+                                  add_new_product, get_product_info, get_user_active_products,
+                                  get_user_moderation_products, create_chat, get_chat_messages, report_message,
+                                  send_message, get_chat_participants,
+                                  get_user_chats, all_count_unread_messages, get_all_digit_categories,
+                                  get_all_not_digit_categories, resolve_chat_report, get_chat_reports, report_chat,
+                                  user_exists, record_referral, get_ref_count, get_chat_part_info,
+                                  get_user_archived_products, delete_product_post, archive_product_post,
+                                  restore_product_post, update_product_post, get_all_moderation_products,
+                                  leave_chat_post, check_user_in_chat, get_chat_info_post, block_user_post,
+                                  notify_reporter_about_block_post, check_user_blocked_post, check_user_block_post,
+                                  get_all_users_info, get_current_currency, set_current_currency, get_balance_user_info,
+                                  add_ton_balance, get_user_ton_transactions, create_ton_transaction,
+                                  get_user_active_deals, get_user_completed_deals, get_pending_deals,
+                                  get_user_reserved_deals, get_count_fav_add, get_user_active_deals_count,
+                                  get_product_info_with_all_photos, remove_admin, add_admin, get_all_admins)
 from src.tonapi import TonapiClient, withdraw_ton_request
-from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin, get_ton_to_rub_rate
+from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin_new, get_ton_to_rub_rate, can_manage_admins, \
+    can_moderate_reviews, can_moderate_chats, can_moderate_products, can_moderate_deals
 
 wmarket_router = APIRouter(
     prefix="",
@@ -106,7 +107,10 @@ async def store(request: Request, session_token=Cookie(default=None)):
             products = await get_all_products(payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -138,7 +142,10 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
             products = await get_all_products_from_category(category_name, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -223,7 +230,10 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             categories = await get_all_categories()
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -263,7 +273,10 @@ async def ads_review(request: Request, session_token=Cookie(default=None)):
                 archived_products = await get_user_archived_products(payload.get("tg_id"))
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
@@ -452,9 +465,9 @@ async def report_product(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
-    if not admin_res:
-        return {"status": "error", "message": "Unauthorized"}
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if not can_moderate_products(admin_role):
+        return {"status": "error", "message": "Access denied"}
 
     data = await request.json()
     product_id = data.get("product_id")
@@ -616,7 +629,10 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
             negative_reviews = user_info[4]
             reputation = positive_reviews - negative_reviews
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if can_moderate_products(admin_role):
+                admin_res= True
             fav_count = await get_count_fav_add(product_id)
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
@@ -653,7 +669,10 @@ async def favs(request: Request, session_token=Cookie(default=None)):
             # 0-product_name / 1-product_price / 2-product_description / 3-product_image_url / 4-id / 5-created_at / 6-is_fav
             products = [[prod[0], prod[1], prod[2], prod[3], prod[4], prod[5], prod[6]] for prod in all_products if prod[4] in all_favs]
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -758,9 +777,15 @@ async def profile(request: Request, session_token=Cookie(default=None)):
             products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             referrals_count = await get_ref_count(payload.get("tg_id"))
-            admin_crown = await is_admin(user_info[0])
+            admin_crown = False
+            admin_role = await is_admin_new(user_info[0])
+            if admin_role:
+                admin_crown = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -816,8 +841,14 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             products = await get_user_active_products(seller_tg_id, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
-            admin_crown = await is_admin(user_info[0])
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
+            admin_crown = False
+            admin_role = await is_admin_new(user_info[0])
+            if admin_role:
+                admin_crown = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -897,7 +928,10 @@ async def chats(request: Request, session_token=Cookie(default=None)):
             user_chats = await get_user_chats(payload.get("tg_id"))
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
@@ -1117,7 +1151,10 @@ async def admin_chat_reports(
         return RedirectResponse(url="/", status_code=303)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if admin_role:
+        admin_res = True
     if admin_res:
         reports = await get_chat_reports(resolved=False)
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
@@ -1136,12 +1173,15 @@ async def admin_chat_reports(
         # Получаем сделки, ожидающие отмены
         pending_deals = await get_pending_deals()
         active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+        admins = await get_all_admins()
 
         context = {
             "request": request,
             "reports": reports,
             "all_undread_count_message": all_undread_count_message,
             "admin": admin_res,
+            "admin_role": admin_role,
+            "admins": admins,
             "moderation_products": moderation_products,
             "users": users,
             "reviews": reviews,
@@ -1161,7 +1201,10 @@ async def admin_chat_view(
         return RedirectResponse(url="/", status_code=303)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if admin_res:
         chat_data = await get_chat_messages(chat_id, None)
         if not chat_data:
@@ -1194,7 +1237,10 @@ async def resolve_report_route(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if admin_res:
         success = await resolve_chat_report(report_id, payload.get("tg_id"))
         return {"status": "success" if success else "error"}
@@ -1315,7 +1361,10 @@ async def cleanup_unused_images(session_token=Cookie(default=None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if not admin_res:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -1379,7 +1428,10 @@ async def approve_product(product_id: int, session_token=Cookie(default=None)):
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if admin_res:
         # Обновляем статус продукта
         update_data = {"active": True}
@@ -1402,7 +1454,10 @@ async def reject_product(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if admin_res:
         data = await request.json()
         reason = data.get("reason", "")
@@ -1427,7 +1482,10 @@ async def get_chat_info(chat_id: int, session_token=Cookie(default=None)):
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if admin_res:
         chat_info = await get_chat_info_post(chat_id)
         return chat_info
@@ -1443,7 +1501,10 @@ async def block_user(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_chats(admin_role):
+        admin_res = True
     if not admin_res:
         return {"status": "error", "message": "Unauthorized"}
 
@@ -1557,7 +1618,10 @@ async def wallet_page(request: Request, session_token=Cookie(default=None)):
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
@@ -1851,7 +1915,10 @@ async def deals(request: Request, session_token=Cookie(default=None)):
             reserved_deals = await get_user_reserved_deals(payload.get("tg_id"))  # Новая функция
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-            admin_res = await is_admin(payload.get("tg_id"))
+            admin_res = False
+            admin_role = await is_admin_new(payload.get("tg_id"))
+            if admin_role:
+                admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
@@ -2183,7 +2250,11 @@ async def moderate_review(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_reviews(admin_role):
+        admin_res = True
+    print(f"Роль {admin_role}, res {admin_res}")
     if not admin_res:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
 
@@ -2360,7 +2431,10 @@ async def moderate_cancel_request(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_deals(admin_role):
+        admin_res = True
     if not admin_res:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
 
@@ -2481,7 +2555,10 @@ async def get_deal_info(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_deals(admin_role):
+        admin_res = True
     if not admin_res:
         return {"status": "error", "message": "Unauthorized"}
 
@@ -2526,7 +2603,10 @@ async def complete_deal(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_deals(admin_role):
+        admin_res = True
     if not admin_res:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
 
@@ -2648,7 +2728,10 @@ async def give_more_time(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_deals(admin_role):
+        admin_res = True
     if not admin_res:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
 
@@ -3025,7 +3108,10 @@ async def complete_meet_deal(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    admin_res = await is_admin(payload.get("tg_id"))
+    admin_res = False
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if can_moderate_deals(admin_role):
+        admin_res = True
     if not admin_res:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=403)
 
@@ -3151,3 +3237,97 @@ async def check_review_exists(deal_id: int, session_token=Cookie(default=None)):
         )
         count = result.scalar()
         return {"exists": count > 0}
+
+
+@wmarket_router.post("/admin/add_admin")
+async def add_admin_route(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+    payload = await decode_jwt(session_token)
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if not can_manage_admins(admin_role):
+        return {"status": "error", "message": "Access denied"}
+
+    data = await request.json()
+    user_id = data.get("user_id")
+    role = data.get("role")
+
+    if not user_id or not role:
+        return {"status": "error", "message": "Missing data"}
+
+    success = await add_admin(user_id, role)
+    return {"status": "success" if success else "error"}
+
+
+@wmarket_router.post("/admin/remove_admin")
+async def remove_admin_route(request: Request, session_token=Cookie(default=None)):
+    if not session_token:
+        return {"status": "error", "message": "Unauthorized"}
+    payload = await decode_jwt(session_token)
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if not can_manage_admins(admin_role):
+        return {"status": "error", "message": "Access denied"}
+
+    data = await request.json()
+    user_id = data.get("user_id")
+
+    success = await remove_admin(user_id)
+    return {"status": "success" if success else "error"}
+
+
+# @wmarket_router.get("/admin/admins_tab")
+# async def admin_admins_tab(
+#         request: Request,
+#         session_token=Cookie(default=None)
+# ):
+#     if not session_token:
+#         return RedirectResponse(url="/", status_code=303)
+#
+#     payload = await decode_jwt(session_token)
+#     admin_role = await is_admin_new(payload.get("tg_id"))
+#
+#     # Проверяем права - только основатель может управлять админами
+#     if not can_manage_admins(admin_role):
+#         return RedirectResponse(url="/admin/chat_reports", status_code=303)
+#
+#     # Получаем всех админов
+#     admins = await get_all_admins()
+#     all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
+#     active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+#     print(admins)
+#
+#     context = {
+#         "request": request,
+#         "admins": admins,
+#         "all_undread_count_message": all_undread_count_message,
+#         "admin": True,
+#         "admin_role": admin_role,  # Добавляем роль
+#         "active_tab": admins,
+#         "active_deals_count": active_deals_count
+#     }
+#     return templates.TemplateResponse("admin_chat_reports.html", context)
+
+
+@wmarket_router.get("/api/search_users")
+async def search_users(request: Request, q: str, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    admin_role = await is_admin_new(payload.get("tg_id"))
+    if not can_manage_admins(admin_role):
+        return JSONResponse({"status": "error", "message": "Access denied"}, status_code=403)
+
+    async with async_session_maker() as session:
+        # Ищем пользователей по username (first_name)
+        result = await session.execute(
+            select(User)
+            .where(User.username.ilike(f"{q}%"))
+            .limit(10)
+        )
+        users = result.scalars().all()
+
+        return [{
+            "tg_id": user.tg_id,
+            "first_name": user.username
+        } for user in users]

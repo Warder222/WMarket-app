@@ -1,9 +1,13 @@
 import json
 from datetime import datetime, timezone, timedelta
 import jwt
+from sqlalchemy import select
+
 from src.config import settings
 from urllib.parse import parse_qs
 import requests
+
+from src.database.database import async_session_maker, AdminRole
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
@@ -43,12 +47,6 @@ async def decode_jwt(token):
         return {"sub": str(e)}
 
 
-async def is_admin(tg_id):
-    if str(tg_id) in [admin for admin in settings.ADMINS.split(",")]:
-        return True
-    else:
-        return False
-
 async def get_ton_to_rub_rate():
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
@@ -64,3 +62,34 @@ async def get_ton_to_rub_rate():
     except Exception as e:
         print("Ошибка при получении данных:", e)
         return None
+
+
+async def is_admin_new(tg_id):
+    """Возвращает роль админа: founder, chat_moderator и т.д. или None"""
+    tg_id = int(tg_id)
+
+    # Проверяем, является ли пользователь founder (из .env)
+    if str(tg_id) in [admin.strip() for admin in settings.ADMINS.split(",") if admin.strip()]:
+        return "founder"
+
+    # Проверяем базу данных
+    async with async_session_maker() as session:
+        result = await session.execute(select(AdminRole).where(AdminRole.user_id == tg_id))
+        role = result.scalar_one_or_none()
+        return role.role if role else None
+
+
+def can_moderate_chats(role):
+    return role in ["founder", "chat_moderator"]
+
+def can_moderate_products(role):
+    return role in ["founder", "product_moderator"]
+
+def can_moderate_reviews(role):
+    return role in ["founder", "review_moderator"]
+
+def can_moderate_deals(role):
+    return role in ["founder", "deal_moderator"]
+
+def can_manage_admins(role):
+    return role == "founder"
