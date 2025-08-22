@@ -147,13 +147,13 @@ class Deal(Base):
     __tablename__ = "deals"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)  # Изменено: nullable=True
     product_name = Column(String)
     seller_id = Column(BigInteger, ForeignKey('users.tg_id'))
     buyer_id = Column(BigInteger, ForeignKey('users.tg_id'))
     currency = Column(String)
     amount = Column(Float)
-    status = Column(String, default="active")  # Добавляем новый статус "reserved"
+    status = Column(String, default="active")
     pending_cancel = Column(Boolean, default=False)
     cancel_reason = Column(String, nullable=True)
     cancel_request_by = Column(BigInteger, nullable=True)
@@ -177,7 +177,7 @@ class Review(Base):
     deal_id = Column(Integer, ForeignKey("deals.id"))
     from_user_id = Column(BigInteger, ForeignKey("users.tg_id"))
     to_user_id = Column(BigInteger, ForeignKey("users.tg_id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
     rating = Column(Integer)  # 1 for plus_rep, -1 for minus_rep
     text = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

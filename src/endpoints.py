@@ -7,7 +7,7 @@ from typing import List
 from fastapi import APIRouter, Request, Cookie, Form, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, update, func, desc
+from sqlalchemy import select, update, func, desc, delete
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
@@ -340,6 +340,7 @@ async def get_user_review_products(
         print(f"Error in get_user_products: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
+
 @wmarket_router.post("/delete_product/{product_id}")
 async def delete_product(product_id: int, session_token=Cookie(default=None)):
     if session_token:
@@ -348,11 +349,37 @@ async def delete_product(product_id: int, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            rest_product = await delete_product_post(product_id=product_id)
-            if rest_product:
-                return JSONResponse({"status": "success"})
-            else:
-                return JSONResponse({"status": "error"}, status_code=500)
+
+            async with async_session_maker() as session:
+                try:
+                    # Сначала обновляем все сделки, связанные с этим товаром
+                    # Устанавливаем product_id = NULL, но сохраняем product_name
+                    await session.execute(
+                        update(Deal)
+                        .where(Deal.product_id == product_id)
+                        .values(product_id=None)
+                    )
+
+                    # Теперь удаляем сам товар
+                    result = await session.execute(
+                        delete(Product)
+                        .where(Product.id == product_id)
+                        .where(Product.tg_id == payload.get("tg_id"))
+                    )
+
+                    await session.commit()
+
+                    if result.rowcount > 0:
+                        return JSONResponse({"status": "success"})
+                    else:
+                        return JSONResponse({"status": "error", "message": "Product not found or not owned by user"},
+                                            status_code=404)
+
+                except Exception as e:
+                    await session.rollback()
+                    print(f"Error deleting product: {e}")
+                    return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
+
     response = RedirectResponse(url="/store", status_code=303)
     return response
 
@@ -783,9 +810,12 @@ async def profile(request: Request, session_token=Cookie(default=None)):
                 admin_res = True
             referrals_count = await get_ref_count(payload.get("tg_id"))
             admin_crown = False
+            moderator_hat = False
             admin_role = await is_admin_new(user_info[0])
-            if admin_role:
+            if admin_role == "founder":
                 admin_crown = True
+            elif admin_role and admin_role != "founder":
+                moderator_hat = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -800,6 +830,7 @@ async def profile(request: Request, session_token=Cookie(default=None)):
                 "admin": admin_res,
                 "referrals_count": referrals_count,
                 "admin_crown": admin_crown,
+                "moderator_hat": moderator_hat,
                 "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("profile.html", context=context)
@@ -846,9 +877,12 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
             if admin_role:
                 admin_res = True
             admin_crown = False
+            moderator_hat = False
             admin_role = await is_admin_new(user_info[0])
-            if admin_role:
+            if admin_role == "founder":
                 admin_crown = True
+            elif admin_role and admin_role != "founder":
+                moderator_hat = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
             context = {
                 "request": request,
@@ -864,6 +898,7 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 "is_blocked": is_blocked,
                 "unblock_at": unblock_at,
                 "admin_crown": admin_crown,
+                "moderator_hat": moderator_hat,
                 "active_deals_count": active_deals_count
             }
             return templates.TemplateResponse("profile.html", context=context)
@@ -1363,7 +1398,7 @@ async def cleanup_unused_images(session_token=Cookie(default=None)):
     payload = await decode_jwt(session_token)
     admin_res = False
     admin_role = await is_admin_new(payload.get("tg_id"))
-    if can_moderate_chats(admin_role):
+    if can_moderate_products(admin_role):
         admin_res = True
     if not admin_res:
         raise HTTPException(status_code=403, detail="Forbidden")

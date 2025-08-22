@@ -49,7 +49,9 @@ async def record_referral(referrer_id: int, referred_id: int) -> bool:
             if existing_ref.scalar() > 0:
                 return False
 
-            print(referrer_id, referred_id)
+            if referrer_id == referred_id:
+                return False
+
             referral = Referral(
                 referrer_id=referrer_id,
                 referred_id=referred_id

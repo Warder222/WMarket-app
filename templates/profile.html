@@ -323,9 +323,26 @@
         fill: #1976D2; /* Синий цвет короны */
     }
 
-    {% if admin_crown %}
+    .moderator-hat {
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 80px;
+        z-index: 10;
+        filter: 
+            drop-shadow(0 0 2px white) /* Белая обводка */
+            drop-shadow(0 0 2px white) /* Дублируем для лучшей видимости */
+            drop-shadow(0 3px 6px rgba(25, 118, 210, 0.4));
+        transition: all 0.3s ease;
+        animation: hat-shine 2s ease-in-out infinite;
+        fill: #1976D2;
+    }
+
+    {% if admin_crown or moderator_hat %}
         .avatar {
-            margin-top: 20px; /* Дополнительный отступ аватара */
+            margin-top: 20px;
         }
     {% endif %}
 
@@ -337,6 +354,35 @@
     @keyframes crown-float {
         0% { transform: translateX(-50%) translateY(0px); }
         100% { transform: translateX(-50%) translateY(-8px); }
+    }
+
+    @keyframes hat-shine {
+        0% { 
+            filter: 
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 3px 6px rgba(25, 118, 210, 0.4)); 
+        }
+        50% { 
+            filter: 
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 3px 12px rgba(25, 118, 210, 0.8)); 
+        }
+        100% { 
+            filter: 
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 0 2px white)
+                drop-shadow(0 3px 6px rgba(25, 118, 210, 0.4)); 
+        }
+    }
+
+    .avatar-container:hover .moderator-hat {
+        transform: translateX(-50%) scale(1.1);
+        filter: 
+            drop-shadow(0 0 2px white)
+            drop-shadow(0 0 2px white)
+            drop-shadow(0 5px 10px rgba(25, 118, 210, 0.6));
     }
 
     @media (max-width: 400px) {
@@ -527,6 +573,69 @@
         50% { transform: scale(1.3); opacity: 0.8; }
         100% { transform: scale(1); opacity: 1; }
     }
+
+    .tooltip {
+        position: absolute;
+        background: var(--card-bg);
+        color: var(--text-color);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        pointer-events: none;
+        border: 1px solid var(--border-color);
+    }
+
+    .tooltip.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .tooltip::before {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: var(--card-bg);
+        transform: rotate(45deg);
+        border-bottom: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-color);
+    }
+
+    .admin-crown-tooltip {
+        top: -80px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .admin-crown-tooltip::before {
+        bottom: -5px;
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+    }
+
+    .moderator-hat-tooltip {
+        top: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .moderator-hat-tooltip::before {
+        bottom: -5px;
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+    }
+
+    .avatar-container {
+        position: relative;
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -569,9 +678,16 @@
     <div class="profile-info">
         <div class="avatar-container">
             {% if admin_crown %}
-            <svg class="admin-crown" viewBox="0 0 170.23 170.23">
-                <path d="M168.695,54.759c-1.424-1.124-3.406-1.187-4.861-0.119l-45.395,32.329L88.771,24.415c-1.34-2.818-5.98-2.818-7.309,0 L51.446,87.702L6.448,54.672c-1.46-1.079-3.464-1.042-4.899,0.081c-1.429,1.124-1.936,3.051-1.239,4.736l30.955,74.667 c0.147,0.343,0.385,0.606,0.606,0.896c5.938,10.035,35.158,12.878,53.246,12.878c17.95,0,46.886-2.79,53.124-12.646 c0.29-0.332,0.549-0.696,0.723-1.129l30.961-74.667C170.61,57.81,170.119,55.887,168.695,54.759z M85.112,139.819 c-28.039,0-44.645-5.543-46.269-8.264c-0.011-0.048-0.011-0.09-0.021-0.121c1.529-3.164,18.151-8.754,46.291-8.754 c28.271,0,44.946,5.647,46.327,8.342C130.058,134.171,113.383,139.819,85.112,139.819z M134.561,123.608 c-10.183-6.935-33.919-9.039-49.449-9.039c-15.53,0-39.277,2.104-49.449,9.039L13.34,69.777L50.597,97.12 c0.981,0.717,2.22,0.96,3.385,0.664c1.176-0.301,2.152-1.097,2.668-2.193L85.112,35.6l28.081,59.21 c0.512,1.081,1.472,1.888,2.632,2.183c1.16,0.307,2.395,0.074,3.37-0.622l37.831-26.952L134.561,123.608z"/>
-            </svg>
+                <svg class="admin-crown" viewBox="0 0 170.23 170.23">
+                    <path d="M168.695,54.759c-1.424-1.124-3.406-1.187-4.861-0.119l-45.395,32.329L88.771,24.415c-1.34-2.818-5.98-2.818-7.309,0 L51.446,87.702L6.448,54.672c-1.46-1.079-3.464-1.042-4.899,0.081c-1.429,1.124-1.936,3.051-1.239,4.736l30.955,74.667 c0.147,0.343,0.385,0.606,0.606,0.896c5.938,10.035,35.158,12.878,53.246,12.878c17.95,0,46.886-2.79,53.124-12.646 c0.29-0.332,0.549-0.696,0.723-1.129l30.961-74.667C170.61,57.81,170.119,55.887,168.695,54.759z M85.112,139.819 c-28.039,0-44.645-5.543-46.269-8.264c-0.011-0.048-0.011-0.09-0.021-0.121c1.529-3.164,18.151-8.754,46.291-8.754 c28.271,0,44.946,5.647,46.327,8.342C130.058,134.171,113.383,139.819,85.112,139.819z M134.561,123.608 c-10.183-6.935-33.919-9.039-49.449-9.039c-15.53,0-39.277,2.104-49.449,9.039L13.34,69.777L50.597,97.12 c0.981,0.717,2.22,0.96,3.385,0.664c1.176-0.301,2.152-1.097,2.668-2.193L85.112,35.6l28.081,59.21 c0.512,1.081,1.472,1.888,2.632,2.183c1.16,0.307,2.395,0.074,3.37-0.622l37.831-26.952L134.561,123.608z"/>
+                </svg>
+                <div class="tooltip admin-crown-tooltip">Основатель маркета</div>
+            {% elif moderator_hat %}
+                <svg class="moderator-hat" viewBox="0 0 318.52 318.519">
+                    <path d="M32.38,191.358h22.489v-21.412h21.409v21.412h21.412v-21.412h21.412v21.412h21.412v-21.412h18.787h2.619v0.177v21.235 h-2.619h-18.792v21.411h-21.412v-21.411H97.684v21.411H76.272v-21.411H54.863v21.411H42.646v9.854 c15.907,55.83,116.653,49.026,116.653,49.026s100.748,6.799,116.654-49.026v-22.898c0,0,4.257-3.459,10.025-8.187h-17.016v21.412 h-21.411v-21.412h-21.411v21.412h-21.412v-21.412h-21.411v21.23h-21.409v-21.23h21.409v-0.181v-21.23h21.411v21.411h21.412 v-21.411h21.411v21.411h21.411v-21.411h21.412v17.797c10.609-8.725,23.726-19.636,27.024-22.913 c5.753-5.727-12.257-12.174-17.575-36.151c-5.317-23.977-3.898-32.565-25.01-34.714c-21.116-2.146-55.432-3.578-82.627-27.558 c-27.195-23.975-32.889-19.682-32.889-19.682s-5.753-4.292-32.949,19.682C99.154,90.568,64.767,92,43.653,94.146 c-21.114,2.149-19.672,10.737-24.99,34.714s-23.294,30.424-17.541,36.151C4.871,168.74,21.34,182.327,32.38,191.358z" 
+                        fill="#1976D2"/>
+                </svg>
+                <div class="tooltip moderator-hat-tooltip">Модератор маркета</div>
             {% endif %}
             <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
         </div>
@@ -909,6 +1025,59 @@
         const menuButton = document.getElementById('menuButton');
         const dropdownMenu = document.getElementById('dropdownMenu');
         const shareReferral = document.getElementById('shareReferral');
+
+        const avatarContainer = document.querySelector('.avatar-container');
+        const adminCrownTooltip = document.querySelector('.admin-crown-tooltip');
+        const moderatorHatTooltip = document.querySelector('.moderator-hat-tooltip');
+
+        if (avatarContainer) {
+            let tooltipTimeout;
+            
+            // Показ подсказки при наведении
+            avatarContainer.addEventListener('mouseenter', function() {
+                clearTimeout(tooltipTimeout);
+                if (adminCrownTooltip) {
+                    tooltipTimeout = setTimeout(() => {
+                        adminCrownTooltip.classList.add('show');
+                    }, 300);
+                } else if (moderatorHatTooltip) {
+                    tooltipTimeout = setTimeout(() => {
+                        moderatorHatTooltip.classList.add('show');
+                    }, 300);
+                }
+            });
+
+            // Скрытие подсказки при уходе курсора
+            avatarContainer.addEventListener('mouseleave', function() {
+                clearTimeout(tooltipTimeout);
+                if (adminCrownTooltip) {
+                    adminCrownTooltip.classList.remove('show');
+                } else if (moderatorHatTooltip) {
+                    moderatorHatTooltip.classList.remove('show');
+                }
+            });
+
+            // Показ/скрытие подсказки при клике (для мобильных устройств)
+            avatarContainer.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (adminCrownTooltip) {
+                    adminCrownTooltip.classList.toggle('show');
+                } else if (moderatorHatTooltip) {
+                    moderatorHatTooltip.classList.toggle('show');
+                }
+            });
+
+            // Скрытие подсказки при клике вне области
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.avatar-container')) {
+                    if (adminCrownTooltip) {
+                        adminCrownTooltip.classList.remove('show');
+                    } else if (moderatorHatTooltip) {
+                        moderatorHatTooltip.classList.remove('show');
+                    }
+                }
+            });
+        }
 
         menuButton.addEventListener('click', function(e) {
             e.stopPropagation();
