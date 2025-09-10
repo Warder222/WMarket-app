@@ -17,7 +17,7 @@ class TonapiClient:
         self.base_url = base_url.rstrip('/') + '/'
         self.client = httpx.AsyncClient(timeout=30.0)
         self.max_retries = 3
-        self.rate_limit_delay = 0.5  # Задержка между запросами в секундах
+        self.rate_limit_delay = 0.5  #request timeout in seconds
 
     async def __aenter__(self):
         return self
@@ -38,7 +38,6 @@ class TonapiClient:
 
         for attempt in range(self.max_retries):
             try:
-                # logger.debug(f"Request attempt {attempt + 1} to {url}")
                 await asyncio.sleep(10)
                 response = await self.client.request(
                     method,
@@ -56,7 +55,6 @@ class TonapiClient:
                 return response.json()
 
             except httpx.HTTPStatusError as e:
-                # logger.warning(f"HTTP error {e.response.status_code}: {e}")
                 if attempt == self.max_retries - 1:
                     raise HTTPException(
                         status_code=502,
@@ -64,7 +62,6 @@ class TonapiClient:
                     )
 
             except httpx.RequestError as e:
-                # logger.warning(f"Request error: {e}")
                 if attempt == self.max_retries - 1:
                     raise HTTPException(
                         status_code=503,
@@ -89,32 +86,30 @@ async def withdraw_ton_request(wallet_address, amount):
     wallet = None
     try:
         mnemonic = settings.WALLET_MNEMONIC.split()
-
-        # Настраиваем логгирование для pytoniq
         logging.getLogger('pytoniq').setLevel(logging.WARNING)
 
-        # Подключаемся с таймаутом
+        # connect with timeout
         provider = LiteBalancer.from_mainnet_config(trust_level=2)
         await provider.start_up()
 
-        # Создаем кошелек с таймаутом
+        # create wallet with timeout
         wallet = await asyncio.wait_for(
             WalletV4R2.from_mnemonic(provider, mnemonics=mnemonic),
             timeout=30
         )
 
-        # Проверяем баланс кошелька с учетом комиссии (добавляем 0.1 TON для комиссии)
+        # Check the wallet balance (0.1 TON for commission)
         balance = await asyncio.wait_for(wallet.get_balance(), timeout=30)
         current_balance = balance / 1e9
 
-        # Минимальная сумма для вывода с учетом комиссии
+        # Minimum withdrawal amount + commission
         min_amount_with_fee = amount
 
         if current_balance < min_amount_with_fee:
             logger.warning(f"Insufficient wallet balance: {current_balance} < {min_amount_with_fee}")
             return {"status": False, "error": "Insufficient wallet balance"}
 
-        # Отправляем TON (переводим в нанотоны)
+        # Send TON
         amount_nano = int(amount * 1e9)
         transfer = await asyncio.wait_for(
             wallet.transfer(
@@ -149,6 +144,7 @@ async def withdraw_ton_request(wallet_address, amount):
             except:
                 pass
 
+
 async def connect_wallet(mnemonic):
     try:
         for _ in range(5):
@@ -165,9 +161,11 @@ async def connect_wallet(mnemonic):
     except Exception as e:
         print(f"Не удалось подключиться после нескольких попыток ({e})")
 
+
 async def check_balance(wallet):
     balance = await wallet.get_balance()
     return "{:.2f}".format(balance / 1e9)
+
 
 async def send_ton(wallet, destination_address: str, amount_ton: float):
     try:

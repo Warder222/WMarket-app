@@ -11,7 +11,7 @@ from sqlalchemy import select, update, func, desc, delete
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
-from src.config import settings, manager
+from src.config import settings
 from src.database.database import async_session_maker, User, TonTransaction, ChatParticipant, Chat, Deal, Review, \
     Product
 from src.database.methods import (get_all_users, add_user, update_token, get_all_categories, get_all_products,
@@ -34,6 +34,7 @@ from src.database.methods import (get_all_users, add_user, update_token, get_all
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import parse_init_data, encode_jwt, decode_jwt, is_admin_new, get_ton_to_rub_rate, can_manage_admins, \
     can_moderate_reviews, can_moderate_chats, can_moderate_products, can_moderate_deals
+from src.websocket_config import manager
 
 wmarket_router = APIRouter(
     prefix="",

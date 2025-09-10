@@ -1,18 +1,19 @@
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs
+
 import jwt
+import requests
 from sqlalchemy import select
 
 from src.config import settings
-from urllib.parse import parse_qs
-import requests
-
-from src.database.database import async_session_maker, AdminRole
+from src.database.database import AdminRole, async_session_maker
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 
 
+#auth___________________________________________________________________________________________________________________
 def parse_init_data(init_data):
     parsed = parse_qs(init_data)
     if 'user' not in parsed:
@@ -45,8 +46,10 @@ async def decode_jwt(token):
         return jwt.decode(token, key=SECRET_KEY, algorithms=ALGORITHM)
     except Exception as e:
         return {"sub": str(e)}
+#_______________________________________________________________________________________________________________________
 
 
+#payment$ton____________________________________________________________________________________________________________
 async def get_ton_to_rub_rate():
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
@@ -62,17 +65,16 @@ async def get_ton_to_rub_rate():
     except Exception as e:
         print("Ошибка при получении данных:", e)
         return None
+#_______________________________________________________________________________________________________________________
 
 
+#admin___________________________________________________________________________________________________________________
 async def is_admin_new(tg_id):
-    """Возвращает роль админа: founder, chat_moderator и т.д. или None"""
     tg_id = int(tg_id)
 
-    # Проверяем, является ли пользователь founder (из .env)
     if str(tg_id) in [admin.strip() for admin in settings.ADMINS.split(",") if admin.strip()]:
         return "founder"
 
-    # Проверяем базу данных
     async with async_session_maker() as session:
         result = await session.execute(select(AdminRole).where(AdminRole.user_id == tg_id))
         role = result.scalar_one_or_none()
@@ -93,3 +95,4 @@ def can_moderate_deals(role):
 
 def can_manage_admins(role):
     return role == "founder"
+#_______________________________________________________________________________________________________________________

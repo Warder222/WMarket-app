@@ -1,29 +1,26 @@
-import os
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, BotCommand
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from src.config import settings
-from src.database.methods import get_user_info, get_product_info, get_all_users
 import asyncio
 import logging
 
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import BotCommand, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from src.config import settings
+from src.database.methods import get_all_users, get_product_info
 from src.utils import is_admin_new
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Инициализация бота
 bot = Bot(token=settings.TG_BOT_TOKEN)
 dp = Dispatcher()
 
 
 async def send_notification_to_user(user_id: int, message: str, product_id: int = None):
     try:
-        # Создаем клавиатуру с кнопкой "Перейти в чат"
         builder = InlineKeyboardBuilder()
 
         await bot.send_message(
@@ -36,7 +33,6 @@ async def send_notification_to_user(user_id: int, message: str, product_id: int 
 
 
 async def set_main_menu(bot: Bot):
-    # Список команд с описанием
     main_menu_commands = [
         BotCommand(command='/start', description='Запустить бота'),
         BotCommand(command='/broadcast', description='Рассылка (админ)'),
@@ -47,7 +43,6 @@ async def set_main_menu(bot: Bot):
 
 @dp.message(Command("start"))
 async def handle_start(message: Message):
-    # Обработка deep links для быстрого перехода в чат
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("chat_"):
         product_id = int(args[1].split("_")[1])
@@ -77,12 +72,10 @@ async def handle_start(message: Message):
         )
 
 
-# Добавляем состояние для FSM
 class BroadcastState(StatesGroup):
     waiting_for_message = State()
 
 
-# Обработчик команды /broadcast
 @dp.message(Command("broadcast"))
 async def cmd_broadcast(message: Message, state: FSMContext):
     admin_res = False
@@ -100,7 +93,6 @@ async def cmd_broadcast(message: Message, state: FSMContext):
     await state.set_state(BroadcastState.waiting_for_message)
 
 
-# Обработчик текста в состоянии ожидания сообщения
 @dp.message(BroadcastState.waiting_for_message, F.text)
 async def process_broadcast_message(message: Message, state: FSMContext):
     broadcast_text = message.text
@@ -116,7 +108,7 @@ async def process_broadcast_message(message: Message, state: FSMContext):
                 text=f"{broadcast_text}"
             )
             success += 1
-            await asyncio.sleep(0.1)  # Задержка между отправками
+            await asyncio.sleep(0.1)
         except Exception as e:
             failed += 1
             continue
