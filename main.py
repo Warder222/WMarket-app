@@ -6,10 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_socketio import SocketManager
 
 from src.bot import start_bot
-from src.endpoints import wmarket_router
+from src.endpoints._endpoints_config import wmarket_router, wmarket_api_router
 
 app = FastAPI()
+
 app.include_router(wmarket_router)
+app.include_router(wmarket_api_router)
+
 app.mount("/static", StaticFiles(directory="static"))
 
 app.add_middleware(
@@ -36,7 +39,6 @@ async def run_app():
         await bot_task
     except asyncio.CancelledError:
         pass
-
 
 if __name__ == "__main__":
     asyncio.run(run_app())

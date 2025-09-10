@@ -277,7 +277,7 @@
                 }
                 
                 // Перенаправляем на страницу объявлений на модерации
-                window.location.href = result.redirect || '/ads_review?tab=moderation';
+                window.location.href = result.redirect || '/product_review?tab=moderation';
                 
             } catch (error) {
                 const errorMessage = error.message.replace(/<[^>]*>?/gm, '');

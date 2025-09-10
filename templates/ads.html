@@ -1459,7 +1459,7 @@
                     const result = await response.json();
                     if (result.status === "success") {
                         showNotification(`Объявление успешно обновлено!`, 'success');
-                        window.location.href = result.redirect || '/ads_review?tab=moderation';
+                        window.location.href = result.redirect || '/product_review?tab=moderation';
                     } else {
                         showNotification(`Ошибка при обновлении объявления`, 'error');
                     }

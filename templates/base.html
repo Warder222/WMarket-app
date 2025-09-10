@@ -246,7 +246,7 @@
             </span>
         </a>
         
-        <a href="{{ url_for('ads_review') }}" class="nav-item">
+        <a href="{{ url_for('product_review') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
@@ -303,7 +303,7 @@
         window.addEventListener('beforeunload', function() {
             // Сохраняем позицию только если это список объявлений или магазин
             const path = window.location.pathname;
-            if (path === '/' || path === '/ads_review' || path === '/favs' || path === '/deals') {
+            if (path === '/' || path === '/product_review' || path === '/favs' || path === '/deals') {
                 sessionStorage.setItem('scrollPosition', window.scrollY);
             }
         });
@@ -314,7 +314,7 @@
             
             // Восстанавливаем позицию ТОЛЬКО если мы на той же странице (например, после refresh)
             const path = window.location.pathname;
-            if ((path === '/' || path === '/ads_review' || path === '/favs' || path === '/deals') && savedPosition) {
+            if ((path === '/' || path === '/product_review' || path === '/favs' || path === '/deals') && savedPosition) {
                 // Задержка, чтобы контент успел загрузиться
                 setTimeout(() => {
                     window.scrollTo(0, parseInt(savedPosition));
