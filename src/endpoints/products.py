@@ -172,7 +172,7 @@ async def add_product_post(
                     "Обычно проверка занимает до 24 часов."
                 )
 
-                return JSONResponse({"status": "success", "redirect": "/ads_review?tab=moderation"})
+                return JSONResponse({"status": "success", "redirect": "/product_review?tab=moderation"})
 
             except Exception as e:
                 print(str(e))
@@ -363,7 +363,7 @@ async def edit_product_post(
 
             return JSONResponse({
                 "status": "success",
-                "redirect": "/ads_review?tab=moderation"
+                "redirect": "/product_review?tab=moderation"
             })
         else:
             print("Failed to update product")
