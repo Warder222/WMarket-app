@@ -4,20 +4,19 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import Request, Cookie, Form, UploadFile, File, HTTPException
+from fastapi import Cookie, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
-from sqlalchemy import update, delete
+from sqlalchemy import delete, select, update
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings
-from src.database.database import async_session_maker, Deal, Product
-from src.database.methods import (get_all_users, get_all_categories,
-                                  add_new_product, get_product_info, get_user_active_products,
-                                  get_user_moderation_products, all_count_unread_messages,
-                                  get_user_archived_products, archive_product_post,
-                                  restore_product_post, update_product_post, get_user_active_deals_count)
-from src.endpoints._endpoints_config import wmarket_router, templates
+from src.database.database import Category, Deal, Product, async_session_maker
+from src.database.methods import (all_count_unread_messages, archive_product_post, get_all_users,
+                                  get_product_info_new, get_user_active_deals_count, get_user_active_products_new,
+                                  get_user_archived_products_new, get_user_moderation_products_new,
+                                  update_product_post)
+from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 
 
@@ -36,11 +35,11 @@ async def product_review(request: Request, session_token=Cookie(default=None)):
             archived_products = []
 
             if tab == 'active':
-                active_products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+                active_products = await get_user_active_products_new(payload.get("tg_id"), payload.get("tg_id"))
             elif tab == 'moderation':
-                moderation_products = await get_user_moderation_products(payload.get("tg_id"))
+                moderation_products = await get_user_moderation_products_new(payload.get("tg_id"))
             elif tab == 'archived':
-                archived_products = await get_user_archived_products(payload.get("tg_id"))
+                archived_products = await get_user_archived_products_new(payload.get("tg_id"))
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -73,7 +72,18 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            categories = await get_all_categories()
+
+            categories = []
+            async with async_session_maker() as db:
+                try:
+                    q = select(Category)
+                    result = await db.execute(q)
+                    categories = result.scalars()
+                    all_categories = [cat.category_name for cat in categories]
+                    categories = all_categories
+                except Exception as exc:
+                    print(f"Error: {exc}")
+
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
             admin_role = await is_admin_new(payload.get("tg_id"))
@@ -137,7 +147,20 @@ async def add_product_post(
                     "product_image_url": json.dumps(image_urls)
                 }
 
-                await add_new_product(product_data, payload.get("tg_id"))
+                async with async_session_maker() as db:
+                    try:
+                        product = Product(
+                            tg_id=payload.get("tg_id"),
+                            category_name=product_data.get("category_name"),
+                            product_name=product_data.get("product_name"),
+                            product_price=product_data.get("product_price"),
+                            product_description=product_data.get("product_description"),
+                            product_image_url=product_data.get("product_image_url")
+                        )
+                        db.add(product)
+                        await db.commit()
+                    except Exception as exc:
+                        print(exc)
 
                 await send_notification_to_user(
                     payload.get("tg_id"),
@@ -224,7 +247,19 @@ async def restore_product(product_id: int, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            rest_product = await restore_product_post(product_id=product_id)
+            rest_product = False
+            async with async_session_maker() as db:
+                try:
+                    await db.execute(
+                        update(Product)
+                        .where(Product.id == product_id)
+                        .values(active=True)
+                    )
+                    await db.commit()
+                    rest_product = True
+                except Exception as e:
+                    print(e)
+
             if rest_product:
                 return JSONResponse({"status": "success"})
             else:
@@ -252,8 +287,8 @@ async def edit_product_post(
     payload = await decode_jwt(session_token)
     print(f"Editing product {product_id} for user {payload.get('tg_id')}")
 
-    product = await get_product_info(product_id, payload.get("tg_id"))
-    if not product or product[1] != payload.get("tg_id"):
+    product = await get_product_info_new(product_id, payload.get("tg_id"))
+    if not product or product["tg_id"] != payload.get("tg_id"):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
     try:
@@ -272,7 +307,6 @@ async def edit_product_post(
 
         print(f"Filtered existing images: {existing_images}")
 
-        # Process new images
         new_image_urls = []
         if product_images:
             print(f"Processing {len(product_images)} new images")

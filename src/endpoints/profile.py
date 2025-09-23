@@ -1,12 +1,13 @@
-
 from datetime import datetime, timezone
 
 from fastapi import Request, Cookie
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select, func
 
-from src.database.methods import (get_all_users, get_user_active_products, all_count_unread_messages, get_ref_count,
+from src.database.database import async_session_maker, Referral
+from src.database.methods import (get_all_users, all_count_unread_messages,
                                   check_user_blocked_post, check_user_block_post, get_user_active_deals_count,
-                                  get_user_info)
+                                  get_user_info_new, get_user_active_products_new)
 from src.endpoints._endpoints_config import wmarket_router, templates
 from src.utils import decode_jwt, is_admin_new
 
@@ -19,21 +20,33 @@ async def profile(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            user_info = await get_user_info(payload.get("tg_id"))
-            positive_reviews = user_info[3]
-            negative_reviews = user_info[4]
+            user_info = await get_user_info_new(payload.get("tg_id"))
+            positive_reviews = user_info["plus_rep"]
+            negative_reviews = user_info["minus_rep"]
             reputation = positive_reviews - negative_reviews
-            products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+            products = await get_user_active_products_new(payload.get("tg_id"), payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
             admin_role = await is_admin_new(payload.get("tg_id"))
             if admin_role:
                 admin_res = True
-            referrals_count = await get_ref_count(payload.get("tg_id"))
+            referrals_count = []
+            async with async_session_maker() as db:
+                try:
+                    refs = await db.execute(
+                        select(func.count()).select_from(Referral).where(
+                            (Referral.referrer_id == payload.get("tg_id"))
+                        )
+                    )
+
+                    referrals_count = refs.scalar()
+                except Exception as exc:
+                    print(f"Error: {exc}")
+
             admin_crown = False
             moderator_hat = False
-            admin_role = await is_admin_new(user_info[0])
+            admin_role = await is_admin_new(user_info["tg_id"])
             if admin_role == "founder":
                 admin_crown = True
             elif admin_role and admin_role != "founder":
@@ -86,11 +99,11 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 else:
                     is_blocked = False
 
-            user_info = await get_user_info(seller_tg_id)
-            positive_reviews = user_info[3]
-            negative_reviews = user_info[4]
+            user_info = await get_user_info_new(seller_tg_id)
+            positive_reviews = user_info["plus_rep"]
+            negative_reviews = user_info["minus_rep"]
             reputation = positive_reviews - negative_reviews
-            products = await get_user_active_products(seller_tg_id, payload.get("tg_id"))
+            products = await get_user_active_products_new(seller_tg_id, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -99,7 +112,7 @@ async def another_profile(seller_tg_id: int, request: Request, session_token=Coo
                 admin_res = True
             admin_crown = False
             moderator_hat = False
-            admin_role = await is_admin_new(user_info[0])
+            admin_role = await is_admin_new(user_info["tg_id"])
             if admin_role == "founder":
                 admin_crown = True
             elif admin_role and admin_role != "founder":

@@ -507,22 +507,22 @@
             const grid = document.getElementById(`${tab}AdsGrid`);
             
             products.forEach(product => {
-                const isReserved = product[9] || false;
+                const isReserved = product["reserved"] || false;
                 const isModeration = tab === 'moderation';
                 const isArchived = tab === 'archived';
                 
                 const productHtml = `
-                    <div class="ad-card ${isReserved ? 'reserved' : ''} ${isModeration ? 'moderation' : ''} ${isArchived ? 'archived' : ''}" data-id="${product[4]}">
+                    <div class="ad-card ${isReserved ? 'reserved' : ''} ${isModeration ? 'moderation' : ''} ${isArchived ? 'archived' : ''}" data-id="${product["product_id"]}">
                         ${isReserved ? '<div class="reserved-badge">Забронировано</div>' : ''}
                         ${isModeration ? '<div class="moderation-badge">На проверке</div>' : ''}
                         ${isArchived ? '<div class="archived-badge">В архиве</div>' : ''}
                         
-                        <img src="/${product[3]}" class="ad-image">
+                        <img src="/${product["product_image_url"]}" class="ad-image">
                         <div class="ad-details">
-                            <div class="ad-title">${product[0]}</div>
-                            <div class="ad-price">${product[1]} ₽</div>
+                            <div class="ad-title">${product["product_name"]}</div>
+                            <div class="ad-price">${product["product_price"]} ₽</div>
                             <div class="ad-description">
-                                <b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}
+                                <b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}
                             </div>
                         </div>
                         
@@ -530,7 +530,7 @@
                             <div class="ad-actions">
                                 ${tab === 'active' && !isReserved ? `
                                     <div class="action-group archive-group">
-                                        <button class="ad-action-btn archive-btn" data-id="${product[4]}" title="В архив">
+                                        <button class="ad-action-btn archive-btn" data-id="${product["product_id"]}" title="В архив">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <polyline points="21 8 21 21 3 21 3 8"></polyline>
                                                 <rect x="1" y="3" width="22" height="5"></rect>
@@ -542,7 +542,7 @@
                                 
                                 ${tab === 'archived' ? `
                                     <div class="action-group archive-group">
-                                        <button class="ad-action-btn restore-btn" data-id="${product[4]}" title="Восстановить">
+                                        <button class="ad-action-btn restore-btn" data-id="${product["product_id"]}" title="Восстановить">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                                                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
@@ -552,7 +552,7 @@
                                 ` : ''}
                                 
                                 <div class="action-group">
-                                    <button class="ad-action-btn delete-btn" data-id="${product[4]}" title="Удалить">
+                                    <button class="ad-action-btn delete-btn" data-id="${product["product_id"]}" title="Удалить">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="3 6 5 6 21 6"></polyline>
                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>

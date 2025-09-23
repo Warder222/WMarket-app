@@ -206,17 +206,17 @@
                 products.forEach(product => {
                     const productHtml = `
                         <div class="ads-container">
-                            <div class="ad-card" data-title="${product[0]}" data-description="${product[2]}" data-id="${product[4]}">
-                                <img src="/${product[3]}" class="ad-image">
+                            <div class="ad-card" data-title="${product["product_name"]}" data-description="${product["product_description"]}" data-id="${product["product_id"]}">
+                                <img src="/${product["product_image_url"]}" class="ad-image">
                                 <div class="ad-details">
-                                    <div class="ad-title">${product[0]}</div>
-                                    <div class="ad-favorite-del" data-id="${product[4]}">
+                                    <div class="ad-title">${product["product_name"]}</div>
+                                    <div class="ad-favorite-del" data-id="${product["product_id"]}">
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                         </svg>
                                     </div>
-                                    <div class="ad-price">${product[1]} ₽</div>
-                                    <div class="ad-description"><b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}</div>
+                                    <div class="ad-price">${product["product_price"]} ₽</div>
+                                    <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
                                 </div>
                             </div>
                         </div>

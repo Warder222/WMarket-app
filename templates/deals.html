@@ -4,7 +4,9 @@
 <style>
     a {
         text-decoration: none;
+        color: var(--text-color);
     }
+
     .header {
         position: sticky;
         top: 0;
@@ -675,10 +677,10 @@
                         <div class="deal-counterparty">
                             {% if deal.buyer_id == user_tg_id %}
                                 <span>Продавец:</span>
-                                <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
+                                <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['seller_id'] }}">{{ deal.seller_first_name or deal.seller_username }}</a></b></span>
                             {% else %}
                                 <span>Покупатель:</span>
-                                <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
+                                <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['buyer_id'] }}">{{ deal.buyer_first_name or deal.buyer_username }}</a></b></span>
                             {% endif %}
                         </div>
                         <div class="deal-time" data-utc-time="{% if deal.completed_at %}{{ deal.completed_at.isoformat() }}{% else %}{{ deal.created_at.isoformat() }}{% endif %}"></div>

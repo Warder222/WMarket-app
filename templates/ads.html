@@ -843,10 +843,10 @@
         </button>
         
         <div class="gallery-container">
-            {% set images = product_info[5]|from_json %}
+            {% set images = product_info["product_image_url"]|from_json %}
             {% for image in images %}
             <div class="gallery-slide {% if loop.first %}active{% endif %}">
-                <img src="/{{ image }}" alt="{{ product_info[2] }}">
+                <img src="/{{ image }}" alt="{{ product_info['product_name'] }}">
             </div>
             {% endfor %}
             
@@ -872,24 +872,24 @@
         </div>
 
         <div class="ad-header">
-            <h1 class="ad-title">{{ product_info[2] }}</h1>
+            <h1 class="ad-title">{{ product_info["product_name"] }}</h1>
             <div class="ad-actions">
-                {% if product_info[1] != user_tg_id %}
-                    {% if admin and not product_info.reserved %}
-                    <button class="ad-report" data-id="{{ product_info[0] }}">
+                {% if product_info["tg_id"] != user_tg_id %}
+                    {% if admin and not product_info["reserved"] %}
+                    <button class="ad-report" data-id="{{ product_info['product_id'] }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                         </svg>
                     </button>
                     {% endif %}
-                    {% if product_info[8] == True %}
-                        <button class="ad-favorite-del" data-id="{{ product_info[0] }}">
+                    {% if product_info["is_fav"] == True %}
+                        <button class="ad-favorite-del" data-id="{{ product_info['product_id'] }}">
                             <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
                         </button>
                     {% else %}
-                        <button class="ad-favorite" data-id="{{ product_info[0] }}">
+                        <button class="ad-favorite" data-id="{{ product_info['product_id'] }}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                             </svg>
@@ -906,8 +906,8 @@
                         </div>
                     </div>
                     
-                    {% if not product_info.reserved %}
-                    <button class="ad-edit" data-id="{{ product_info[0] }}">
+                    {% if not product_info["reserved"] %}
+                    <button class="ad-edit" data-id="{{ product_info['product_id'] }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -918,26 +918,26 @@
             </div>
         </div>
 
-        <div class="ad-price">{{ product_info[3] }} ₽</div>
+        <div class="ad-price">{{ product_info["product_price"] }} ₽</div>
         
-        {% if product_info.reserved %}
+        {% if product_info["reserved"] %}
             <div class="reservation-info">
-                {% if product_info.reserved_by == user_tg_id %}
-                    <p>Вы забронировали этот товар до {{ product_info.reserved_until.strftime('%d.%m.%Y %H:%M') }}</p>
+                {% if product_info["reserved_by"] == user_tg_id %}
+                    <p>Вы забронировали этот товар до {{ product_info["reserved_until"].strftime('%d.%m.%Y %H:%M') }}</p>
                     <p>Перейдите во вкладку "Сделки" и завершите покупку</p>
-                {% elif product_info[1] == user_tg_id %}
-                    <p>Ваш товар зарезервирован до {{ product_info.reserved_until.strftime('%d.%m.%Y %H:%M') }}</p>
+                {% elif product_info["tg_id"] == user_tg_id %}
+                    <p>Ваш товар зарезервирован до {{ product_info["reserved_until"].strftime('%d.%m.%Y %H:%M') }}</p>
                     <p>Ожидайте завершения сделки покупателем</p>
                 {% else %}
-                    <p>Товар зарезервирован до {{ product_info.reserved_until.strftime('%d.%m.%Y %H:%M') }}</p>
+                    <p>Товар зарезервирован до {{ product_info["reserved_until"].strftime('%d.%m.%Y %H:%M') }}</p>
                 {% endif %}
             </div>
         {% endif %}
-        {% if product_info[1] != user_tg_id %}
+        {% if product_info["tg_id"] != user_tg_id %}
         <div class="seller-info">
             <div class="seller-header">
-                <img src="{{ user_info[2] }}" alt="Аватар продавца" class="seller-avatar">
-                <div class="seller-username">{{ user_info[1] }}</div>
+                <img src="{{ user_info['photo_url'] }}" alt="Аватар продавца" class="seller-avatar">
+                <div class="seller-username">{{ user_info["first_name"] }}</div>
                 <div class="seller-reputation">
                     <div class="reputation-value 
                         {% if reputation > 0 %}positive
@@ -959,7 +959,7 @@
             </div>
         </div>
         {% endif %}
-        {% if product_info[1] != user_tg_id and not product_info.reserved %}
+        {% if product_info["tg_id"] != user_tg_id and not product_info["reserved"] %}
             <div class="action-buttons">
                 <button id="payButton" class="action-btn payment-btn">
                     Оплатить
@@ -993,7 +993,7 @@
                     
                     <div id="paymentDetails" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
                         <div id="rubDetails" style="display: none;">
-                            <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Сумма к оплате: {{ product_info[3] }} ₽</p>
+                            <p style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Сумма к оплате: {{ product_info["product_price"] }} ₽</p>
                             <button onclick="processPayment('rub')" class="payment-confirm-btn" style="width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">
                                 Оплатить
                             </button>
@@ -1017,7 +1017,7 @@
                 </div>
             </div>
 
-            <button class="action-btn contact-btn" onclick="window.location.href='/start_chat/{{ product_info[0] }}'">
+            <button class="action-btn contact-btn" onclick="window.location.href='/start_chat/{{ product_info['product_id'] }}'">
                 Написать продавцу
             </button>
         {% endif %}
@@ -1049,7 +1049,7 @@
                 </div>
                 
                 <div id="reserveAmountInfo" class="reservation-amount">
-                    Сумма бронирования: {{ (product_info[3] * 0.15) | round(2) }} ₽
+                    Сумма бронирования: {{ (product_info["product_price"] * 0.15) | round(2) }} ₽
                 </div>
                 
                 <button id="confirmReserveBtn" class="confirm-reservation-btn">
@@ -1064,36 +1064,36 @@
         <div class="modal-content">
             <div class="modal-title">Редактировать объявление</div>
             <form id="editForm" enctype="multipart/form-data">
-                <input type="hidden" name="product_id" value="{{ product_info[0] }}">
+                <input type="hidden" name="product_id" value="{{ product_info['product_id'] }}">
                 
                 <div class="form-group">
                     <label for="editTitle">Название</label>
-                    <input type="text" id="editTitle" name="title" value="{{ product_info[2] }}" required>
+                    <input type="text" id="editTitle" name="title" value="{{ product_info['product_name'] }}" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="editPrice">Цена (₽)</label>
-                    <input type="number" id="editPrice" name="price" value="{{ product_info[3] }}" required>
+                    <input type="number" id="editPrice" name="price" value="{{ product_info['product_price'] }}" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="editCategory">Категория</label>
                     <select id="editCategory" name="category" required>
                         {% for category in categories %}
-                            <option value="{{ category }}" {% if category == product_info[6] %}selected{% endif %}>{{ category }}</option>
+                            <option value="{{ category }}" {% if category == product_info['category_name'] %}selected{% endif %}>{{ category }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 
                 <div class="form-group">
                     <label for="editDescription">Описание</label>
-                    <textarea id="editDescription" name="description" required>{{ product_info[4] }}</textarea>
+                    <textarea id="editDescription" name="description" required>{{ product_info["product_description"] }}</textarea>
                 </div>
                 
                 <div class="form-group">
                     <label>Фотографии товара (максимум 10)</label>
                     <div id="imageGallery" class="image-gallery">
-                        {% set images = product_info[5]|from_json %}
+                        {% set images = product_info["product_image_url"]|from_json %}
                         {% for image in images %}
                         <div class="gallery-item" data-image="{{ image }}">
                             <img src="/{{ image }}" alt="Фото товара">
@@ -1111,7 +1111,7 @@
                     </label>
                     <input type="file" id="addImages" name="new_images" accept="image/jpeg,image/png,image/gif" multiple style="display: none;">
                     
-                    <input type="hidden" id="currentImages" name="current_images" value="{{ product_info[5] }}">
+                    <input type="hidden" id="currentImages" name="current_images" value="{{ product_info['product_image_url'] }}">
                 </div>
                 
                 <div class="modal-actions">
@@ -1273,7 +1273,7 @@
             if (sellerInfo) {
                 sellerInfo.addEventListener('click', (e) => {
                     if (!e.target.closest('.ad-favorite, .ad-favorite-del, .ad-report, .contact-btn')) {
-                        window.location.href = `/profile/{{ product_info[1] }}`;
+                        window.location.href = `/profile/{{ product_info["tg_id"] }}`;
                     }
                 });
                 sellerInfo.style.cursor = 'pointer';
@@ -1472,7 +1472,7 @@
             // Проверка существования чата
             async function checkChatExists() {
                 try {
-                    const response = await fetch(`/check_chat_exists/{{ product_info[0] }}`);
+                    const response = await fetch(`/check_chat_exists/{{ product_info['product_id'] }}`);
                     const data = await response.json();
                     return data.exists;
                 } catch (error) {
@@ -1719,7 +1719,7 @@
             }
 
             async function updateReserveAmount(currency) {
-                const rubAmount = {{ product_info[3] }} * 0.15;
+                const rubAmount = {{ product_info["product_price"] }} * 0.15;
                 const amountElement = document.getElementById('reserveAmountInfo');
                 const confirmBtn = document.getElementById('confirmReserveBtn');
                 
@@ -1755,7 +1755,7 @@
             }
 
             document.getElementById('confirmReserveBtn')?.addEventListener('click', async function() {
-                const rubAmount = {{ product_info[3] }} * 0.15;
+                const rubAmount = {{ product_info["product_price"] }} * 0.15;
                 let amount, currency = currentReserveCurrency;
                 
                 if (currency === 'rub') {
@@ -1793,7 +1793,7 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            product_id: {{ product_info[0] }},
+                            product_id: {{ product_info["product_id"] }},
                             amount: amount,
                             currency: currency
                         })
@@ -1872,7 +1872,7 @@
                         throw new Error('Неверный курс TON');
                     }
                     
-                    const tonAmount = ({{ product_info[3] }} / rate).toFixed(4);
+                    const tonAmount = ({{ product_info["product_price"] }} / rate).toFixed(4);
                     document.getElementById('tonAmount').textContent = tonAmount;
                     
                     // Активируем кнопку подтверждения
@@ -1903,8 +1903,8 @@
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
-                                product_id: {{ product_info[0] }},
-                                amount: {{ product_info[3] }},
+                                product_id: {{ product_info["product_id"] }},
+                                amount: {{ product_info["product_price"] }},
                                 currency: 'meet'
                             })
                         });
@@ -1937,7 +1937,7 @@
                     }
                 }
                 
-                const amount = method === 'rub' ? {{ product_info[3] }} : parseFloat(document.getElementById('tonAmount').textContent);
+                const amount = method === 'rub' ? {{ product_info["product_price"] }} : parseFloat(document.getElementById('tonAmount').textContent);
                 
                 try {
                     const balanceResponse = await fetch('/get_wallet_balance');
@@ -1959,7 +1959,7 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            product_id: {{ product_info[0] }},
+                            product_id: {{ product_info["product_id"] }},
                             amount: amount,
                             currency: method
                         })

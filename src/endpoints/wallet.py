@@ -1,16 +1,16 @@
 from datetime import datetime, timezone
 
-from fastapi import Request, Cookie
+from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, update
+from sqlalchemy import desc, select, update
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings
-from src.database.database import async_session_maker, User, TonTransaction
-from src.database.methods import (get_all_users, all_count_unread_messages, get_current_currency, set_current_currency, get_balance_user_info,
-                                  add_ton_balance, get_user_ton_transactions, create_ton_transaction, get_user_active_deals_count)
-from src.endpoints._endpoints_config import wmarket_router, templates
+from src.database.database import TonTransaction, User, async_session_maker
+from src.database.methods import (all_count_unread_messages, create_ton_transaction,
+                                  get_all_users, get_user_active_deals_count)
+from src.endpoints._endpoints_config import templates, wmarket_router
 from src.tonapi import TonapiClient, withdraw_ton_request
 from src.utils import decode_jwt, is_admin_new
 
@@ -55,7 +55,16 @@ async def get_wallet_balance(request: Request, session_token=Cookie(default=None
 
     try:
         payload = await decode_jwt(session_token)
-        user_data = await get_balance_user_info(payload.get('tg_id'))
+
+        user_data = None
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(User.rub_balance, User.ton_balance, User.current_currency)
+                .where(User.tg_id == payload.get('tg_id'))
+            )
+            user_data_result = result.fetchone()
+            user_data = user_data_result
+
         if not user_data:
             return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
 
@@ -87,7 +96,14 @@ async def set_currency(request: Request, session_token=Cookie(default=None)):
     if currency not in ['rub', 'ton']:
         return JSONResponse({"status": "error", "message": "Invalid currency"}, status_code=400)
 
-    await set_current_currency(payload.get("tg_id"), currency)
+    async with async_session_maker() as session:
+        await session.execute(
+            update(User)
+            .where(User.tg_id == payload.get("tg_id"))
+            .values(current_currency=currency)
+        )
+        await session.commit()
+
     return JSONResponse({"status": "success"})
 
 
@@ -97,7 +113,12 @@ async def get_currency(request: Request, session_token=Cookie(default=None)):
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    currency = await get_current_currency(payload.get("tg_id"))
+    currency = None
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(User.current_currency).where(User.tg_id == payload.get("tg_id")))
+        currency_new = result.scalar_one_or_none()
+        currency = currency_new or 'rub'
 
     return JSONResponse({
         "status": "success",
@@ -111,7 +132,18 @@ async def get_ton_transactions(request: Request, session_token=Cookie(default=No
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    transactions = await get_user_ton_transactions(payload.get("tg_id"))
+    transactions = []
+    async with async_session_maker() as session:
+        try:
+            result = await session.execute(
+                select(TonTransaction)
+                .where(TonTransaction.user_id == payload.get("tg_id"))
+                .order_by(desc(TonTransaction.created_at))
+                .limit(20)
+            )
+            transactions = result.scalars().all()
+        except Exception as e:
+            print(f"Error getting transactions: {e}")
 
     return JSONResponse({
         "status": "success",
@@ -178,7 +210,18 @@ async def deposit_ton(
 
             user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
             user = user.scalar_one_or_none()
-            await add_ton_balance(payload.get("tg_id"), amount)
+
+            async with async_session_maker() as session:
+                try:
+                    user = await session.execute(select(User).where(User.tg_id == payload.get("tg_id")))
+                    user = user.scalar_one_or_none()
+                    if user:
+                        user.ton_balance += amount
+                        await session.commit()
+
+                except Exception as e:
+                    print(f"Error updating TON balance: {e}")
+                    return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
 
             await session.execute(
                 update(TonTransaction)

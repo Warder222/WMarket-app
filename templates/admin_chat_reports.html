@@ -1009,19 +1009,19 @@
         </button>
         {% if moderation_products %}
             {% for product in moderation_products %}
-            <div class="product-item" data-product-id="{{ product[4] }}">
+            <div class="product-item" data-product-id="{{ product['product_id'] }}">
                 <div class="item-header">
                     <div>
-                        <span class="item-id">Объявление #{{ product[4] }}</span>
-                        <span>от пользователя {{ product[7] }} ({{ product[1] }})</span>
+                        <span class="item-id">Объявление #{{ product['product_id'] }}</span>
+                        <span>от пользователя {{ product['tg_id'] }} ({{ product["product_name"] }})</span>
                     </div>
-                    <div class="item-time">{{ product[5].strftime('%d.%m.%Y %H:%M') }}</div>
+                    <div class="item-time">{{ product['created_at'].strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
                 
                 <!-- Галерея фотографий -->
                 <div class="product-gallery-container">
-                    {% if product[3] %}
-                        {% set images = product[3]|from_json %}
+                    {% if product['product_image_url'] %}
+                        {% set images = product['product_image_url']|from_json %}
                         <div class="product-gallery">
                             {% for image in images %}
                             <div class="product-gallery-slide {% if loop.first %}active{% endif %}">
@@ -1042,15 +1042,15 @@
                 </div>
                 
                 <div class="product-info">
-                    <div class="product-title">{{ product[0] }}</div>
-                    <div class="product-price">{{ product[1] }} ₽</div>
-                    <div class="product-category">Категория: {{ product[6] }}</div>
-                    <div class="product-description">{{ product[2] }}</div>
+                    <div class="product-title">{{ product['product_title'] }}</div>
+                    <div class="product-price">{{ product['product_price'] }} ₽</div>
+                    <div class="product-category">Категория: {{ product['category_name'] }}</div>
+                    <div class="product-description">{{ product['product_description'] }}</div>
                 </div>
                 
                 <div class="item-actions">
-                    <button class="approve-button" data-action="approve" data-id="{{ product[4] }}">Одобрить</button>
-                    <button class="reject-button" data-action="reject" data-id="{{ product[4] }}">Отклонить</button>
+                    <button class="approve-button" data-action="approve" data-id="{{ product['product_id'] }}">Одобрить</button>
+                    <button class="reject-button" data-action="reject" data-id="{{ product['product_id'] }}">Отклонить</button>
                 </div>
             </div>
             {% endfor %}

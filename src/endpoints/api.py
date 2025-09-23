@@ -1,17 +1,21 @@
-
 from datetime import datetime, timezone
 
-from fastapi import Request, Cookie, APIRouter
-from sqlalchemy import select, func, desc
+from fastapi import Cookie, Request
+from sqlalchemy import desc, func, select
 from starlette.responses import JSONResponse
 
-from src.database.database import async_session_maker, User, Deal, Review
-from src.database.methods import (get_all_products,
-                                  get_all_products_from_category, get_all_user_favs, get_user_active_products,
-                                  get_user_moderation_products,
-                                  get_user_archived_products, check_user_blocked_post)
+from src.database.database import Deal, Review, User, async_session_maker
+from src.database.methods import (
+    check_user_blocked_post,
+    get_all_products_from_category_new,
+    get_all_products_new,
+    get_all_user_favs,
+    get_user_active_products_new,
+    get_user_archived_products_new,
+    get_user_moderation_products_new,
+)
 from src.endpoints._endpoints_config import wmarket_api_router
-from src.utils import decode_jwt, is_admin_new, can_manage_admins
+from src.utils import can_manage_admins, decode_jwt, is_admin_new
 
 
 @wmarket_api_router.get("/products")
@@ -30,30 +34,29 @@ async def get_products(
 
     try:
         if category:
-            products = await get_all_products_from_category(category, payload.get("tg_id"))
+            products = await get_all_products_from_category_new(category, payload.get("tg_id"))
         else:
-            products = await get_all_products(payload.get("tg_id"))
+            products = await get_all_products_new(payload.get("tg_id"))
 
         if search:
             search_lower = search.lower()
-            products = [p for p in products if search_lower in p[0].lower()]
+            products = [p for p in products if search_lower in p["product_name"].lower()]
 
         total = len(products)
         start = (page - 1) * per_page
         end = start + per_page
         paginated_products = products[start:end]
 
-        now = datetime.now(timezone.utc)
         formatted_products = []
         for product in paginated_products:
-            created_at_str = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else product[
-                5]
-            is_new = (now - product[5]).total_seconds() < 86400 if isinstance(product[5], datetime) else False
-
-            formatted_product = list(product)
-            formatted_product[5] = created_at_str
-            formatted_product.append(is_new)
-            formatted_products.append(formatted_product)
+            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
+                product["created_at"], datetime) else \
+                product["created_at"]
+            product["is_new"] = (
+                (datetime.now(timezone.utc) - product["created_at"]).total_seconds() < 86400 if isinstance(
+                    product["created_at"],
+                    datetime) else False)
+            formatted_products.append(product)
 
         return JSONResponse({
             "status": "success",
@@ -79,9 +82,9 @@ async def get_favorites(
 
     try:
         all_favs = await get_all_user_favs(payload.get("tg_id"))
-        all_products = await get_all_products(payload.get("tg_id"))
+        all_products = await get_all_products_new(payload.get("tg_id"))
 
-        products = [prod for prod in all_products if prod[4] in all_favs]
+        products = [prod for prod in all_products if prod["product_id"] in all_favs]
 
         total = len(products)
         start = (page - 1) * per_page
@@ -90,10 +93,9 @@ async def get_favorites(
 
         formatted_products = []
         for product in paginated_products:
-            formatted_product = list(product)
-            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else \
-            product[5]
-            formatted_products.append(formatted_product)
+            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product["created_at"], datetime) else \
+            product["created_at"]
+            formatted_products.append(product)
 
         return JSONResponse({
             "status": "success",
@@ -121,11 +123,11 @@ async def get_user_review_products(
 
     try:
         if tab == 'active':
-            products = await get_user_active_products(payload.get("tg_id"), payload.get("tg_id"))
+            products = await get_user_active_products_new(payload.get("tg_id"), payload.get("tg_id"))
         elif tab == 'moderation':
-            products = await get_user_moderation_products(payload.get("tg_id"))
+            products = await get_user_moderation_products_new(payload.get("tg_id"))
         elif tab == 'archived':
-            products = await get_user_archived_products(payload.get("tg_id"))
+            products = await get_user_archived_products_new(payload.get("tg_id"))
         else:
             return JSONResponse({"status": "error", "message": "Invalid tab"}, status_code=400)
 
@@ -138,9 +140,10 @@ async def get_user_review_products(
         # Форматирование дат
         formatted_products = []
         for product in paginated_products:
-            formatted_product = list(product)
-            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else product[5]
-            formatted_products.append(formatted_product)
+            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
+                product["created_at"], datetime) else \
+                product["created_at"]
+            formatted_products.append(product)
 
         return JSONResponse({
             "status": "success",
@@ -166,7 +169,7 @@ async def get_user_products(
     per_page = 20
 
     try:
-        products = await get_user_active_products(user_id, payload.get("tg_id"))
+        products = await get_user_active_products_new(user_id, payload.get("tg_id"))
 
         total = len(products)
         start = (page - 1) * per_page
@@ -175,13 +178,14 @@ async def get_user_products(
 
         formatted_products = []
         for product in paginated_products:
-            formatted_product = list(product)
-            formatted_product[5] = product[5].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product[5], datetime) else \
-            product[5]
-            formatted_product.append(
-                (datetime.now(timezone.utc) - product[5]).total_seconds() < 86400 if isinstance(product[5],
-                                                                                                datetime) else False)
-            formatted_products.append(formatted_product)
+            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
+                product["created_at"], datetime) else \
+                product["created_at"]
+            product["is_new"] = (
+                (datetime.now(timezone.utc) - product["created_at"]).total_seconds() < 86400 if isinstance(
+                    product["created_at"],
+                    datetime) else False)
+            formatted_products.append(product)
 
         return JSONResponse({
             "status": "success",

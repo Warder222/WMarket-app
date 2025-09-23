@@ -1,18 +1,15 @@
-
 from datetime import datetime, timezone
 
-from fastapi import Request, Cookie
+from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
-from src.database.database import async_session_maker, User, Deal, Review, Product
-from src.database.methods import (get_all_users, get_user_info,
-                                  all_count_unread_messages, archive_product_post,
-                                  get_user_active_deals, get_user_completed_deals,
-                                  get_user_reserved_deals, get_user_active_deals_count)
-from src.endpoints._endpoints_config import wmarket_router, templates
+from src.database.database import Deal, Product, Review, User, async_session_maker
+from src.database.methods import (all_count_unread_messages, archive_product_post, get_all_users,
+                                  get_user_active_deals, get_user_active_deals_count, get_user_info_new)
+from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 
 
@@ -27,8 +24,78 @@ async def deals(request: Request, session_token=Cookie(default=None)):
             tab = request.query_params.get('tab', 'active')
 
             active_deals = await get_user_active_deals(payload.get("tg_id"))
-            completed_deals = await get_user_completed_deals(payload.get("tg_id"))
-            reserved_deals = await get_user_reserved_deals(payload.get("tg_id"))
+
+            completed_deals = []
+            async with async_session_maker() as session:
+                query_user_id = payload.get("tg_id")
+                result = await session.execute(
+                    select(Deal)
+                    .where(
+                        (Deal.seller_id == query_user_id) | (Deal.buyer_id == query_user_id),
+                        Deal.status.in_(["completed", "completed_by_admin", "cancelled", "cancelled_by_admin"])
+                    )
+                    .order_by(desc(Deal.completed_at if Deal.completed_at is not None else Deal.created_at))
+                )
+                deals = result.scalars().all()
+
+                deal_list = []
+                for deal in deals:
+                    amount = deal.amount
+                    if deal.currency == 'meet':
+                        product = await session.execute(select(Product).where(Product.id == deal.product_id))
+                        product = product.scalar_one_or_none()
+                        if product:
+                            amount = product.product_price
+
+                    seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+                    seller = seller.scalar_one_or_none()
+                    buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+                    buyer = buyer.scalar_one_or_none()
+
+                    status_text = ""
+                    if deal.status == 'completed':
+                        if deal.admin_decision == 'for_seller':
+                            status_text = "Завершена администратором (в пользу продавца)"
+                        else:
+                            status_text = "Завершена"
+                    else:
+                        if deal.admin_decision == 'for_buyer':
+                            status_text = "Отменена администратором (в пользу покупателя)"
+                        else:
+                            status_text = "Отменена"
+
+                    deal_list.append({
+                        "id": deal.id,
+                        "product_name": deal.product_name,
+                        "seller_id": deal.seller_id,
+                        "buyer_id": deal.buyer_id,
+                        "seller_username": seller.first_name if seller else "Unknown",
+                        "buyer_username": buyer.first_name if buyer else "Unknown",
+                        "currency": deal.currency,
+                        "amount": amount,
+                        "status": deal.status,
+                        "status_text": status_text,
+                        "created_at": deal.created_at,
+                        "completed_at": deal.completed_at,
+                        "is_reserved": deal.is_reserved,
+                        "reservation_amount": deal.reservation_amount,
+                        "admin_decision": deal.admin_decision
+                    })
+
+                completed_deals = deal_list
+
+            reserved_deals = None
+            async with async_session_maker() as session:
+                result = await session.execute(
+                    select(Deal)
+                    .where(Deal.is_reserved == True)
+                    .where(
+                        (Deal.buyer_id == payload.get("tg_id")) |
+                        (Deal.seller_id == payload.get("tg_id"))
+                    )
+                    .order_by(Deal.reservation_until)
+                )
+                reserved_deals = result.scalars().all()
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -106,14 +173,14 @@ async def confirm_deal(
 
                 await session.commit()
 
-                buyer_info = await get_user_info(deal.buyer_id)
-                seller_info = await get_user_info(deal.seller_id)
+                buyer_info = await get_user_info_new(deal.buyer_id)
+                seller_info = await get_user_info_new(deal.seller_id)
 
                 # Уведомление продавцу
                 await send_notification_to_user(
                     deal.seller_id,
                     f"⚠️ Сделка по товару '{deal.product_name}' отправлена на модерацию.\n\n"
-                    f"Покупатель {buyer_info[1]} подтвердил получение товара при личной встрече.\n\n"
+                    f"Покупатель {buyer_info["first_name"]} подтвердил получение товара при личной встрече.\n\n"
                     f"Администратор проверит сделку и подтвердит её завершение.\n"
                     f"По вопросам обращайтесь @wmarket_support"
                 )
@@ -161,15 +228,15 @@ async def confirm_deal(
             await session.commit()
             await archive_product_post(deal.product_id)
 
-            buyer_info_arr = await get_user_info(deal.buyer_id)
-            seller_info_arr = await get_user_info(deal.seller_id)
+            buyer_info_arr = await get_user_info_new(deal.buyer_id)
+            seller_info_arr = await get_user_info_new(deal.seller_id)
 
             await send_notification_to_user(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия: {market_fee:.2f})\n"
-                f"👤 {buyer_info_arr[1]} подтвердил получение товара.\n\n"
+                f"👤 {buyer_info_arr["first_name"]} подтвердил получение товара.\n\n"
                 f"Средства зачислены на ваш баланс!"
             )
 
@@ -178,7 +245,7 @@ async def confirm_deal(
                 f"✅ Вы подтвердили сделку!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
                 f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
-                f"👤 Продавец: {seller_info_arr[1] if seller_info_arr else 'неизвестен'}\n\n"
+                f"👤 Продавец: {seller_info_arr["first_name"] if seller_info_arr else 'неизвестен'}\n\n"
                 f"Ваш отзыв отправлен на модерацию."
             )
 

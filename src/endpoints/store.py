@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
-from fastapi import Request, Cookie
+from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
 
-from src.database.methods import (get_all_users, get_all_products,
-                                  get_all_products_from_category,all_count_unread_messages, get_all_digit_categories,
-                                  get_all_not_digit_categories, get_user_active_deals_count)
-from src.endpoints._endpoints_config import wmarket_router, templates
+from src.database.methods import (all_count_unread_messages, get_all_digit_categories, get_all_not_digit_categories,
+                                  get_all_products_from_category_new, get_all_products_new, get_all_users,
+                                  get_user_active_deals_count)
+from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 
 
@@ -21,7 +21,7 @@ async def store(request: Request, session_token=Cookie(default=None)):
 
             cats = await get_all_not_digit_categories()
             dig_cats = await get_all_digit_categories()
-            products = await get_all_products(payload.get("tg_id"))
+            products = await get_all_products_new(payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -56,7 +56,7 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             cats = await get_all_not_digit_categories()
             dig_cats = await get_all_digit_categories()
-            products = await get_all_products_from_category(category_name, payload.get("tg_id"))
+            products = await get_all_products_from_category_new(category_name, payload.get("tg_id"))
             now = datetime.now(timezone.utc)
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False

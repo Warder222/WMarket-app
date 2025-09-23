@@ -1,19 +1,16 @@
+from datetime import datetime, timedelta, timezone
 
-from datetime import datetime, timezone, timedelta
-
-from fastapi import Request, Cookie
+from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select, func
+from sqlalchemy import and_, exists, func, select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
-from src.database.database import async_session_maker, User, ChatParticipant, Chat, Deal, Product
-from src.database.methods import (get_all_users, get_user_info,
-                                  get_product_info, all_count_unread_messages,
-                                  get_all_not_digit_categories, get_count_fav_add, get_user_active_deals_count,
-                                  get_product_info_with_all_photos)
-from src.endpoints._endpoints_config import wmarket_router, templates
-from src.utils import decode_jwt, is_admin_new, get_ton_to_rub_rate, can_moderate_products
+from src.database.database import (Chat, ChatParticipant, Deal, Fav, Product, User, async_session_maker)
+from src.database.methods import (all_count_unread_messages, get_all_not_digit_categories, get_all_users,
+                                  get_product_info_new, get_user_active_deals_count, get_user_info_new)
+from src.endpoints._endpoints_config import templates, wmarket_router
+from src.utils import can_moderate_products, decode_jwt, get_ton_to_rub_rate, is_admin_new
 
 
 @wmarket_router.get('/ads/{product_id}')
@@ -24,21 +21,56 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            product_info = await get_product_info_with_all_photos(product_id, payload.get("tg_id"))
+            product_info = {}
+
+            async with async_session_maker() as session:
+                result = await session.execute(
+                    select(
+                        Product.id.label("product_id"),
+                        Product.tg_id,
+                        Product.product_name,
+                        Product.product_price,
+                        Product.product_description,
+                        Product.product_image_url,
+                        Product.category_name,
+                        Product.created_at,
+                        exists().where(and_(Fav.tg_id == payload.get("tg_id"), Fav.product_id == Product.id)).label("is_fav"),
+                        Product.reserved,
+                        Product.reserved_by,
+                        Product.reserved_until,
+                        Product.reservation_amount,
+                        Product.reservation_currency
+                    ).where(Product.id == product_id)
+                )
+
+                if product := result.first():
+                    product_info = dict(product._mapping)
+
             if not product_info:
                 return RedirectResponse(url="/store", status_code=303)
 
             categories = await get_all_not_digit_categories()
-            user_info = await get_user_info(product_info[1])
-            positive_reviews = user_info[3]
-            negative_reviews = user_info[4]
+            user_info = await get_user_info_new(product_info["tg_id"])
+            positive_reviews = user_info["plus_rep"]
+            negative_reviews = user_info["minus_rep"]
             reputation = positive_reviews - negative_reviews
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
             admin_role = await is_admin_new(payload.get("tg_id"))
             if can_moderate_products(admin_role):
                 admin_res= True
-            fav_count = await get_count_fav_add(product_id)
+
+            fav_count = 0
+            async with async_session_maker() as db:
+                try:
+                    q = select(Fav).filter_by(product_id=product_id)
+                    result = await db.execute(q)
+                    fav_count = result.scalars()
+                    fav_arr = [fav.tg_id for fav in fav_count]
+                    fav_count = len(fav_arr)
+                except Exception as exc:
+                    print(f"Error: {exc}")
+
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
             context = {
@@ -69,11 +101,11 @@ async def check_chat_exists(product_id: int, session_token=Cookie(default=None))
     payload = await decode_jwt(session_token)
     buyer_id = payload.get("tg_id")
 
-    product = await get_product_info(product_id, None)
+    product = await get_product_info_new(product_id, None)
     if not product:
         return {"exists": False}
 
-    seller_id = product[1]
+    seller_id = product["tg_id"]
 
     async with async_session_maker() as session:
         result = await session.execute(
@@ -104,11 +136,11 @@ async def create_deal(
     amount = data.get("amount")
     currency = data.get("currency")
 
-    product = await get_product_info(product_id, None)
+    product = await get_product_info_new(product_id, None)
     if not product:
         return JSONResponse({"status": "error", "message": "Product not found"}, status_code=404)
 
-    seller_id = product[1]
+    seller_id = product["tg_id"]
     buyer_id = payload.get("tg_id")
 
     if seller_id == buyer_id:
@@ -137,7 +169,7 @@ async def create_deal(
 
             deal = Deal(
                 product_id=product_id,
-                product_name=product[2],
+                product_name=product["product_name"],
                 seller_id=seller_id,
                 buyer_id=buyer_id,
                 amount=amount,
@@ -148,24 +180,24 @@ async def create_deal(
             session.add(deal)
             await session.commit()
 
-            buyer_info = await get_user_info(buyer_id)
+            buyer_info = await get_user_info_new(buyer_id)
 
             if currency == 'meet':
                 await send_notification_to_user(
                     seller_id,
                     f"💰 Покупатель хочет встретиться для оплаты!\n\n"
-                    f"📌 Название: {product[2]}\n"
-                    f"💰 Сумма: {product[3]} ₽ (оплата при встрече)\n"
-                    f"👤 Покупатель: {buyer_info[1] or 'без username'}\n\n"
+                    f"📌 Название: {product["product_name"]}\n"
+                    f"💰 Сумма: {product["product_price"]} ₽ (оплата при встрече)\n"
+                    f"👤 Покупатель: {buyer_info["first_name"] or 'без username'}\n\n"
                     f"Договоритесь о времени и месте встречи в чате."
                 )
             else:
                 await send_notification_to_user(
                     seller_id,
                     f"💰 Товар оплачен, и ждёт подтверждения!\n\n"
-                    f"📌 Название: {product[2]}\n"
+                    f"📌 Название: {product["product_name"]}\n"
                     f"💰 Сумма: {amount} {currency.upper()}\n"
-                    f"👤 Покупатель: {buyer_info[1] or 'без username'}\n\n"
+                    f"👤 Покупатель: {buyer_info["first_name"] or 'без username'}\n\n"
                     f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
                 )
 
@@ -173,9 +205,9 @@ async def create_deal(
                 await send_notification_to_user(
                     buyer_id,
                     f"✅ Вы создали сделку с оплатой при встрече!\n\n"
-                    f"📌 Товар: {product[2]}\n"
-                    f"💰 Сумма: {product[3]} ₽\n"
-                    f"👤 Продавец: {product[1]}\n\n"
+                    f"📌 Товар: {product["product_name"]}\n"
+                    f"💰 Сумма: {product["product_price"]} ₽\n"
+                    f"👤 Продавец: {product["tg_id"]}\n\n"
                     f"Договоритесь о времени и месте встречи в чате."
                 )
 

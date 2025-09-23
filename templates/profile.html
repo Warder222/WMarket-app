@@ -648,7 +648,7 @@
 <main>
     <div class="profile-header">
         <div class="header-icon" id="menuButton">
-            {% if user_info[0] == user_tg_id %}
+            {% if user_info["tg_id"] == user_tg_id %}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="18" cy="5" r="3"></circle>
                 <circle cx="6" cy="12" r="3"></circle>
@@ -668,7 +668,7 @@
             </div>
         </div>
         <div class="profile-title">Профиль</div>
-        {% if user_info[0] == user_tg_id %}
+        {% if user_info["tg_id"] == user_tg_id %}
         <div class="header-right">
             <div class="referrals-count">{{ referrals_count }} реф.</div>
         </div>
@@ -689,20 +689,20 @@
                 </svg>
                 <div class="tooltip moderator-hat-tooltip">Модератор маркета</div>
             {% endif %}
-            <img src="{{ user_info[2] }}" alt="Аватар" class="avatar">
+            <img src="{{ user_info['photo_url'] }}" alt="Аватар" class="avatar">
         </div>
-        <div class="username">{{ user_info[1] }}</div>
-        {% if user_info[0] == user_tg_id %}
+        <div class="username">{{ user_info["first_name"] }}</div>
+        {% if user_info["tg_id"] == user_tg_id %}
         <div class="earned-container">
             <div class="earned-title">Заработано</div>
             <div class="earned-amount">
                 <div class="earned-currency">
                     <span class="currency-symbol">₽</span>
-                    <span>{{ "%.2f"|format(user_info[7]) if user_info[5] else "0.00" }}</span>
+                    <span>{{ "%.2f"|format(user_info["earned_rub"]) if user_info["rub_balance"] else "0.00" }}</span>
                 </div>
                 <div class="earned-currency">
                     <span class="currency-symbol">TON</span>
-                    <span>{{ "%.2f"|format(user_info[8]) if user_info[6] else "0.00" }}</span>
+                    <span>{{ "%.2f"|format(user_info["earned_ton"]) if user_info["ton_balance"] else "0.00" }}</span>
                 </div>
             </div>
         </div>
@@ -740,14 +740,14 @@
             </div>
         </div>
 
-        {% if user_info[0] != user_tg_id %}
+        {% if user_info["tg_id"] != user_tg_id %}
         <div class="ads-section">
             <div class="ads-section-title">Объявления</div>
             <div class="ads-grid" id="adsGrid">
                 <!-- Товары будут загружаться динамически -->
             </div>
             <div class="loading-indicator" id="loadingIndicator">
-                Загрузка товаров {{ user_info[1] }}...
+                Загрузка товаров {{ user_info["first_name"] }}...
             </div>
         </div>
         {% endif %}
@@ -792,7 +792,7 @@
         let currentPage = 1;
         let isLoading = false;
         let hasMore = true;
-        const sellerId = {{ user_info[0] }};
+        const sellerId = {{ user_info["tg_id"] }};
         const currentUserId = {{ user_tg_id }};
 
         // Функция для загрузки товаров
@@ -838,30 +838,30 @@
             const adsGrid = document.getElementById('adsGrid');
             
             products.forEach(product => {
-                const isNew = (new Date() - new Date(product[5])) / (1000 * 60 * 60 * 24) < 1;
-                const isFavorite = product[8]; // Индекс 7 - это флаг избранного
+                const isNew = (new Date() - new Date(product["created_at"])) / (1000 * 60 * 60 * 24) < 1;
+                const isFavorite = product["is_fav"]; // Индекс 7 - это флаг избранного
                 
                 const productHtml = `
                     <div class="ads-container">
-                        <div class="ad-card" data-id="${product[4]}">
+                        <div class="ad-card" data-id="${product['product_id']}">
                             ${isNew ? '<div class="ad-new-badge">Новое</div>' : ''}
-                            <img src="/${product[3]}" class="ad-image">
+                            <img src="/${product['product_image_url']}" class="ad-image">
                             <div class="ad-details">
-                                <div class="ad-title">${product[0]}</div>
+                                <div class="ad-title">${product["product_name"]}</div>
                                 ${sellerId !== currentUserId ? 
                                 (isFavorite ?
-                                `<div class="ad-favorite-del" data-id="${product[4]}">
+                                `<div class="ad-favorite-del" data-id="${product['product_id']}">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
                                 </div>` : 
-                                `<div class="ad-favorite" data-id="${product[4]}">
+                                `<div class="ad-favorite" data-id="${product['product_id']}">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
                                 </div>`) : ''}
-                                <div class="ad-price">${product[1]} ₽</div>
-                                <div class="ad-description"><b>${formatDate(product[5])}</b> ${product[5].split(' ')[1]}</div>
+                                <div class="ad-price">${product["product_price"]} ₽</div>
+                                <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
                             </div>
                         </div>
                     </div>
@@ -969,7 +969,7 @@
             reviewsModal.classList.add('show');
             
             try {
-                const response = await fetch(`/api/user_reviews/{{ user_info[0] }}`);
+                const response = await fetch(`/api/user_reviews/{{ user_info['tg_id'] }}`);
                 const reviews = await response.json();
                 
                 if (reviews.length > 0) {
@@ -1094,7 +1094,7 @@
             e.stopPropagation();
             dropdownMenu.classList.remove('show');
             
-            const referralLink = `https://t.me/test_tma8_bot?startapp=ref_{{ user_info[0] }}`;
+            const referralLink = `https://t.me/test_tma8_bot?startapp=ref_{{ user_info["tg_id"] }}`;
             const message = `Покупай и продавай прямо в Телеграмме:\n\n${referralLink}`;
             
             if (window.Telegram && window.Telegram.WebApp) {

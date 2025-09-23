@@ -7,7 +7,6 @@ from . import auth
 from . import chats
 from . import deals
 from . import favorites
-from . import notify
 from . import products
 from . import profile
 from . import store

@@ -1,26 +1,23 @@
 import json
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from fastapi import Request, Cookie, HTTPException
+from fastapi import Cookie, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, desc, select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings
-from src.database.database import async_session_maker, User, Deal, Review, Product
-from src.database.methods import (get_user_info,
-                                  get_product_info, get_chat_messages, all_count_unread_messages, resolve_chat_report, get_chat_reports,
-                                  delete_product_post, archive_product_post,
-                                  update_product_post, get_all_moderation_products,
-                                  get_chat_info_post, block_user_post, get_all_users_info, get_pending_deals,
-                                  get_user_active_deals_count,
-                                   remove_admin, add_admin, get_all_admins)
-from src.endpoints._endpoints_config import wmarket_router, templates
-from src.endpoints.notify import notify_product_approved, notify_product_rejected
-from src.utils import decode_jwt, is_admin_new, can_manage_admins, \
-    can_moderate_reviews, can_moderate_chats, can_moderate_products, can_moderate_deals
+from src.database.database import (AdminRole, ChatParticipant, ChatReport, Deal, Fav, Product, Review, User,
+                                   async_session_maker)
+from src.database.methods import (all_count_unread_messages, archive_product_post, block_user_post,
+                                  check_user_blocked_post, get_chat_messages, get_pending_deals, get_product_info_new,
+                                  get_user_active_deals_count, get_user_info_new, resolve_chat_report,
+                                  update_product_post)
+from src.endpoints._endpoints_config import templates, wmarket_router
+from src.utils import (can_manage_admins, can_moderate_chats, can_moderate_deals, can_moderate_products,
+                       can_moderate_reviews, decode_jwt, is_admin_new)
 
 
 @wmarket_router.get("/admin/chat_reports")
@@ -37,10 +34,59 @@ async def admin_chat_reports(
     if admin_role:
         admin_res = True
     if admin_res:
-        reports = await get_chat_reports(resolved=False)
+
+        reports = []
+        async with async_session_maker() as db:
+            try:
+                q = select(ChatReport).filter_by(resolved=False).order_by(desc(ChatReport.created_at))
+                result = await db.execute(q)
+                reports = result.scalars().all()
+            except Exception as exc:
+                print(f"Error getting chat reports: {exc}")
+
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
-        moderation_products = await get_all_moderation_products()
-        users = await get_all_users_info()
+
+        moderation_products = []
+        async with async_session_maker() as db:
+            try:
+                result = await db.execute(
+                    select(Product)
+                    .filter_by(active=False)
+                    .order_by(desc(Product.created_at))
+                )
+
+                for prod in result.scalars():
+                    moderation_products.append({'product_id': prod.id,
+                                                'product_name': prod.product_name,
+                                                'product_price': prod.product_price,
+                                                'product_description': prod.product_description,
+                                                'product_image_url': prod.product_image_url,
+                                                'created_at': prod.created_at,
+                                                'category_name': prod.category_name,
+                                                'tg_id': prod.tg_id})
+            except Exception as exc:
+                print(f"Error: {exc}")
+        print()
+
+        users = []
+        async with async_session_maker() as session:
+            try:
+                users = await session.execute(select(User))
+                users = users.scalars().all()
+
+                users_info = []
+                for user in users:
+                    is_blocked = await check_user_blocked_post(user.tg_id)
+                    users_info.append({
+                        "tg_id": user.tg_id,
+                        "first_name": user.first_name,
+                        "username": user.username,
+                        "is_blocked": is_blocked.get("is_blocked", False)
+                    })
+
+                users = users_info
+            except Exception as e:
+                print(f"Error getting users info: {e}")
 
         async with async_session_maker() as session:
             result = await session.execute(
@@ -52,7 +98,18 @@ async def admin_chat_reports(
 
         pending_deals = await get_pending_deals()
         active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
-        admins = await get_all_admins()
+
+        admins = []
+        async with async_session_maker() as session:
+            admins_result = await session.execute(select(AdminRole))
+            for admin in admins_result.scalars().all():
+                admins.append({"tg_id": admin.user_id,
+                               "first_name": (await session.execute(
+                                    select(User.first_name).where(User.tg_id == admin.user_id))).scalar() or "Неизвестно",
+                               "username": (await session.execute(
+                                    select(User.username).where(User.tg_id == admin.user_id))).scalar() or "Нет",
+                               "role": admin.role,
+                               "assigned_at": admin.assigned_at.strftime("%d.%m.%Y %H:%M")})
 
         context = {
             "request": request,
@@ -191,14 +248,14 @@ async def moderate_review(
 
                 review.moderated = True
 
-                from_user_info = await get_user_info(review.from_user_id)
-                to_user_info = await get_user_info(review.to_user_id)
+                from_user_info = await get_user_info_new(review.from_user_id)
+                to_user_info = await get_user_info_new(review.to_user_id)
 
                 await send_notification_to_user(
                     review.to_user_id,
                     f"📢 Ваш рейтинг обновлён!\n\n"
                     f"Получен {'положительный' if review.rating > 0 else 'отрицательный'} отзыв "
-                    f"от пользователя {from_user_info[1] if from_user_info else 'неизвестен'}.\n\n"
+                    f"от пользователя {from_user_info["first_name"] if from_user_info else 'неизвестен'}.\n\n"
                     f"Текст отзыва: {review.text}"
                 )
 
@@ -312,7 +369,7 @@ async def report_product(
     except (TypeError, ValueError):
         return {"status": "error", "message": "Invalid product ID"}
 
-    product = await get_product_info(product_id_int, None)
+    product = await get_product_info_new(product_id_int, None)
     if not product:
         return {"status": "error", "message": "Product not found"}
 
@@ -321,8 +378,8 @@ async def report_product(
 
     if update_res:
         await send_notification_to_user(
-            product[1],
-            f"⚠️ Ваше объявление '{product[2]}' было отправлено на повторную проверку администратором."
+            product["tg_id"],
+            f"⚠️ Ваше объявление '{product["product_name"]}' было отправлено на повторную проверку администратором."
         )
         return {"status": "success"}
 
@@ -342,7 +399,23 @@ async def get_chat_info(chat_id: int, session_token=Cookie(default=None)):
     if can_moderate_chats(admin_role):
         admin_res = True
     if admin_res:
-        chat_info = await get_chat_info_post(chat_id)
+        chat_info = {}
+
+        async with async_session_maker() as session:
+            participants = await session.execute(
+                select(ChatParticipant.user_id)
+                .where(ChatParticipant.chat_id == chat_id)
+            )
+            user_ids = [p[0] for p in participants.all()]
+            user_one = await get_user_info_new(user_ids[0])
+            user_two = await get_user_info_new(user_ids[1])
+            chat_info = {
+                "user1_id": user_ids[0] if len(user_ids) > 0 else None,
+                "user2_id": user_ids[1] if len(user_ids) > 1 else None,
+                "user1_username": user_one["first_name"] if len(user_ids) > 0 else None,
+                "user2_username": user_two["first_name"] if len(user_ids) > 1 else None,
+            }
+
         return chat_info
     return {"status": "error", "message": "Unauthorized"}
 
@@ -413,14 +486,36 @@ async def approve_product(product_id: int, session_token=Cookie(default=None)):
     payload = await decode_jwt(session_token)
     admin_res = False
     admin_role = await is_admin_new(payload.get("tg_id"))
-    if can_moderate_chats(admin_role):
+    if can_moderate_products(admin_role):
         admin_res = True
     if admin_res:
         update_data = {"active": True}
         update_res = await update_product_post(product_id, update_data)
 
         if update_res:
-            await notify_product_approved(product_id)
+            try:
+                product = await get_product_info_new(product_id, None)
+                if not product:
+                    print(f"Product not found: {product_id}")
+
+                seller_id = product["tg_id"]
+                user_info = await get_user_info_new(seller_id)
+                if not user_info:
+                    print(f"User info not found for seller: {seller_id}")
+
+                message = (
+                    f"✅ Ваше объявление прошло модерацию!\n\n"
+                    f"📌 Название: {product["product_name"]}\n"
+                    f"⚙️ Категория: {product["category_name"]}\n"
+                    f"💰 Цена: {product["product_price"]} ₽"
+                )
+
+                await send_notification_to_user(seller_id, message)
+                print(f"Product approval notification sent to user {seller_id} for product {product_id}")
+
+            except Exception as e:
+                print(f"Error in notify_product_approved: {e}", exc_info=True)
+
             return {"status": "success"}
 
     return {"status": "error", "message": "Неавторизованный запрос"}
@@ -447,8 +542,38 @@ async def reject_product(
         update_res = await update_product_post(product_id, update_data)
 
         if update_res:
-            await notify_product_rejected(product_id, reason)
-            await delete_product_post(product_id)
+            try:
+                product = await get_product_info_new(product_id, None)
+                if not product:
+                    print(f"Product not found: {product_id}")
+
+                seller_id = product["tg_id"]
+                user_info = await get_user_info_new(seller_id)
+                if not user_info:
+                    print(f"User info not found for seller: {seller_id}")
+
+                message = (
+                    f"❌ Ваше объявление не прошло модерацию\n\n"
+                    f"📌 Название: {product["product_name"]}\n"
+                    f"📝 Причина/пункт: {reason}\n\n"
+                    f'Вы можете исправить его (<a href="https://telegra.ph/Osnovnye-punkty-i-prichiny-blokirovki-06-26">прочитав причину или пункт</a>)'
+                    f" и повторно опубликовать."
+                )
+
+                await send_notification_to_user(seller_id, message)
+                print(f"Product rejection notification sent to user {seller_id} for product {product_id}")
+
+            except Exception as e:
+                print(f"Error in notify_product_rejected: {e}", exc_info=True)
+
+            async with async_session_maker() as db:
+                try:
+                    await db.execute(delete(Fav).where(Fav.product_id == product_id))
+                    await db.execute(delete(Product).where(Product.id == product_id))
+                    await db.commit()
+                except Exception as e:
+                    print(e)
+
             return {"status": "success"}
 
     return {"status": "error", "message": "Неавторизованный запрос"}
@@ -565,16 +690,16 @@ async def get_deal_info(
         if not deal:
             return {"status": "error", "message": "Deal not found"}
 
-        seller = await get_user_info(deal.seller_id)
-        buyer = await get_user_info(deal.buyer_id)
+        seller = await get_user_info_new(deal.seller_id)
+        buyer = await get_user_info_new(deal.buyer_id)
 
         return {
             "id": deal.id,
             "product_name": deal.product_name,
             "seller_id": deal.seller_id,
-            "seller_first_name": seller[1] if seller else "Unknown",
+            "seller_first_name": seller["first_name"] if seller else "Unknown",
             "buyer_id": deal.buyer_id,
-            "buyer_first_name": buyer[1] if buyer else "Unknown",
+            "buyer_first_name": buyer["first_name"] if buyer else "Unknown",
             "amount": deal.amount,
             "currency": deal.currency,
             "status": deal.status,
@@ -910,7 +1035,18 @@ async def add_admin_route(request: Request, session_token=Cookie(default=None)):
     if not user_id or not role:
         return {"status": "error", "message": "Missing data"}
 
-    success = await add_admin(user_id, role)
+    success = False
+    user_id = int(user_id)
+    async with async_session_maker() as session:
+        if str(user_id) in [admin.strip() for admin in settings.ADMINS.split(",")]:
+            success = False
+
+        await session.execute(delete(AdminRole).where(AdminRole.user_id == user_id))
+
+        session.add(AdminRole(user_id=user_id, role=role))
+        await session.commit()
+        success = True
+
     return {"status": "success" if success else "error"}
 
 
@@ -926,6 +1062,15 @@ async def remove_admin_route(request: Request, session_token=Cookie(default=None
     data = await request.json()
     user_id = data.get("user_id")
 
-    success = await remove_admin(user_id)
+    success = False
+    user_id = int(user_id)
+    if str(user_id) in [admin.strip() for admin in settings.ADMINS.split(",")]:
+        success = False
+
+    async with async_session_maker() as session:
+        await session.execute(delete(AdminRole).where(AdminRole.user_id == user_id))
+        await session.commit()
+        success = True
+
     return {"status": "success" if success else "error"}
 #_______________________________________________________________________________________________________________________

@@ -1,7 +1,9 @@
 from fastapi import Request, Cookie
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select, func, update
 
-from src.database.methods import get_all_users, add_user, update_token, user_exists, record_referral
+from src.database.database import User, async_session_maker, Referral
+from src.database.methods import get_all_users
 from src.endpoints._endpoints_config import wmarket_router, templates
 from src.utils import parse_init_data, encode_jwt
 
@@ -35,15 +37,66 @@ async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
             return response
 
     new_session_token = await encode_jwt({"tg_id": user_data.get("tg_id")})
-    add_result = await add_user(user_data, new_session_token)
+    async with async_session_maker() as db:
+        try:
+            user = User(tg_id=user_data.get("tg_id"),
+                        first_name=user_data.get("first_name"),
+                        last_name=user_data.get("last_name"),
+                        username=user_data.get("username"),
+                        photo_url=user_data.get("photo_url"),
+                        token=session_token)
+            db.add(user)
+            await db.commit()
+            add_result = True
+        except Exception as exc:
+            print(exc)
+            add_result =  False
     if not add_result:
-        await update_token(session_token, new_session_token)
+        async with async_session_maker() as db:
+            try:
+                q = update(User).where(User.token == session_token).values(token=new_session_token)
+                await db.execute(q)
+                await db.commit()
+            except Exception as exc:
+                print(exc)
 
     ref_code = user_data.get("ref_code")
     if ref_code:
         ref_code = int(ref_code)
-        if await user_exists(ref_code):
-            res = await record_referral(ref_code, user_data.get("tg_id"))
+        user_exists_result = False
+
+        async with async_session_maker() as session:
+            result = await session.execute(select(func.count()).select_from(User).where(User.tg_id == ref_code))
+            count = result.scalar()
+            if count > 0:
+                user_exists_result = True
+
+
+        if user_exists_result:
+            async with async_session_maker() as session:
+                try:
+                    existing_ref = await session.execute(
+                        select(func.count()).select_from(Referral).where(
+                            (Referral.referrer_id == ref_code) &
+                            (Referral.referred_id == user_data.get("tg_id"))
+                        )
+                    )
+
+                    if existing_ref.scalar() > 0:
+                        return False
+
+                    if ref_code == user_data.get("tg_id"):
+                        return False
+
+                    referral = Referral(
+                        referrer_id=ref_code,
+                        referred_id=user_data.get("tg_id")
+                    )
+                    session.add(referral)
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    print(f"Error recording referral: {e}")
 
     response = RedirectResponse(url="/store", status_code=303)
     response.set_cookie(key="session_token", value=new_session_token, httponly=True, secure=True)

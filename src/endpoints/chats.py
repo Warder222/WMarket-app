@@ -1,15 +1,16 @@
 import json
 from datetime import datetime, timezone
 
-from fastapi import Request, Cookie, WebSocket, WebSocketDisconnect
+from fastapi import Cookie, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
+from sqlalchemy import delete, desc, func, select, update
 
-from src.database.methods import (get_all_users, create_chat, get_chat_messages, report_message,
-                                  send_message, get_chat_participants,
-                                  get_user_chats, all_count_unread_messages, report_chat, get_chat_part_info,
-                                  leave_chat_post, check_user_in_chat, check_user_blocked_post, check_user_block_post, get_user_active_deals_count)
-from src.endpoints._endpoints_config import wmarket_router, templates
-from src.endpoints.notify import notify_new_message
+from src.bot import send_notification_to_user
+from src.database.database import Chat, ChatParticipant, ChatReport, Message, Product, User, async_session_maker
+from src.database.methods import (all_count_unread_messages, check_user_block_post, check_user_blocked_post,
+                                  get_all_users, get_chat_messages, get_user_active_deals_count, get_user_info_new,
+                                  mark_messages_as_read)
+from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 from src.websocket_config import manager
 
@@ -22,7 +23,83 @@ async def chats(request: Request, session_token=Cookie(default=None)):
 
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
-            user_chats = await get_user_chats(payload.get("tg_id"))
+
+            async with async_session_maker() as session:
+                last_message_subq = (
+                    select(
+                        Message.chat_id,
+                        func.max(Message.created_at).label('last_message_time')
+                    )
+                    .group_by(Message.chat_id)
+                    .subquery()
+                )
+
+                result = await session.execute(
+                    select(
+                        Chat,
+                        last_message_subq.c.last_message_time
+                    )
+                    .join(ChatParticipant, ChatParticipant.chat_id == Chat.id)
+                    .join(last_message_subq, Chat.id == last_message_subq.c.chat_id, isouter=True)
+                    .where(ChatParticipant.user_id == payload.get("tg_id"))
+                    .order_by(
+                        desc(last_message_subq.c.last_message_time),
+                        desc(Chat.created_at)
+                    )
+                )
+
+                chats_with_times = result.all()
+
+                chats_with_info = []
+                for chat, last_message_time in chats_with_times:
+                    product = await session.execute(select(Product).where(Product.id == chat.product_id))
+                    product = product.scalar_one_or_none()
+
+                    other_participants = await session.execute(
+                        select(ChatParticipant.user_id)
+                        .where(
+                            (ChatParticipant.chat_id == chat.id) &
+                            (ChatParticipant.user_id != payload.get("tg_id"))
+                        )
+                    )
+                    other_user_id = other_participants.scalar_one_or_none()
+
+                    other_user = await session.execute(select(User).where(User.tg_id == other_user_id))
+                    other_user = other_user.scalar_one_or_none()
+
+                    last_message = await session.execute(
+                        select(Message)
+                        .where(Message.chat_id == chat.id)
+                        .order_by(desc(Message.created_at))
+                        .limit(1)
+                    )
+                    last_message = last_message.first()
+                    if last_message:
+                        last_message = last_message[0]
+                    image_urls = json.loads(product.product_image_url) if product.product_image_url else []
+
+                    count_unread_result = await session.execute(
+                        select(func.count(Message.id))
+                        .where(Message.chat_id == chat.id)
+                        .where(Message.receiver_id == payload.get("tg_id"))
+                        .where(Message.is_read == False)
+                    )
+                    count_unread_messages = count_unread_result.scalar() or 0
+
+                    chats_with_info.append({
+                        "id": chat.id,
+                        "product_id": chat.product_id,
+                        "product_title": product.product_name if product else "Неизвестный товар",
+                        "product_price": product.product_price if product else 0,
+                        "product_image": image_urls[0] if image_urls else "static/img/zaglush.png",
+                        "product_active": product.active if product else None,
+                        "seller_username": other_user.first_name if other_user else "Неизвестный",
+                        "last_message": last_message.content if last_message else "Чат начат",
+                        "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
+                        "unread_count": count_unread_messages
+                    })
+
+            user_chats = chats_with_info
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -50,7 +127,41 @@ async def start_chat(product_id: int, request: Request, session_token=Cookie(def
         return RedirectResponse(url="/", status_code=303)
 
     payload = await decode_jwt(session_token)
-    chat_id = await create_chat(product_id, payload.get("tg_id"))
+
+    async with async_session_maker() as db:
+        product = await db.execute(select(Product).filter_by(id=product_id))
+        product = product.scalar_one_or_none()
+
+        if not product:
+            return None
+
+        if product.tg_id == payload.get("tg_id"):
+            return None
+
+        existing_chat = await db.execute(
+            select(Chat)
+            .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+            .where(Chat.product_id == product_id)
+            .where(ChatParticipant.user_id.in_([product.tg_id, payload.get("tg_id")]))
+            .group_by(Chat.id)
+            .having(func.count(ChatParticipant.user_id) == 2)
+        )
+        existing_chat = existing_chat.scalar_one_or_none()
+
+        if existing_chat:
+            return existing_chat.id
+
+        chat = Chat(product_id=product_id)
+        db.add(chat)
+        await db.flush()
+
+        participants = [
+            ChatParticipant(chat_id=chat.id, user_id=product.tg_id),
+            ChatParticipant(chat_id=chat.id, user_id=payload.get("tg_id"))
+        ]
+        db.add_all(participants)
+        await db.commit()
+        chat_id = chat.id
 
     if not chat_id:
         return RedirectResponse(url="/store", status_code=303)
@@ -115,9 +226,48 @@ async def leave_chat_route(chat_id: int, session_token=Cookie(default=None)):
     if not payload or "tg_id" not in payload:
         return {"status": "error", "message": "Invalid token"}
 
-    await check_user_in_chat(chat_id, payload["tg_id"])
+    async with async_session_maker() as session:
+        was_participant = await session.execute(
+            select(func.count())
+            .select_from(ChatParticipant)
+            .where(
+                (ChatParticipant.chat_id == chat_id) &
+                (ChatParticipant.user_id == payload["tg_id"])
+            )
+        )
+        if not was_participant.scalar():
+            return {"status": "error", "message": "Not a participant"}
 
-    success = await leave_chat_post(chat_id, payload["tg_id"])
+
+    success = False
+    async with async_session_maker() as session:
+        try:
+            await session.execute(
+                delete(ChatParticipant)
+                .where(
+                    (ChatParticipant.chat_id == chat_id) &
+                    (ChatParticipant.user_id == payload["tg_id"])
+                )
+            )
+
+            remaining = await session.execute(
+                select(func.count())
+                .select_from(ChatParticipant)
+                .where(ChatParticipant.chat_id == chat_id)
+            )
+            remaining_count = remaining.scalar()
+
+            if remaining_count == 0:
+                await session.execute(delete(Message).where(Message.chat_id == chat_id))
+                await session.execute(delete(ChatReport).where(ChatReport.chat_id == chat_id))
+                await session.execute(delete(Chat).where(Chat.id == chat_id))
+
+            await session.commit()
+            success = True
+        except Exception as e:
+            await session.rollback()
+            print(f"Error leaving chat: {e}")
+
     if success:
         return {"status": "success"}
     else:
@@ -126,7 +276,22 @@ async def leave_chat_route(chat_id: int, session_token=Cookie(default=None)):
 
 @wmarket_router.get("/chat_participants_info/{chat_id}")
 async def get_chat_participants_info(chat_id: int):
-    users_info = await get_chat_part_info(chat_id)
+    users_info = {}
+    async with async_session_maker() as session:
+        participants = await session.execute(
+            select(ChatParticipant.user_id)
+            .where(ChatParticipant.chat_id == chat_id)
+        )
+        participant_ids = [p[0] for p in participants.all()]
+
+        users_info_result = {}
+        for user_id in participant_ids:
+            user = await session.execute(select(User).where(User.tg_id == user_id))
+            user = user.scalar_one_or_none()
+            if user:
+                users_info_result[user_id] = user.first_name or user.username or f"User {user_id}"
+
+        users_info = users_info_result
     return users_info
 
 
@@ -136,7 +301,16 @@ async def report_message_route(message_id: int, session_token=Cookie(default=Non
     if not session_token:
         return {"status": "error", "message": "Unauthorized"}
 
-    success = await report_message(message_id)
+    success = False
+
+    async with async_session_maker() as db:
+        await db.execute(
+            update(Message)
+            .where(Message.id == message_id)
+            .values(reported=True))
+        await db.commit()
+        success = True
+
     return {"status": "success" if success else "error"}
 
 
@@ -153,7 +327,20 @@ async def report_chat_route(
     data = await request.json()
     reason = data.get("reason", "")
 
-    success = await report_chat(chat_id, payload.get("tg_id"), reason)
+    success = False
+    async with async_session_maker() as db:
+        try:
+            report = ChatReport(
+                chat_id=chat_id,
+                reporter_id=payload.get("tg_id"),
+                reason=reason
+            )
+            db.add(report)
+            await db.commit()
+            success = True
+        except Exception as exc:
+            print(f"Error reporting chat: {exc}")
+
     return {"status": "success" if success else "error"}
 
 
@@ -166,6 +353,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             message_data = json.loads(data)
 
             if message_data["type"] == "get_history":
+                await mark_messages_as_read(message_data["chat_id"], int(user_id))
+
                 chat_data = await get_chat_messages(message_data["chat_id"], int(user_id))
                 if chat_data:
                     await websocket.send_text(json.dumps({
@@ -177,45 +366,99 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                                 "receiver_id": msg.receiver_id,
                                 "content": msg.content,
                                 "created_at": msg.created_at.isoformat(),
-                                "id": msg.id
+                                "id": msg.id,
+                                "is_read": msg.is_read
                             }
                             for msg in chat_data["messages"]
                         ]
                     }))
 
             if message_data["type"] == "send_message" and user_id != "0":
-                participants = await get_chat_participants(message_data["chat_id"])
+                participants = {}
+                async with async_session_maker() as session:
+                    query = select(ChatParticipant).where(ChatParticipant.chat_id == message_data["chat_id"])
+                    result = await session.execute(query)
+                    participants = result.scalars().all()
+
                 receiver_id = next((p.user_id for p in participants if p.user_id != int(user_id)), None)
 
                 if not receiver_id:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "message": "Получатель не найден в чате"
+                    }))
                     continue
 
                 receiver_connected = manager.is_connected(str(receiver_id))
 
-                message = await send_message(
-                    message_data["chat_id"],
-                    int(user_id),
-                    message_data["content"],
-                    mark_unread=not receiver_connected
-                )
+                message_obj = None
+                async with async_session_maker() as db:
+                    participants = await db.execute(
+                        select(ChatParticipant.user_id)
+                        .where(ChatParticipant.chat_id == message_data["chat_id"]))
+                    participants = participants.scalars().all()
+                    receiver_id = next((p for p in participants if p != int(user_id)), None)
 
-                if message:
-                    if not receiver_connected:
-                        await notify_new_message(
-                            message_data["chat_id"],
-                            int(user_id),
-                            message_data["content"]
+                    if not receiver_id:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "Участник чата не найден"
+                        }))
+                        continue
+
+                    try:
+                        message_obj = Message(
+                            chat_id=message_data["chat_id"],
+                            sender_id=int(user_id),
+                            receiver_id=receiver_id,
+                            content=message_data["content"],
+                            is_read=receiver_connected
+                        )
+                        db.add(message_obj)
+                        await db.commit()
+                        await db.refresh(message_obj)
+                    except Exception as e:
+                        await db.rollback()
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": f"Ошибка сохранения сообщения: {str(e)}"
+                        }))
+                        continue
+
+                if not receiver_connected:
+                    try:
+                        chat_data = await get_chat_messages(message_data["chat_id"], int(user_id))
+                        if not chat_data:
+                            print(f"Chat data not found for chat_id: {message_data['chat_id']}")
+                            continue
+
+                        receiver_id = chat_data["other_user"].tg_id
+                        user_data = await get_user_info_new(int(user_id))
+
+                        notification_message = (
+                            f"💬 Новое сообщение от \n{user_data['first_name']} \n\n📢 Объявление:\n{chat_data['product'].product_name}"
                         )
 
-                    await manager.broadcast(json.dumps({
-                        "type": "new_message",
-                        "chat_id": message.chat_id,
-                        "sender_id": message.sender_id,
-                        "receiver_id": message.receiver_id,
-                        "content": message.content,
-                        "created_at": message.created_at.isoformat(),
-                        "id": message.id
-                    }))
+                        await send_notification_to_user(receiver_id, notification_message, chat_data['product'].id)
+                        print(
+                            f"Notification sent to user {receiver_id} about new message in chat {message_data['chat_id']}")
+
+                    except Exception as e:
+                        print(f"Error in notify_new_message: {e}")
+
+                broadcast_data = {
+                    "type": "new_message",
+                    "chat_id": message_obj.chat_id,
+                    "sender_id": message_obj.sender_id,
+                    "receiver_id": message_obj.receiver_id,
+                    "content": message_obj.content,
+                    "created_at": message_obj.created_at.isoformat(),
+                    "id": message_obj.id,
+                    "is_read": message_obj.is_read
+                }
+
+                await manager.broadcast(json.dumps(broadcast_data))
+
     except WebSocketDisconnect:
         manager.disconnect(user_id)
     except Exception as e:

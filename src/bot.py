@@ -9,7 +9,7 @@ from aiogram.types import BotCommand, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.config import settings
-from src.database.methods import get_all_users, get_product_info
+from src.database.methods import get_all_users, get_product_info_new
 from src.utils import is_admin_new
 
 logging.basicConfig(level=logging.INFO)
@@ -46,10 +46,10 @@ async def handle_start(message: Message):
     args = message.text.split()
     if len(args) > 1 and args[1].startswith("chat_"):
         product_id = int(args[1].split("_")[1])
-        product = await get_product_info(product_id, message.from_user.id)
+        product = await get_product_info_new(product_id, message.from_user.id)
         if product:
             await message.answer(
-                f"Вы можете перейти к чату по объявлению '{product[2]}' в мини-приложении",
+                f"Вы можете перейти к чату по объявлению '{product["product_name"]}' в мини-приложении",
                 reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[
                     types.InlineKeyboardButton(
                         text="Открыть мини-приложение",
