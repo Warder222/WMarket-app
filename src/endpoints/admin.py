@@ -14,10 +14,11 @@ from src.database.database import (AdminRole, ChatParticipant, ChatReport, Deal,
 from src.database.methods import (all_count_unread_messages, archive_product_post, block_user_post,
                                   check_user_blocked_post, get_chat_messages, get_pending_deals, get_product_info_new,
                                   get_user_active_deals_count, get_user_info_new, resolve_chat_report,
-                                  update_product_post)
+                                  update_product_post, create_system_message)
 from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import (can_manage_admins, can_moderate_chats, can_moderate_deals, can_moderate_products,
                        can_moderate_reviews, decode_jwt, is_admin_new)
+from src.websocket_config import manager
 
 
 @wmarket_router.get("/admin/chat_reports")
@@ -40,7 +41,18 @@ async def admin_chat_reports(
             try:
                 q = select(ChatReport).filter_by(resolved=False).order_by(desc(ChatReport.created_at))
                 result = await db.execute(q)
-                reports = result.scalars().all()
+                reports = [{"id": report.id,
+                            "chat_id": report.chat_id,
+                            "reporter_id": report.reporter_id,
+                            "reporter_first_name": None,
+                            "reason": report.reason,
+                            "created_at": report.created_at,
+                            "resolved": report.resolved,
+                            "admin_id": report.admin_id} for report in result.scalars().all()]
+                for rep in reports:
+                    reporter_info = await get_user_info_new(rep["reporter_id"])
+                    rep["reporter_first_name"] = reporter_info["first_name"]
+
             except Exception as exc:
                 print(f"Error getting chat reports: {exc}")
 
@@ -438,6 +450,25 @@ async def admin_chat_view(
         chat_data = await get_chat_messages(chat_id, None)
         if not chat_data:
             return RedirectResponse(url="/admin/chat_reports", status_code=303)
+
+        admin_info = await get_user_info_new(payload.get("tg_id"))
+        admin_name = admin_info.get("first_name", "Администратор") if admin_info else "Администратор"
+
+        system_message_content = f"⚡ Администратор {admin_name} <br>Зашёл в чат для проверки<br>Решение будет принято в ближайшее время"
+        system_message = await create_system_message(chat_id, system_message_content)
+
+        if system_message:
+            broadcast_data = {
+                "type": "new_message",
+                "chat_id": system_message.chat_id,
+                "sender_id": system_message.sender_id,
+                "receiver_id": system_message.receiver_id,
+                "content": system_message.content,
+                "created_at": system_message.created_at.isoformat(),
+                "id": system_message.id,
+                "is_read": system_message.is_read
+            }
+            await manager.broadcast(json.dumps(broadcast_data))
 
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
         active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))

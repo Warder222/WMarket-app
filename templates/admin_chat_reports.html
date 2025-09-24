@@ -926,7 +926,7 @@
                 <div class="item-header">
                     <div>
                         <span class="item-id">Чат #{{ report.chat_id }}</span>
-                        <span>от пользователя {{ report.reporter_first_name }} ({{ report.reporter_id }})</span>
+                        <span>от пользователя:<br>{{ report.reporter_first_name }}<br>(ID:{{ report.reporter_id }})</span>
                     </div>
                     <div class="item-time">{{ report.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>

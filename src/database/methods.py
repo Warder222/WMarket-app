@@ -480,7 +480,8 @@ async def create_system_message(chat_id: int, content: str):
                 sender_id=0,
                 receiver_id=0,
                 content=content,
-                is_read=False
+                is_read=False,
+                created_at=datetime.now(timezone.utc)
             )
             db.add(system_message)
             await db.commit()

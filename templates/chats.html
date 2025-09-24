@@ -213,7 +213,7 @@
                     </div>
                     <div class="chat-product">{{ chat.product_title }}</div>
                     <div class="chat-price">{{ chat.product_price }} ₽</div>
-                    <div class="chat-preview">{{ chat.last_message }}</div>
+                    <div class="chat-preview">{{ chat.last_message|striptags|replace('\n', '  ') }}</div>
                     <div class="chat-time">{{ chat.last_message_time }}</div>
                 </div>
                 <div class="chat-actions">

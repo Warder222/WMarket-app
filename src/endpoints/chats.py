@@ -346,7 +346,7 @@ async def report_chat_route(
 
             reporter_info = await get_user_info_new(reporter_id)
 
-            system_message_content = f"⚠️ {reporter_info['first_name']} отправил жалобу на этот чат"
+            system_message_content = f"⚠️ {reporter_info['first_name']} <br>Отправил жалобу на этот чат"
             system_message = await create_system_message(chat_id, system_message_content)
 
             if system_message:

@@ -2,6 +2,10 @@
 
 {% block style %}
 <style>
+    body {
+        overscroll-behavior-y: contain;
+    }
+    
     .ptr-element {
         display: none !important;
     }
@@ -421,7 +425,13 @@
 {% block scripts %}
 <script>
     function goBackAndReload() {
-        window.location.href = '/chats';
+        {% if current_user.is_admin %}
+            // Для админа - возврат в админ панель
+            window.location.href = '/admin/chat_reports?tab=reports';
+        {% else %}
+            // Для пользователей - возврат в чаты
+            window.location.href = '/chats';
+        {% endif %}
     }
 
     // Функция для форматирования даты сообщения
@@ -614,11 +624,7 @@
                 const userReportResponse = await fetch(`/check_existing_report/{{ chat_id }}`);
                 const userReportResult = await userReportResponse.json();
                 
-                // Проверяем активные жалобы на чат от любого пользователя
-                const chatReportResponse = await fetch(`/check_chat_active_reports/{{ chat_id }}`);
-                const chatReportResult = await chatReportResponse.json();
-                
-                if (userReportResult.has_existing_report || chatReportResult.has_active_reports) {
+                if (userReportResult.has_existing_report) {
                     reportChatButton.disabled = true;
                     reportChatButton.style.opacity = '0.5';
                     reportChatButton.style.cursor = 'not-allowed';
@@ -645,17 +651,8 @@
                     const userReportResponse = await fetch(`/check_existing_report/{{ chat_id }}`);
                     const userReportResult = await userReportResponse.json();
                     
-                    // Проверяем активные жалобы на чат от любого пользователя
-                    const chatReportResponse = await fetch(`/check_chat_active_reports/{{ chat_id }}`);
-                    const chatReportResult = await chatReportResponse.json();
-                    
                     if (userReportResult.has_existing_report) {
                         showNotification('У вас уже есть активная жалоба на этот чат. Дождитесь её решения.', 'info');
-                        return;
-                    }
-                    
-                    if (chatReportResult.has_active_reports) {
-                        showNotification('На этот чат уже подана жалоба. Дождитесь решения администратора.', 'info');
                         return;
                     }
                 } catch (error) {
