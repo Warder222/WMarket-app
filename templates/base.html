@@ -325,8 +325,6 @@
         });
     </script>
     <script>
-        // Добавляем в начало скрипта в base.html
-// Проверка блокировки пользователя
         async function checkUserBlock() {
             try {
                 const response = await fetch('/check_user_block');
@@ -350,9 +348,12 @@
             }
         }
 
-        // Вызываем при загрузке страницы
         document.addEventListener('DOMContentLoaded', checkUserBlock);
-        // Ожидаем полной загрузки DOM
+
+        function isChatPage() {
+            return window.location.pathname.startsWith('/chat/');
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const globalLoader = document.getElementById('globalLoader');
             let loaderTimeout;
@@ -398,21 +399,24 @@
                 Telegram.WebApp.expand();
             }
 
-            // Элементы для pull-to-refresh
             const ptrElement = document.querySelector('.ptr-element');
             const wLoader = document.querySelector('.ptr-element .w-loader');
             let startY = 0;
             let isRefreshing = false;
 
-            // Обработчик начала касания
+            // Обработчик начала касания - пропускаем для чатов
             function handleTouchStart(e) {
+                if (isChatPage()) return; // Отключаем для страниц чатов
+                
                 if (window.scrollY === 0 && !isRefreshing) {
                     startY = e.touches[0].clientY;
                 }
             }
 
-            // Обработчик движения пальца
+            // Обработчик движения пальца - пропускаем для чатов
             function handleTouchMove(e) {
+                if (isChatPage()) return; // Отключаем для страниц чатов
+                
                 if (isRefreshing || startY === 0) return;
                 
                 const currentY = e.touches[0].clientY;
@@ -432,13 +436,22 @@
                 }
             }
 
-            // Обработчик окончания касания
+            // Обработчик окончания касания - пропускаем для чатов
             function handleTouchEnd() {
+                if (isChatPage()) return; // Отключаем для страниц чатов
+                
                 if (!isRefreshing) {
                     ptrElement.style.transform = 'translateY(-100%)';
                     wLoader.style.opacity = 0;
                 }
                 startY = 0;
+            }
+
+            // Добавляем обработчики событий только если не страница чата
+            if (!isChatPage()) {
+                document.addEventListener('touchstart', handleTouchStart, { passive: true });
+                document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                document.addEventListener('touchend', handleTouchEnd, { passive: true });
             }
 
             // Функция запуска обновления

@@ -673,7 +673,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.95);
             z-index: 1000;
             justify-content: center;
             align-items: center;
@@ -687,15 +687,19 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow: hidden;
+            touch-action: none;
         }
 
         .fullscreen-image {
             max-width: 100%;
             max-height: 100%;
             transform-origin: center center;
-            transition: transform 0.1s ease-out;
+            transition: transform 0.15s ease-out;
             user-select: none;
             -webkit-user-drag: none;
+            touch-action: none;
+            will-change: transform; /* Для лучшей производительности */
         }
 
         .close-fullscreen {
@@ -1091,7 +1095,7 @@
                 </div>
                 
                 <div class="form-group">
-                    <label>Фотографии товара (максимум 10)</label>
+                    <label>Фотографии товара</label>
                     <div id="imageGallery" class="image-gallery">
                         {% set images = product_info["product_image_url"]|from_json %}
                         {% for image in images %}
@@ -1599,6 +1603,19 @@
             const fullscreenImage = document.getElementById('fullscreenImage');
             const closeFullscreen = document.getElementById('closeFullscreen');
 
+            // Переменные для масштабирования и перемещения
+            let currentScale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let isZooming = false;
+            let startX = 0;
+            let startY = 0;
+            let initialDistance = 0;
+            let initialScale = 1;
+            let gestureCenter = { x: 0, y: 0 };
+            let lastTap = 0;
+
             // Открытие изображения в полноэкранном режиме
             gallerySlides.forEach(slide => {
                 slide.addEventListener('click', () => {
@@ -1608,8 +1625,10 @@
                         fullscreenOverlay.style.display = 'flex';
                         document.body.style.overflow = 'hidden';
                         
-                        // Сброс масштаба при открытии
+                        // Сброс масштаба и позиции при открытии
                         currentScale = 1;
+                        translateX = 0;
+                        translateY = 0;
                         fullscreenImage.style.transform = `scale(${currentScale})`;
                     }
                 });
@@ -1617,38 +1636,168 @@
 
             // Закрытие полноэкранного режима
             closeFullscreen.addEventListener('click', () => {
-                fullscreenOverlay.style.display = 'none';
-                document.body.style.overflow = ''; // Восстанавливаем прокрутку страницы
+                closeFullscreenView();
             });
 
-            // Закрытие при клике на оверлей (но не на само изображение)
+            // Закрытие при клике на оверлей
             fullscreenOverlay.addEventListener('click', (e) => {
                 if (e.target === fullscreenOverlay) {
-                    fullscreenOverlay.style.display = 'none';
-                    document.body.style.overflow = '';
+                    closeFullscreenView();
                 }
             });
 
-            // Масштабирование изображения (pinch zoom)
-            let currentScale = 1;
-            let initialDistance = 0;
+            function closeFullscreenView() {
+                fullscreenOverlay.style.display = 'none';
+                document.body.style.overflow = '';
+                // Сброс состояния при закрытии
+                isDragging = false;
+                isZooming = false;
+            }
 
+            // Масштабирование изображения (pinch zoom) с правильным центром
             fullscreenOverlay.addEventListener('touchstart', (e) => {
+                // Предотвращаем свайпы страницы когда изображение приближено
+                if (currentScale > 1) {
+                    e.stopPropagation();
+                }
+                
                 if (e.touches.length === 2) {
                     e.preventDefault();
+                    e.stopPropagation();
+                    
+                    isZooming = true;
+                    isDragging = false;
+                    
+                    // Определяем центр жеста
+                    gestureCenter = getGestureCenter(e.touches[0], e.touches[1]);
                     initialDistance = getDistance(e.touches[0], e.touches[1]);
+                    initialScale = currentScale;
+                    
+                    // Сохраняем текущее смещение для коррекции
+                    startX = translateX;
+                    startY = translateY;
+                    
+                } else if (e.touches.length === 1 && currentScale > 1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    isDragging = true;
+                    isZooming = false;
+                    
+                    // Начало перемещения
+                    startX = e.touches[0].clientX - translateX;
+                    startY = e.touches[0].clientY - translateY;
+                }
+                
+                // Двойной тап для сброса масштаба
+                if (e.touches.length === 1) {
+                    const now = Date.now();
+                    if (now - lastTap < 300) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Сброс масштаба и позиции
+                        currentScale = 1;
+                        translateX = 0;
+                        translateY = 0;
+                        fullscreenImage.style.transform = `scale(${currentScale})`;
+                        isDragging = false;
+                        isZooming = false;
+                    }
+                    lastTap = now;
                 }
             });
 
             fullscreenOverlay.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 2) {
+                // Предотвращаем свайпы страницы когда изображение приближено
+                if (currentScale > 1) {
+                    e.stopPropagation();
+                }
+                
+                if (e.touches.length === 2 && isZooming) {
                     e.preventDefault();
+                    e.stopPropagation();
+                    
                     const currentDistance = getDistance(e.touches[0], e.touches[1]);
-                    const scale = currentDistance / initialDistance;
-                    currentScale = Math.max(1, Math.min(scale * currentScale, 5)); // Ограничиваем масштаб от 1x до 5x
-                    fullscreenImage.style.transform = `scale(${currentScale})`;
+                    
+                    if (initialDistance > 0) {
+                        const scale = (currentDistance / initialDistance) * initialScale;
+                        currentScale = Math.max(1, Math.min(scale, 5));
+                        
+                        // Вычисляем смещение для масштабирования от центра жеста
+                        const rect = fullscreenImage.getBoundingClientRect();
+                        const imageCenterX = rect.left + rect.width / 2;
+                        const imageCenterY = rect.top + rect.height / 2;
+                        
+                        // Вычисляем как сместится точка жеста при новом масштабе
+                        const scaleRatio = currentScale / initialScale;
+                        
+                        // Корректируем смещение так, чтобы точка жеста оставалась под пальцами
+                        const newGestureCenter = getGestureCenter(e.touches[0], e.touches[1]);
+                        const deltaX = newGestureCenter.x - gestureCenter.x;
+                        const deltaY = newGestureCenter.y - gestureCenter.y;
+                        
+                        // Вычисляем смещение для сохранения точки жеста под пальцами
+                        const offsetX = (gestureCenter.x - imageCenterX) * (scaleRatio - 1) + deltaX;
+                        const offsetY = (gestureCenter.y - imageCenterY) * (scaleRatio - 1) + deltaY;
+                        
+                        // Применяем трансформацию
+                        translateX = startX + offsetX;
+                        translateY = startY + offsetY;
+                        
+                        // Ограничиваем перемещение
+                        applyBounds();
+                        
+                        fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+                    }
+                } else if (e.touches.length === 1 && currentScale > 1 && isDragging) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    translateX = e.touches[0].clientX - startX;
+                    translateY = e.touches[0].clientY - startY;
+                    
+                    // Ограничиваем перемещение
+                    applyBounds();
+                    
+                    fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
                 }
             });
+
+            fullscreenOverlay.addEventListener('touchend', (e) => {
+                if (e.touches.length < 2) {
+                    isZooming = false;
+                    initialDistance = 0;
+                    initialScale = currentScale;
+                }
+                if (e.touches.length === 0) {
+                    isDragging = false;
+                }
+            });
+
+
+            // Функция для ограничения перемещения в пределах изображения
+            function applyBounds() {
+                if (currentScale <= 1) {
+                    translateX = 0;
+                    translateY = 0;
+                    return;
+                }
+                
+                const maxX = (fullscreenImage.offsetWidth * (currentScale - 1)) / 2;
+                const maxY = (fullscreenImage.offsetHeight * (currentScale - 1)) / 2;
+                
+                translateX = Math.max(-maxX, Math.min(translateX, maxX));
+                translateY = Math.max(-maxY, Math.min(translateY, maxY));
+            }
+
+            // Функция для определения центра жеста
+            function getGestureCenter(touch1, touch2) {
+                return {
+                    x: (touch1.clientX + touch2.clientX) / 2,
+                    y: (touch1.clientY + touch2.clientY) / 2
+                };
+            }
 
             function getDistance(touch1, touch2) {
                 const dx = touch1.clientX - touch2.clientX;
@@ -1656,47 +1805,67 @@
                 return Math.sqrt(dx * dx + dy * dy);
             }
 
-            // Перемещение изображения при масштабировании
-            let startX, startY, translateX = 0, translateY = 0;
-            let isDragging = false;
-
-            fullscreenImage.addEventListener('touchstart', (e) => {
-                if (e.touches.length === 1 && currentScale > 1) {
-                    e.preventDefault();
-                    isDragging = true;
-                    startX = e.touches[0].clientX - translateX;
-                    startY = e.touches[0].clientY - translateY;
-                }
-            });
-
-            fullscreenImage.addEventListener('touchmove', (e) => {
-                if (e.touches.length === 1 && currentScale > 1 && isDragging) {
-                    e.preventDefault();
-                    translateX = e.touches[0].clientX - startX;
-                    translateY = e.touches[0].clientY - startY;
-                    
-                    // Ограничиваем перемещение, чтобы изображение не уходило за границы
-                    const maxX = (fullscreenImage.offsetWidth * (currentScale - 1)) / 2;
-                    const maxY = (fullscreenImage.offsetHeight * (currentScale - 1)) / 2;
-                    
-                    translateX = Math.max(-maxX, Math.min(translateX, maxX));
-                    translateY = Math.max(-maxY, Math.min(translateY, maxY));
-                    
-                    fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
-                }
-            });
-
-            fullscreenImage.addEventListener('touchend', () => {
-                isDragging = false;
-            });
-
             // Закрытие по клавише ESC
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && fullscreenOverlay.style.display === 'flex') {
-                    fullscreenOverlay.style.display = 'none';
-                    document.body.style.overflow = '';
+                    closeFullscreenView();
                 }
             });
+
+            // Предотвращаем прокрутку страницы когда открыт полноэкранный просмотр
+            fullscreenOverlay.addEventListener('wheel', (e) => {
+                if (fullscreenOverlay.style.display === 'flex') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // Также предотвращаем другие жесты
+            fullscreenOverlay.addEventListener('gesturestart', (e) => {
+                e.preventDefault();
+            });
+            fullscreenOverlay.addEventListener('gesturechange', (e) => {
+                e.preventDefault();
+            });
+            fullscreenOverlay.addEventListener('gestureend', (e) => {
+                e.preventDefault();
+            });
+
+            // fullscreenImage.addEventListener('touchstart', (e) => {
+            //     if (e.touches.length === 1) {
+            //         const now = Date.now();
+            //         if (now - lastTap < 300) {
+            //             // Двойной тап - сброс масштаба
+            //             e.preventDefault();
+            //             currentScale = 1;
+            //             translateX = 0;
+            //             translateY = 0;
+            //             fullscreenImage.style.transform = `scale(${currentScale})`;
+            //         }
+            //         lastTap = now;
+            //     }
+            // });
+
+
+            // fullscreenImage.addEventListener('touchmove', (e) => {
+            //     if (e.touches.length === 1 && currentScale > 1 && isDragging) {
+            //         e.preventDefault();
+            //         translateX = e.touches[0].clientX - startX;
+            //         translateY = e.touches[0].clientY - startY;
+                    
+            //         // Ограничиваем перемещение, чтобы изображение не уходило за границы
+            //         const maxX = (fullscreenImage.offsetWidth * (currentScale - 1)) / 2;
+            //         const maxY = (fullscreenImage.offsetHeight * (currentScale - 1)) / 2;
+                    
+            //         translateX = Math.max(-maxX, Math.min(translateX, maxX));
+            //         translateY = Math.max(-maxY, Math.min(translateY, maxY));
+                    
+            //         fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+            //     }
+            // });
+
+            // fullscreenImage.addEventListener('touchend', () => {
+            //     isDragging = false;
+            // });
 
             // Функции для работы с модальным окном бронирования
             let currentReserveCurrency = 'rub';

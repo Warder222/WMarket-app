@@ -9,7 +9,8 @@ from src.bot import send_notification_to_user
 from src.database.database import Chat, ChatParticipant, ChatReport, Message, Product, User, async_session_maker
 from src.database.methods import (all_count_unread_messages, check_user_block_post, check_user_blocked_post,
                                   get_all_users, get_chat_messages, get_user_active_deals_count, get_user_info_new,
-                                  mark_messages_as_read)
+                                  mark_messages_as_read, check_existing_report, create_system_message,
+                                  check_any_active_chat_report)
 from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 from src.websocket_config import manager
@@ -133,10 +134,10 @@ async def start_chat(product_id: int, request: Request, session_token=Cookie(def
         product = product.scalar_one_or_none()
 
         if not product:
-            return None
+            return RedirectResponse(url="/store?error=product_not_found", status_code=303)
 
         if product.tg_id == payload.get("tg_id"):
-            return None
+            return RedirectResponse(url="/store?error=cannot_chat_with_yourself", status_code=303)
 
         existing_chat = await db.execute(
             select(Chat)
@@ -149,7 +150,7 @@ async def start_chat(product_id: int, request: Request, session_token=Cookie(def
         existing_chat = existing_chat.scalar_one_or_none()
 
         if existing_chat:
-            return existing_chat.id
+            return RedirectResponse(url=f"/chat/{existing_chat.id}", status_code=303)
 
         chat = Chat(product_id=product_id)
         db.add(chat)
@@ -162,9 +163,6 @@ async def start_chat(product_id: int, request: Request, session_token=Cookie(def
         db.add_all(participants)
         await db.commit()
         chat_id = chat.id
-
-    if not chat_id:
-        return RedirectResponse(url="/store", status_code=303)
 
     return RedirectResponse(url=f"/chat/{chat_id}", status_code=303)
 
@@ -295,7 +293,6 @@ async def get_chat_participants_info(chat_id: int):
     return users_info
 
 
-
 @wmarket_router.post("/report_message/{message_id}")
 async def report_message_route(message_id: int, session_token=Cookie(default=None)):
     if not session_token:
@@ -324,24 +321,73 @@ async def report_chat_route(
         return {"status": "error", "message": "Unauthorized"}
 
     payload = await decode_jwt(session_token)
+    reporter_id = payload.get("tg_id")
     data = await request.json()
     reason = data.get("reason", "")
+
+    existing_chat_report = await check_any_active_chat_report(chat_id)
+    if not existing_chat_report:
+        return {
+            "status": "error",
+            "message": "На этот чат уже подана жалоба. Дождитесь решения администратора."
+        }
 
     success = False
     async with async_session_maker() as db:
         try:
             report = ChatReport(
                 chat_id=chat_id,
-                reporter_id=payload.get("tg_id"),
+                reporter_id=reporter_id,
                 reason=reason
             )
             db.add(report)
             await db.commit()
             success = True
+
+            reporter_info = await get_user_info_new(reporter_id)
+
+            system_message_content = f"⚠️ {reporter_info['first_name']} отправил жалобу на этот чат"
+            system_message = await create_system_message(chat_id, system_message_content)
+
+            if system_message:
+                broadcast_data = {
+                    "type": "new_message",
+                    "chat_id": system_message.chat_id,
+                    "sender_id": system_message.sender_id,
+                    "receiver_id": system_message.receiver_id,
+                    "content": system_message.content,
+                    "created_at": system_message.created_at.isoformat(),
+                    "id": system_message.id,
+                    "is_read": system_message.is_read
+                }
+                await manager.broadcast(json.dumps(broadcast_data))
+
         except Exception as exc:
             print(f"Error reporting chat: {exc}")
+            if "unique_chat_report" in str(exc).lower():
+                return {
+                    "status": "error",
+                    "message": "У вас уже есть активная жалоба на этот чат. Дождитесь её решения."
+                }
 
     return {"status": "success" if success else "error"}
+
+
+@wmarket_router.get("/check_existing_report/{chat_id}")
+async def check_existing_report_route(
+        chat_id: int,
+        session_token=Cookie(default=None)
+):
+    if not session_token:
+        return {"has_existing_report": False}
+
+    payload = await decode_jwt(session_token)
+    reporter_id = payload.get("tg_id")
+
+    existing_report = await check_existing_report(chat_id, reporter_id)
+
+    return {"has_existing_report": existing_report}
+
 
 
 @wmarket_router.websocket("/ws/{user_id}")

@@ -423,6 +423,72 @@ async def resolve_chat_report(report_id: int, admin_id: int):
         except Exception as exc:
             print(f"Error resolving chat report: {exc}")
             return False
+
+
+async def get_resolved_reports_count(chat_id: int, reporter_id: int):
+    """Получить количество решенных жалоб пользователя на чат"""
+    async with async_session_maker() as db:
+        try:
+            q = select(func.count(ChatReport.id)).filter_by(
+                chat_id=chat_id,
+                reporter_id=reporter_id,
+                resolved=True
+            )
+            result = await db.execute(q)
+            return result.scalar() or 0
+        except Exception as exc:
+            print(f"Error getting resolved reports count: {exc}")
+            return 0
+
+
+async def check_existing_report(chat_id: int, reporter_id: int):
+    async with async_session_maker() as db:
+        try:
+            q = select(ChatReport).filter_by(
+                chat_id=chat_id,
+                reporter_id=reporter_id,
+                resolved=False
+            )
+            result = await db.execute(q)
+            return result.scalar_one_or_none() is not None
+        except Exception as exc:
+            print(f"Error checking existing report: {exc}")
+            return False
+
+
+async def check_any_active_chat_report(chat_id: int):
+    async with async_session_maker() as db:
+        try:
+            q = select(ChatReport).filter_by(
+                chat_id=chat_id,
+                resolved=False
+            )
+            result = await db.execute(q)
+            result = result.scalar_one_or_none()
+            if not result:
+                return True
+        except Exception as exc:
+            print(f"Error checking active chat reports: {exc}")
+            return False
+
+
+async def create_system_message(chat_id: int, content: str):
+    async with async_session_maker() as db:
+        try:
+            system_message = Message(
+                chat_id=chat_id,
+                sender_id=0,
+                receiver_id=0,
+                content=content,
+                is_read=False
+            )
+            db.add(system_message)
+            await db.commit()
+            await db.refresh(system_message)
+            return system_message
+        except Exception as exc:
+            print(f"Error creating system message: {exc}")
+            return None
 #_______________________________________________________________________________________________________________________
 
 

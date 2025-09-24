@@ -2,12 +2,16 @@
 
 {% block style %}
 <style>
+    .ptr-element {
+        display: none !important;
+    }
+    
     .chat-container {
         display: flex;
         flex-direction: column;
         height: 87vh;
         padding: 16px;
-        padding-bottom: 0; /* Убираем отступ снизу, так как навигации нет */
+        padding-bottom: 0;
     }
 
     .chat-header {
@@ -281,6 +285,54 @@
         filter: grayscale(100%);
         opacity: 0.7;
     }
+
+    .message-date-divider {
+        text-align: center;
+        margin: 16px 0;
+        position: relative;
+    }
+    
+    .message-date-divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background-color: var(--border-color);
+        z-index: 1;
+    }
+    
+    .message-date-text {
+        background-color: var(--bg-color);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        color: var(--secondary-text);
+        position: relative;
+        z-index: 2;
+        display: inline-block;
+    }
+
+    .message-system {
+        max-width: 85%;
+        margin: 8px auto;
+        padding: 6px 10px;
+        background-color: var(--card-bg);
+        border-left: 3px solid #ffc107;
+        border-radius: 6px;
+        text-align: center;
+        color: var(--secondary-text);
+        font-size: 12px;
+        line-height: 1.3;
+        font-style: normal;
+    }
+
+    .message-system .message-time {
+        text-align: center;
+        color: #ffc107;
+        font-size: 11px;
+    }
 </style>
 {% endblock %}
 
@@ -368,9 +420,84 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    function goBackAndReload() {
+        window.location.href = '/chats';
+    }
+
+    // Функция для форматирования даты сообщения
+    function formatMessageDate(messageDate) {
+        const now = new Date();
+        const messageTime = new Date(messageDate);
+        const diffMs = now - messageTime;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        // Если сообщение сегодня - показываем только время
+        if (diffDays === 0) {
+            return messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        // Если сообщение вчера - показываем "вчера" и время
+        else if (diffDays === 1) {
+            return `вчера ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        }
+        // Если сообщение в течение года - показываем дату и время
+        else if (diffDays < 365) {
+            return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        }
+        // Если сообщение старше года - показываем полную дату с годом и время
+        else {
+            return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+        }
+    }
+
+    // Функция добавления сообщения в интерфейс
+    function addMessageToUI(message, isSent) {
+        const messageElement = document.createElement('div');
+        const isAdminMessage = message.sender_id === 0;
+        const isSystemMessage = message.sender_id === 0 && message.receiver_id === 0;
+        
+        if (isSystemMessage) {
+            messageElement.className = 'message message-system';
+            messageElement.innerHTML = `
+                <div class="message-content">
+                    ${message.content}
+                </div>
+                <div class="message-time">
+                    ${formatMessageDate(message.created_at)}
+                </div>
+            `;
+        } else {
+            messageElement.className = `message ${
+                isAdminMessage ? 'message-admin' : 
+                isSent ? 'message-sent' : 'message-received'
+            }`;
+            
+            messageElement.innerHTML = `
+                <div class="message-content">
+                    ${message.senderName || ''}
+                    ${message.content}
+                </div>
+                <div class="message-time">
+                    ${formatMessageDate(message.created_at)}
+                </div>
+            `;
+        }
+        
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function closeReportModal() {
+        reportChatModal.style.display = 'none';
+        reportReason.value = '';
+        setTimeout(() => {
+            messageInput.focus();
+            document.body.style.overflow = 'auto';
+        }, 50);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Обработка блокировки пользователя
         {% if is_blocked %}
-            // Отключаем все элементы ввода
             const messageInput = document.getElementById('messageInput');
             const sendButton = document.getElementById('sendButton');
             
@@ -384,13 +511,8 @@
                 sendButton.style.opacity = "0.5";
             }
         {% endif %}
-    });
-</script>
-<script>
-    function goBackAndReload() {
-        window.location.href = '/chats';
-    }
-    document.addEventListener('DOMContentLoaded', () => {
+
+        // Основная логика чата
         const socket = new WebSocket(`wss://${window.location.host}/ws/{{ current_user.id }}`);
         const chatId = {{ chat_id }};
         const currentUserId = {{ current_user.id }};
@@ -398,6 +520,13 @@
         const sendButton = document.getElementById('sendButton');
         const chatMessages = document.getElementById('chatMessages');
         const isAdmin = currentUserId === 0;
+
+        // Элементы для жалоб
+        const reportChatButton = document.getElementById('reportChatButton');
+        const reportChatModal = document.getElementById('reportChatModal');
+        const cancelReport = document.getElementById('cancelReport');
+        const submitReport = document.getElementById('submitReport');
+        const reportReason = document.getElementById('reportReason');
 
         // Удаляем все сообщения, которые были загружены при рендеринге шаблона
         chatMessages.innerHTML = '<div style="background-color: var(--card-bg); color: var(--secondary-text); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; text-align: center; border-left: 3px solid var(--primary-color);">Уважаемый пользователь,<br>Маркет не несёт ответственности<br> за предоплату/оплату<br>напрямую между пользователями (самостоятельные переводы и сделки).</div>';
@@ -434,6 +563,8 @@
             }
             // Обработка истории сообщений при подключении
             else if (data.type === "chat_history") {
+                
+                // Затем добавляем сообщения
                 data.messages.forEach(msg => {
                     // Для админа добавляем имя отправителя
                     if (isAdmin) {
@@ -468,32 +599,6 @@
             }
         }
         
-        // Функция добавления сообщения в интерфейс
-        function addMessageToUI(message, isSent) {
-            const messageElement = document.createElement('div');
-            const isAdminMessage = message.sender_id === 0;
-            
-            messageElement.className = `message ${
-                isAdminMessage ? 'message-admin' : 
-                isSent ? 'message-sent' : 'message-received'
-            }`;
-            
-            const time = new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
-            messageElement.innerHTML = `
-                <div class="message-content">
-                    ${message.senderName || ''}
-                    ${message.content}
-                </div>
-                <div class="message-time">
-                    ${time}
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageElement);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
         // Обработчики событий
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
@@ -502,69 +607,116 @@
             }
         });
 
-        // Жалоба на сообщение
-        const reportChatButton = document.getElementById('reportChatButton');
-        const reportChatModal = document.getElementById('reportChatModal');
-        const cancelReport = document.getElementById('cancelReport');
-        const submitReport = document.getElementById('submitReport');
-        const reportReason = document.getElementById('reportReason');
-
-        function closeReportModal() {
-            reportChatModal.style.display = 'none';
-            reportReason.value = '';
-            // Убедимся, что модальное окно действительно закрыто
-            setTimeout(() => {
-                messageInput.focus();
-                document.body.style.overflow = 'auto'; // Разблокируем прокрутку
-            }, 50);
-        }
-
-        reportChatButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Предотвращаем всплытие события
-            reportChatModal.style.display = 'flex';
-            document.body.style.overflow = 'hidden'; // Блокируем прокрутку при открытом модальном окне
-            reportReason.focus();
-        });
-
-        cancelReport.addEventListener('click', closeReportModal);
-
-        submitReport.addEventListener('click', async () => {
-            const reason = reportReason.value.trim();
-            if (!reason) {
-                showNotification('Пожалуйста, укажите причину жалобы', 'info');
-                return;
-            }
-
+        // Проверяем существующие жалобы при загрузке
+        if (reportChatButton) {
             try {
-                const response = await fetch(`/report_chat/${chatId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ reason })
-                });
-
-                if (response.ok) {
-                    showNotification('Жалоба отправлена администратору, обнови страницу', 'success');
-                    closeReportModal();
-                } else {
-                    showNotification('Ошибка при отправке жалобы', 'error');
+                // Проверяем жалобу текущего пользователя
+                const userReportResponse = await fetch(`/check_existing_report/{{ chat_id }}`);
+                const userReportResult = await userReportResponse.json();
+                
+                // Проверяем активные жалобы на чат от любого пользователя
+                const chatReportResponse = await fetch(`/check_chat_active_reports/{{ chat_id }}`);
+                const chatReportResult = await chatReportResponse.json();
+                
+                if (userReportResult.has_existing_report || chatReportResult.has_active_reports) {
+                    reportChatButton.disabled = true;
+                    reportChatButton.style.opacity = '0.5';
+                    reportChatButton.style.cursor = 'not-allowed';
+                    
+                    if (userReportResult.has_existing_report) {
+                        reportChatButton.title = 'У вас уже есть активная жалоба на этот чат';
+                    } else {
+                        reportChatButton.title = 'На этот чат уже подана жалоба. Ожидайте решения.';
+                    }
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showNotification('Ошибка при отправке жалобы', 'error');
+                console.error('Error checking reports:', error);
             }
-        });
+        }
 
-        // Обработчик клика вне модального окна для закрытия
-        reportChatModal.addEventListener('click', (e) => {
-            if (e.target === reportChatModal) {
-                closeReportModal();
-            }
-        });
+        // Обработчики для жалоб
+        if (reportChatButton) {
+            reportChatButton.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                
+                // Проверяем существующие жалобы
+                try {
+                    // Проверяем жалобу текущего пользователя
+                    const userReportResponse = await fetch(`/check_existing_report/{{ chat_id }}`);
+                    const userReportResult = await userReportResponse.json();
+                    
+                    // Проверяем активные жалобы на чат от любого пользователя
+                    const chatReportResponse = await fetch(`/check_chat_active_reports/{{ chat_id }}`);
+                    const chatReportResult = await chatReportResponse.json();
+                    
+                    if (userReportResult.has_existing_report) {
+                        showNotification('У вас уже есть активная жалоба на этот чат. Дождитесь её решения.', 'info');
+                        return;
+                    }
+                    
+                    if (chatReportResult.has_active_reports) {
+                        showNotification('На этот чат уже подана жалоба. Дождитесь решения администратора.', 'info');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking reports:', error);
+                }
+                
+                reportChatModal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                reportReason.focus();
+            });
+        }
+
+        if (submitReport) {
+            submitReport.addEventListener('click', async () => {
+                const reason = reportReason.value.trim();
+                if (!reason) {
+                    showNotification('Пожалуйста, укажите причину жалобы', 'info');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/report_chat/{{ chat_id }}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ reason })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        showNotification('Жалоба отправлена администратору', 'success');
+                        closeReportModal();
+                        
+                        // Делаем кнопку неактивной после успешной отправки
+                        if (reportChatButton) {
+                            reportChatButton.disabled = true;
+                            reportChatButton.style.opacity = '0.5';
+                            reportChatButton.style.cursor = 'not-allowed';
+                            reportChatButton.title = 'Жалоба отправлена. Ожидайте решения.';
+                        }
+                        
+                    } else {
+                        showNotification(result.message || 'Ошибка при отправке жалобы', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Ошибка при отправке жалобы', 'error');
+                }
+            });
+        }
+
+        if (cancelReport) {
+            cancelReport.addEventListener('click', closeReportModal);
+        }
 
         // Инициализация фокуса при загрузке
-        messageInput.focus();
+        if (messageInput) {
+            messageInput.focus();
+        }
     });
 </script>
 {% endblock %}
