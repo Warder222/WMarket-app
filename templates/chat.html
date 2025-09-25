@@ -26,29 +26,11 @@
         margin-bottom: 16px;
     }
 
-    .back-button {
-        background-color: var(--primary-color);
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        margin-right: 12px;
-    }
-
-    .back-button svg {
-        width: 24px;
-        height: 24px;
-        fill: white;
-    }
-
     .chat-title {
         font-size: 18px;
         font-weight: bold;
         flex-grow: 1;
+        margin-left: 1vh;
     }
 
     .chat-messages {
@@ -95,7 +77,7 @@
 
     .chat-input-container {
         position: fixed;
-        bottom: 0px; /* Уменьшаем отступ, так как навигации нет */
+        bottom: 0px;
         left: 0;
         right: 0;
         background-color: var(--bg-color);
@@ -337,16 +319,78 @@
         color: #ffc107;
         font-size: 11px;
     }
+
+    .blocked-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+    }
+
+    .blocked-message {
+        background-color: var(--card-bg);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        max-width: 300px;
+        border-left: 4px solid #ffc107;
+        color: var(--secondary-text);
+    }
+
+    .blocked-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .back-button {
+        background-color: var(--primary-color);
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        margin: 0 auto;
+    }
+
+    .back-button svg {
+        width: 24px;
+        height: 24px;
+        fill: white;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-{% if is_blocked %}
-<div style="background-color: #ffebee; color: #c62828; padding: 16px; text-align: center; border-radius: 8px; margin: 16px;">
-    ⚠️ Этот пользователь заблокирован до {{ unblock_at }}. Вы не можете отправлять сообщения.
-</div>
-{% endif %}
 <div class="chat-container">
+    {% if is_blocked %}
+    <div class="blocked-overlay">
+        <div class="blocked-message">
+            <div class="blocked-warning">
+                ⚠️ Этот пользователь заблокирован. Вы не можете отправлять сообщения.
+            </div>
+            <button class="back-button" onclick="goBackAndReload()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="chat-header">
         <button class="back-button" onclick="goBackAndReload()">
             <svg viewBox="0 0 24 24">
@@ -387,6 +431,7 @@
             <div class="product-price">{{ product.product_price }} ₽</div>
         </div>
     </div>
+    
     <div class="chat-messages" id="chatMessages">
         {% for message in messages %}
         <div class="message {% if message.sender_id == current_user.id %}message-sent{% elif message.sender_id == 0 %}message-admin{% else %}message-received{% endif %}">
@@ -400,9 +445,9 @@
         {% endfor %}
     </div>
 
-    <div class="chat-input-container">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Написать сообщение...">
-        <button class="send-button" id="sendButton">
+    <div class="chat-input-container" {% if is_blocked %}style="display: none;"{% endif %}>
+        <input type="text" class="chat-input" id="messageInput" placeholder="Написать сообщение..." {% if is_blocked %}disabled{% endif %}>
+        <button class="send-button" id="sendButton" {% if is_blocked %}disabled{% endif %}>
             <svg viewBox="0 0 24 24">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
@@ -426,10 +471,8 @@
 <script>
     function goBackAndReload() {
         {% if current_user.is_admin %}
-            // Для админа - возврат в админ панель
             window.location.href = '/admin/chat_reports?tab=reports';
         {% else %}
-            // Для пользователей - возврат в чаты
             window.location.href = '/chats';
         {% endif %}
     }
@@ -441,19 +484,15 @@
         const diffMs = now - messageTime;
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         
-        // Если сообщение сегодня - показываем только время
         if (diffDays === 0) {
             return messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
-        // Если сообщение вчера - показываем "вчера" и время
         else if (diffDays === 1) {
             return `вчера ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         }
-        // Если сообщение в течение года - показываем дату и время
         else if (diffDays < 365) {
             return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         }
-        // Если сообщение старше года - показываем полную дату с годом и время
         else {
             return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         }
@@ -506,10 +545,12 @@
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // Обработка блокировки пользователя
-        {% if is_blocked %}
+        const isBlocked = {{ is_blocked|lower }};
+        
+        if (isBlocked) {
             const messageInput = document.getElementById('messageInput');
             const sendButton = document.getElementById('sendButton');
+            const reportChatButton = document.getElementById('reportChatButton');
             
             if (messageInput) {
                 messageInput.disabled = true;
@@ -520,9 +561,18 @@
                 sendButton.disabled = true;
                 sendButton.style.opacity = "0.5";
             }
-        {% endif %}
+            
+            if (reportChatButton) {
+                reportChatButton.disabled = true;
+                reportChatButton.style.opacity = "0.5";
+                reportChatButton.style.cursor = "not-allowed";
+            }
+            
+            // Не инициализируем WebSocket и другую логику чата
+            return;
+        }
 
-        // Основная логика чата
+        // Основная логика чата (только если не заблокирован)
         const socket = new WebSocket(`wss://${window.location.host}/ws/{{ current_user.id }}`);
         const chatId = {{ chat_id }};
         const currentUserId = {{ current_user.id }};

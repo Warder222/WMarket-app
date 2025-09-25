@@ -68,6 +68,7 @@ async def admin_chat_reports(
                 )
 
                 for prod in result.scalars():
+                    seller_info = await get_user_info_new(prod.tg_id)
                     moderation_products.append({'product_id': prod.id,
                                                 'product_name': prod.product_name,
                                                 'product_price': prod.product_price,
@@ -75,7 +76,8 @@ async def admin_chat_reports(
                                                 'product_image_url': prod.product_image_url,
                                                 'created_at': prod.created_at,
                                                 'category_name': prod.category_name,
-                                                'tg_id': prod.tg_id})
+                                                'tg_id': prod.tg_id,
+                                                'first_name': seller_info["first_name"]})
             except Exception as exc:
                 print(f"Error: {exc}")
         print()
@@ -106,7 +108,24 @@ async def admin_chat_reports(
                 .where(Review.moderated == False)
                 .order_by(Review.created_at.desc())
             )
-            reviews = result.scalars().all()
+            reviews_arr = result.scalars().all()
+        reviews = []
+        for review in reviews_arr:
+            from_user_review_info = await get_user_info_new(review.from_user_id)
+            to_user_review_info = await get_user_info_new(review.to_user_id)
+            reviews.append({
+                "id": review.id,
+                "deal_id": review.deal_id,
+                "from_user_id": review.from_user_id,
+                "from_user_first_name": from_user_review_info["first_name"],
+                "to_user_id": review.to_user_id,
+                "to_user_first_name": to_user_review_info["first_name"],
+                "product_id": review.product_id,
+                "rating": review.rating,
+                "text": review.text,
+                "created_at": review.created_at,
+                "moderated": review.moderated
+            })
 
         pending_deals = await get_pending_deals()
         active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))

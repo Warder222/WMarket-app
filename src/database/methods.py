@@ -632,7 +632,37 @@ async def get_pending_deals():
             )
             .order_by(Deal.created_at.desc())
         )
-        return result.scalars().all()
+        deals = result.scalars().all()
+        pending_deals = []
+        for deal in deals:
+            buyer_info = await get_user_info_new(deal.buyer_id)
+            seller_info = await get_user_info_new(deal.seller_id)
+            pending_deals.append({
+                "id": deal.id,
+                "product_id": deal.product_id,
+                "product_name": deal.product_name,
+                "seller_id": deal.seller_id,
+                "seller_first_name": seller_info["first_name"],
+                "buyer_id": deal.buyer_id,
+                "buyer_first_name": buyer_info["first_name"],
+                "currency": deal.currency,
+                "amount": deal.amount,
+                "status": deal.status,
+                "pending_cancel": deal.pending_cancel,
+                "cancel_reason": deal.cancel_reason,
+                "cancel_request_by": deal.cancel_request_by,
+                "created_at": deal.created_at,
+                "completed_at": deal.completed_at,
+                "admin_decision": deal.admin_decision,
+                "admin_reason": deal.admin_reason,
+                "admin_id": deal.admin_id,
+                "time_extension": deal.time_extension,
+                "time_extension_until": deal.time_extension_until,
+                "is_reserved": deal.is_reserved,
+                "reservation_amount": deal.reservation_amount,
+                "reservation_until": deal.reservation_until,
+            })
+        return pending_deals
 #_______________________________________________________________________________________________________________________
 
 

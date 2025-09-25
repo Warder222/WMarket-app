@@ -1013,7 +1013,7 @@
                 <div class="item-header">
                     <div>
                         <span class="item-id">Объявление #{{ product['product_id'] }}</span>
-                        <span>от пользователя {{ product['tg_id'] }} ({{ product["product_name"] }})</span>
+                        <span>от пользователя <a href="/profile/{{ product['tg_id'] }}" class="user-link">{{ product['first_name'] }}</a> ({{ product["product_name"] }})</span>
                     </div>
                     <div class="item-time">{{ product['created_at'].strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
@@ -1090,19 +1090,13 @@
                     <div class="review-user">
                         <span class="user-label">От:</span>
                         <a href="/profile/{{ review.from_user_id }}" class="user-link">
-                            {{ review.from_user_first_name }} (ID: {{ review.from_user_id }})
+                            {{ review.from_user_first_name }}
                         </a>
-                        <!-- <a href="/profile/{{ review.from_user_id }}" class="user-link">
-                            ID: {{ review.from_user_id }}
-                        </a> -->
                     </div>
                     <div class="review-user">
                         <span class="user-label">Кому:</span>
-                        <!-- <a href="/profile/{{ review.to_user_id }}" class="user-link">
-                            ID: {{ review.to_user_id }}
-                        </a> -->
                         <a href="/profile/{{ review.to_user_id }}" class="user-link">
-                            {{ review.to_user_first_name }} (ID: {{ review.to_user_id }})
+                            {{ review.to_user_first_name }}
                         </a>
                     </div>
                 </div>
@@ -1150,12 +1144,9 @@
                     </div>
                     <div class="item-time">{{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
-                
                 <div class="deal-info">
-                    <!-- <div><strong>Продавец:</strong> {{ deal.seller_first_name }} (ID: {{ deal.seller_id }})</div>
-                    <div><strong>Покупатель:</strong> {{ deal.buyer_first_name }} (ID: {{ deal.buyer_id }})</div> -->
-                    <div><strong>Продавец:</strong> {{ deal.seller_first_name }} (ID: {{ deal.seller_id }})</div>
-                    <div><strong>Покупатель:</strong> {{ deal.buyer_first_name }} (ID: {{ deal.buyer_id }})</div>
+                    <div><strong>Продавец:</strong> <a href="/profile/{{ deal.seller_id }}" class="user-link">{{ deal.seller_first_name }}</a></div>
+                    <div><strong>Покупатель:</strong> <a href="/profile/{{ deal.buyer_id }}" class="user-link">{{ deal.buyer_first_name }}</a></div>
                     <div><strong>Сумма:</strong> {{ deal.amount }} {{ deal.currency.upper() }}</div>
                     <div><strong>Статус:</strong> {{ deal.status }}</div>
                     <div><strong>Тип оплаты:</strong> {% if deal.currency == 'meet' %}При встрече{% else %}Онлайн{% endif %}</div>
