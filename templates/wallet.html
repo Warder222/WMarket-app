@@ -208,32 +208,6 @@
         }
     }
 
-    .currency-switcher {
-        position: fixed;
-        top: 100px;
-        right: 50px;
-        z-index: 100;
-    }
-
-    .currency-button {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .currency-button svg {
-        width: 24px;
-        height: 24px;
-    }
-
     .history-container {
         max-height: 21vh;
         overflow-y: auto;
@@ -449,31 +423,7 @@
         <h1 class="wallet-title">Мой кошелёк</h1>
     </div>
 
-    <div class="balance-card" id="rubBalanceCard">
-        <div class="balance-header">
-            <div class="balance-title">Рублёвый счёт</div>
-        </div>
-        <div class="balance-amount" id="rubBalanceAmount">0 ₽</div>
-        
-        <div class="balance-actions">
-            <button class="balance-button" id="depositRubButton">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="19" x2="12" y2="5"></line>
-                    <polyline points="5 12 12 5 19 12"></polyline>
-                </svg>
-                Пополнить
-            </button>
-            <button class="balance-button outline" id="withdrawRubButton">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <polyline points="19 12 12 19 5 12"></polyline>
-                </svg>
-                Вывести
-            </button>
-        </div>
-    </div>
-
-    <div class="balance-card" id="tonBalanceCard" style="display: none;">
+    <div class="balance-card" id="tonBalanceCard">
         <div class="balance-header">
             <div class="balance-title">TON счёт</div>
         </div>
@@ -506,25 +456,10 @@
         </div>
     </div>
 
-    <h2 class="history-title" id="rubHistoryTitle">История операций</h2>
-    <h2 class="history-title" id="tonHistoryTitle" style="display: none;">История операций</h2>
+    <h2 class="history-title">История операций</h2>
 
-    <div id="rubHistory">
-        <div class="history-empty">Нет операций</div>
-    </div>
-
-    <div id="tonHistory" style="display: none;">
+    <div id="tonHistory">
         <div class="history-container" id="tonHistoryContainer"></div>
-    </div>
-
-    <div class="currency-switcher">
-        <button class="currency-button" id="currencySwitchButton">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 16V4h5v4"></path>
-                <path d="M17 8V20h-5v-4"></path>
-                <path d="M3 12h18"></path>
-            </svg>
-        </button>
     </div>
 </div>
 
@@ -641,14 +576,14 @@
         const RECIPIENT_ADDRESS = '{{ recipient_address }}';
         
         // Функция для форматирования баланса
-        function formatBalance(balance, isRub) {
+        function formatBalance(balance) {
             if (balance === 0) {
-                return isRub ? '0 ₽' : '0 TON';
+                return '0 TON';
             }
             
             // Округляем до 2 знаков, убираем лишние нули
             const formatted = parseFloat(balance.toFixed(2));
-            return isRub ? `${formatted} ₽` : `${formatted} TON`;
+            return `${formatted} TON`;
         }
 
         // Функция для обновления всех балансов
@@ -660,10 +595,8 @@
                     
                     if (data.status === 'success') {
                         // Обновляем отображение в кошельке
-                        document.getElementById('rubBalanceAmount').textContent = 
-                            formatBalance(data.rub_balance, true);
                         document.getElementById('tonBalanceAmount').textContent = 
-                            formatBalance(data.ton_balance, false);
+                            formatBalance(data.ton_balance);
                     }
                 }
             } catch (error) {
@@ -730,92 +663,16 @@
         await checkPendingTransactions();
 
         // Элементы DOM
-        const currencySwitchButton = document.getElementById('currencySwitchButton');
-        const rubBalanceCard = document.getElementById('rubBalanceCard');
         const tonBalanceCard = document.getElementById('tonBalanceCard');
-        const rubHistoryTitle = document.getElementById('rubHistoryTitle');
-        const tonHistoryTitle = document.getElementById('tonHistoryTitle');
-        const rubHistory = document.getElementById('rubHistory');
         const tonHistory = document.getElementById('tonHistory');
         const tonConnectContainer = document.getElementById('ton-connect');
         const tonConnectBalance = document.getElementById('ton-connect-balance');
         
-        // Текущая валюта (по умолчанию рубли)
-        let currentCurrency = 'rub';
-
-        // Функция для переключения валюты
-        async function switchCurrency(newCurrency) {
-            currentCurrency = newCurrency;
-            
-            if (currentCurrency === 'rub') {
-                rubBalanceCard.style.display = 'block';
-                tonBalanceCard.style.display = 'none';
-                rubHistoryTitle.style.display = 'block';
-                tonHistoryTitle.style.display = 'none';
-                rubHistory.style.display = 'block';
-                tonHistory.style.display = 'none';
-                tonConnectContainer.style.display = 'none';
-                tonConnectBalance.style.display = 'none';
-            } else {
-                rubBalanceCard.style.display = 'none';
-                tonBalanceCard.style.display = 'block';
-                rubHistoryTitle.style.display = 'none';
-                tonHistoryTitle.style.display = 'block';
-                rubHistory.style.display = 'none';
-                tonHistory.style.display = 'block';
-                tonConnectContainer.style.display = 'block';
-                tonConnectBalance.style.display = 'block';
-                
-                // Обновляем историю операций при переключении на TON
-                await updateTransactionHistory();
-            }
-            
-            // Сохраняем выбор валюты
-            try {
-                await fetch('/set_currency', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ currency: currentCurrency })
-                });
-            } catch (error) {
-                console.error('Error saving currency preference:', error);
-                showNotification('Ошибка сохранения валюты', 'error');
-            }
-        }
-
-        // Загружаем текущую валюту из базы данных
-        try {
-            const response = await fetch('/get_currency');
-            if (response.ok) {
-                const data = await response.json();
-                if (data.currency === 'ton') {
-                    await switchCurrency('ton');
-                } else {
-                    await switchCurrency('rub');
-                }
-            }
-        } catch (error) {
-            console.error('Error loading currency preference:', error);
-            showNotification('Ошибка загрузки настроек валюты', 'error');
-            await switchCurrency('rub');
-        }
-
-        // Обработчик кнопки переключения валюты
-        currencySwitchButton.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await switchCurrency(currentCurrency === 'rub' ? 'ton' : 'rub');
-        });
-
-        // Обработчики кнопок
-        document.getElementById('depositRubButton').addEventListener('click', () => {
-            showNotification('Функция пополнения рублёвого счёта будет реализована позже', 'info');
-        });
-
-        document.getElementById('withdrawRubButton').addEventListener('click', () => {
-            showNotification('Функция вывода с рублёвого счёта будет реализована позже', 'info');
-        });
+        // Всегда показываем TON интерфейс
+        tonBalanceCard.style.display = 'block';
+        tonHistory.style.display = 'block';
+        tonConnectContainer.style.display = 'block';
+        tonConnectBalance.style.display = 'block';
 
         // Модальное окно для отправки TON
         const sendTonModal = document.getElementById('sendTonModal');

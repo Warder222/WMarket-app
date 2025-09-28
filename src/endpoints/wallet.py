@@ -59,7 +59,7 @@ async def get_wallet_balance(request: Request, session_token=Cookie(default=None
         user_data = None
         async with async_session_maker() as session:
             result = await session.execute(
-                select(User.rub_balance, User.ton_balance, User.current_currency)
+                select(User.ton_balance)
                 .where(User.tg_id == payload.get('tg_id'))
             )
             user_data_result = result.fetchone()
@@ -68,62 +68,58 @@ async def get_wallet_balance(request: Request, session_token=Cookie(default=None
         if not user_data:
             return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
 
-        rub_balance = float(user_data[0]) if user_data[0] is not None else 0.0
-        ton_balance = float(user_data[1]) if user_data[1] is not None else 0.0
-        currency = user_data[2] if user_data[2] else 'rub'
+        ton_balance = float(user_data[0]) if user_data[0] is not None else 0.0
+        print(ton_balance)
 
         return JSONResponse({
             "status": "success",
-            "rub_balance": rub_balance,
-            "ton_balance": ton_balance,
-            "balance": rub_balance if currency == 'rub' else ton_balance,
-            "currency": currency
+            "ton_balance": ton_balance
         })
     except Exception as e:
         print(f"Error getting wallet balance: {e}")
         return JSONResponse({"status": "error", "message": "Server error"}, status_code=500)
 
 
-@wmarket_router.post("/set_currency")
-async def set_currency(request: Request, session_token=Cookie(default=None)):
-    if not session_token:
-        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+# @wmarket_router.post("/set_currency")
+# async def set_currency(request: Request, session_token=Cookie(default=None)):
+#     if not session_token:
+#         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+#
+#     payload = await decode_jwt(session_token)
+#     data = await request.json()
+#     currency = data.get("currency")
+#
+#     if currency not in ['rub', 'ton']:
+#         return JSONResponse({"status": "error", "message": "Invalid currency"}, status_code=400)
+#
+#     async with async_session_maker() as session:
+#         await session.execute(
+#             update(User)
+#             .where(User.tg_id == payload.get("tg_id"))
+#             .values(current_currency=currency)
+#         )
+#         await session.commit()
+#
+#     return JSONResponse({"status": "success"})
 
-    payload = await decode_jwt(session_token)
-    data = await request.json()
-    currency = data.get("currency")
 
-    if currency not in ['rub', 'ton']:
-        return JSONResponse({"status": "error", "message": "Invalid currency"}, status_code=400)
-
-    async with async_session_maker() as session:
-        await session.execute(
-            update(User)
-            .where(User.tg_id == payload.get("tg_id"))
-            .values(current_currency=currency)
-        )
-        await session.commit()
-
-    return JSONResponse({"status": "success"})
-
-
-@wmarket_router.get("/get_currency")
-async def get_currency(request: Request, session_token=Cookie(default=None)):
-    if not session_token:
-        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
-
-    payload = await decode_jwt(session_token)
-    currency = None
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(User.current_currency).where(User.tg_id == payload.get("tg_id")))
-        currency_new = result.scalar_one_or_none()
-        currency = currency_new or 'rub'
-
-    return JSONResponse({
-        "status": "success",
-        "currency": currency
-    })
+# @wmarket_router.get("/get_currency")
+# async def get_currency(request: Request, session_token=Cookie(default=None)):
+#     if not session_token:
+#         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+#
+#     payload = await decode_jwt(session_token)
+#     currency = None
+#     async with async_session_maker() as session:
+#         result = await session.execute(
+#             select(User.current_currency).where(User.tg_id == payload.get("tg_id")))
+#         currency_new = result.scalar_one_or_none()
+#         currency = currency_new or 'rub'
+#
+#     return JSONResponse({
+#         "status": "success",
+#         "currency": currency
+#     })
 
 
 @wmarket_router.get("/get_ton_transactions")

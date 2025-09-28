@@ -6,6 +6,7 @@ from sqlalchemy import desc, select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
+from src.config import settings
 from src.database.database import Deal, Product, Review, User, async_session_maker
 from src.database.methods import (all_count_unread_messages, archive_product_post, get_all_users,
                                   get_user_active_deals, get_user_active_deals_count, get_user_info_new)
@@ -72,14 +73,15 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                         "seller_username": seller.first_name if seller else "Unknown",
                         "buyer_username": buyer.first_name if buyer else "Unknown",
                         "currency": deal.currency,
-                        "amount": amount,
+                        "amount": deal.rub_amount if deal.currency == 'rub' and deal.rub_amount else deal.amount,
                         "status": deal.status,
                         "status_text": status_text,
                         "created_at": deal.created_at,
                         "completed_at": deal.completed_at,
                         "is_reserved": deal.is_reserved,
                         "reservation_amount": deal.reservation_amount,
-                        "admin_decision": deal.admin_decision
+                        "admin_decision": deal.admin_decision,
+                        "original_amount": deal.amount  # Сохраняем оригинальную сумму для внутренних расчетов
                     })
 
                 completed_deals = deal_list
@@ -123,8 +125,8 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
 @wmarket_router.post("/confirm_deal")
 async def confirm_deal(
-        request: Request,
-        session_token=Cookie(default=None)
+    request: Request,
+    session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -155,48 +157,21 @@ async def confirm_deal(
                     status_code=400
                 )
 
-            if deal.currency == 'meet':
-                deal.pending_cancel = True
-                deal.cancel_reason = "Ожидает подтверждения администратором (личная встреча)"
-                deal.cancel_request_by = payload.get("tg_id")
-
-                review = Review(
-                    deal_id=deal.id,
-                    from_user_id=deal.buyer_id,
-                    to_user_id=deal.seller_id,
-                    product_id=deal.product_id,
-                    rating=rating,
-                    text=review_text,
-                    moderated=False
-                )
-                session.add(review)
-
-                await session.commit()
-
-                buyer_info = await get_user_info_new(deal.buyer_id)
-                seller_info = await get_user_info_new(deal.seller_id)
-
-                # Уведомление продавцу
-                await send_notification_to_user(
-                    deal.seller_id,
-                    f"⚠️ Сделка по товару '{deal.product_name}' отправлена на модерацию.\n\n"
-                    f"Покупатель {buyer_info["first_name"]} подтвердил получение товара при личной встрече.\n\n"
-                    f"Администратор проверит сделку и подтвердит её завершение.\n"
-                    f"По вопросам обращайтесь @wmarket_support"
+            # Для рублевых сделок проверяем подтверждение оплаты
+            if deal.currency == 'rub' and not deal.rub_payment_confirmed:
+                return JSONResponse(
+                    {"status": "error", "message": "Wait for seller to confirm rub payment"},
+                    status_code=400
                 )
 
-                # Уведомление покупателю
-                await send_notification_to_user(
-                    deal.buyer_id,
-                    f"⚠️ Ваша сделка по товару '{deal.product_name}' отправлена на модерацию.\n\n"
-                    f"Для подтверждения сделки обратитесь к @wmarket_support\n"
-                    f"Администратор проверит факт передачи товара и подтвердит сделку."
-                )
+            comsa = settings.COMMISSION
 
-                return {"status": "success"}
-
-            seller_amount = deal.amount * 0.93
-            market_fee = deal.amount * 0.07
+            if deal.currency == 'rub':
+                seller_amount = deal.amount * comsa
+                market_fee = deal.amount * (1 - comsa)
+            else:
+                seller_amount = deal.amount * comsa
+                market_fee = deal.amount * (1 - comsa)
 
             deal.status = "completed"
             deal.completed_at = datetime.now(timezone.utc)
@@ -205,11 +180,12 @@ async def confirm_deal(
             seller = seller.scalar_one_or_none()
 
             if deal.currency == 'rub':
-                if seller.earned_rub is None:
-                    seller.earned_rub = 0.0
-                seller.earned_rub += seller_amount
-                seller.rub_balance += seller_amount
-            else:
+                # Возвращаем продавцу 90% залога
+                seller.ton_balance += seller_amount
+                if seller.earned_ton is None:
+                    seller.earned_ton = 0.0
+                seller.earned_ton += seller_amount
+            elif deal.currency == 'ton':
                 if seller.earned_ton is None:
                     seller.earned_ton = 0.0
                 seller.earned_ton += seller_amount
@@ -235,7 +211,7 @@ async def confirm_deal(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
-                f"💰 Сумма: {seller_amount:.2f} {deal.currency.upper()} (комиссия: {market_fee:.2f})\n"
+                f"💰 {"Залог возвращен" if deal.currency == 'rub' else "Сумма"}: {seller_amount:.4f} TON (комиссия: {market_fee:.4f})\n"
                 f"👤 {buyer_info_arr["first_name"]} подтвердил получение товара.\n\n"
                 f"Средства зачислены на ваш баланс!"
             )
@@ -244,7 +220,7 @@ async def confirm_deal(
                 deal.buyer_id,
                 f"✅ Вы подтвердили сделку!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
-                f"💰 Сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"💰 Сумма: {deal.amount} {"TON" if deal.currency == 'ton' else "₽"}\n"
                 f"👤 Продавец: {seller_info_arr["first_name"] if seller_info_arr else 'неизвестен'}\n\n"
                 f"Ваш отзыв отправлен на модерацию."
             )
@@ -254,6 +230,70 @@ async def confirm_deal(
         except Exception as e:
             await session.rollback()
             print(f"Error confirming deal: {e}")
+            return JSONResponse(
+                {"status": "error", "message": "Internal server error"},
+                status_code=500
+            )
+
+
+@wmarket_router.post("/confirm_rub_payment")
+async def confirm_rub_payment(
+    request: Request,
+    session_token=Cookie(default=None)
+):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    data = await request.json()
+    deal_id = data.get("deal_id")
+
+    async with async_session_maker() as session:
+        try:
+            result = await session.execute(select(Deal).where(Deal.id == int(deal_id)))
+            deal = result.scalar_one_or_none()
+
+            if not deal:
+                return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
+
+            if deal.seller_id != payload.get("tg_id"):
+                return JSONResponse(
+                    {"status": "error", "message": "Only seller can confirm rub payment"},
+                    status_code=403
+                )
+
+            if deal.currency != 'rub':
+                return JSONResponse(
+                    {"status": "error", "message": "This deal is not in rubles"},
+                    status_code=400
+                )
+
+            if deal.rub_payment_confirmed:
+                return JSONResponse(
+                    {"status": "error", "message": "Payment already confirmed"},
+                    status_code=400
+                )
+
+            # Помечаем оплату как подтвержденную
+            deal.rub_payment_confirmed = True
+
+            await session.commit()
+
+            buyer_info = await get_user_info_new(deal.buyer_id)
+
+            await send_notification_to_user(
+                deal.buyer_id,
+                f"✅ Продавец подтвердил получение рублевого платежа!\n\n"
+                f"📌 Товар: {deal.product_name}\n"
+                f"💰 Сумма: {deal.amount} TON (эквивалент)\n\n"
+                f"Теперь вы можете подтвердить получение товара."
+            )
+
+            return JSONResponse({"status": "success"})
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Error confirming rub payment: {e}")
             return JSONResponse(
                 {"status": "error", "message": "Internal server error"},
                 status_code=500
@@ -272,6 +312,7 @@ async def check_deal_status(request: Request, deal_id: int, session_token=Cookie
         if not deal:
             return JSONResponse({"status": "error", "message": "Deal not found"}, status_code=404)
 
+        # Проверяем истекло ли время расширения
         if deal.time_extension_until and deal.time_extension_until < datetime.now(timezone.utc):
             deal.pending_cancel = True
             deal.cancel_reason = "Время на завершение сделки истекло"
@@ -280,7 +321,9 @@ async def check_deal_status(request: Request, deal_id: int, session_token=Cookie
         return JSONResponse({
             "status": deal.status,
             "pending_cancel": deal.pending_cancel,
-            "time_extension_until": deal.time_extension_until.isoformat() if deal.time_extension_until else None
+            "time_extension_until": deal.time_extension_until.isoformat() if deal.time_extension_until else None,
+            "currency": deal.currency,  # Добавляем валюту
+            "rub_payment_confirmed": deal.rub_payment_confirmed if deal.currency == 'rub' else None  # Добавляем статус оплаты для рублевых сделок
         })
 
 
@@ -380,14 +423,7 @@ async def complete_reservation(
 
             remaining_amount = deal.amount - deal.reservation_amount
 
-            if deal.currency == 'rub':
-                if buyer.rub_balance < remaining_amount:
-                    return JSONResponse(
-                        {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
-                        status_code=400
-                    )
-                buyer.rub_balance -= remaining_amount
-            else:
+            if deal.currency == 'ton':
                 if buyer.ton_balance < remaining_amount:
                     return JSONResponse(
                         {"status": "error", "message": "Недостаточно средств на TON балансе"},
@@ -460,9 +496,7 @@ async def cancel_reservation(
 
             refund_amount = deal.reservation_amount * 2 / 3
 
-            if deal.currency == 'rub':
-                buyer.rub_balance += refund_amount
-            else:
+            if deal.currency == 'ton':
                 buyer.ton_balance += refund_amount
 
             deal.is_reserved = False

@@ -292,6 +292,16 @@ async def search_users(request: Request, q: str, session_token=Cookie(default=No
         } for user in users]
 
 
+@wmarket_api_router.get("/check_review_exists")
+async def api_check_review_exists(deal_id: int, session_token=Cookie(default=None)):
+    if not session_token:
+        return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
+
+    payload = await decode_jwt(session_token)
+    exists = await check_review_exists(deal_id, payload.get("tg_id"))
+
+    return JSONResponse({"exists": exists})
+
 # @wmarket_router.get("/user_info/{user_id}")
 # async def get_user_info_endpoint(user_id: int):
 #     user_info = await get_user_info(user_id)

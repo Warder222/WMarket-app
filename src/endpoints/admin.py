@@ -666,9 +666,7 @@ async def moderate_cancel_request(
                 buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
                 buyer = buyer.scalar_one_or_none()
 
-                if deal.currency == 'rub':
-                    buyer.rub_balance += deal.amount
-                else:
+                if deal.currency == 'ton':
                     buyer.ton_balance += deal.amount
 
                 deal.status = "cancelled"
@@ -798,15 +796,11 @@ async def complete_deal(
             seller = seller.scalar_one_or_none()
 
             if action == "for_seller":
-                seller_amount = deal.amount * 0.93
-                market_fee = deal.amount * 0.07
+                comsa = settings.COMMISSION
+                seller_amount = deal.amount * comsa
+                market_fee = deal.amount * (1 - comsa)
 
-                if deal.currency == 'rub':
-                    seller.rub_balance += seller_amount
-                    if seller.earned_rub is None:
-                        seller.earned_rub = 0.0
-                    seller.earned_rub += seller_amount
-                else:
+                if deal.currency == 'ton':
                     seller.ton_balance += seller_amount
                     if seller.earned_ton is None:
                         seller.earned_ton = 0.0
@@ -837,9 +831,7 @@ async def complete_deal(
                 )
 
             elif action == "for_buyer":
-                if deal.currency == 'rub':
-                    buyer.rub_balance += deal.amount
-                else:
+                if deal.currency == 'ton':
                     buyer.ton_balance += deal.amount
 
                 deal.status = "completed_by_admin"
@@ -865,6 +857,61 @@ async def complete_deal(
                 )
 
                 await archive_product_post(deal.product_id)
+
+            # В функции complete_deal добавляем новые условия
+            if action == "return_collateral_to_seller":
+                # Возвращаем 100% залога продавцу
+                if deal.currency == 'rub':
+                    seller.ton_balance += deal.amount  # Полный возврат залога
+
+                deal.status = "completed_by_admin"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.admin_decision = "return_to_seller"
+                deal.admin_reason = reason
+                deal.admin_id = payload.get("tg_id")
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"✅ Администратор вернул вам залог по сделке!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Залог: {deal.amount} TON (возвращён полностью)\n"
+                    f"Причина решения: {reason}"
+                )
+
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"ℹ️ Администратор завершил сделку в пользу продавца.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Залог возвращён продавцу.\n"
+                    f"Причина решения: {reason}"
+                )
+
+            elif action == "return_collateral_to_buyer":
+                # Возвращаем 100% залога покупателю
+                if deal.currency == 'rub':
+                    buyer.ton_balance += deal.amount  # Полный возврат залога
+
+                deal.status = "completed_by_admin"
+                deal.completed_at = datetime.now(timezone.utc)
+                deal.admin_decision = "return_to_buyer"
+                deal.admin_reason = reason
+                deal.admin_id = payload.get("tg_id")
+
+                await send_notification_to_user(
+                    deal.buyer_id,
+                    f"✅ Администратор вернул вам залог по сделке!\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Залог: {deal.amount} TON (возвращён полностью)\n"
+                    f"Причина решения: {reason}"
+                )
+
+                await send_notification_to_user(
+                    deal.seller_id,
+                    f"ℹ️ Администратор вернул залог покупателю.\n\n"
+                    f"Товар: {deal.product_name}\n"
+                    f"Залог: {deal.amount} TON\n"
+                    f"Причина решения: {reason}"
+                )
 
             await session.commit()
             return JSONResponse({"status": "success"})
@@ -995,8 +1042,9 @@ async def complete_meet_deal(
                 seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
                 seller = seller.scalar_one_or_none()
 
-                seller_amount = deal.amount * 0.93
-                market_fee = deal.amount * 0.07
+                comsa = settings.COMMISSION
+                seller_amount = deal.amount * comsa
+                market_fee = deal.amount * (1 - comsa)
 
                 if seller.earned_rub is None:
                     seller.earned_rub = 0.0

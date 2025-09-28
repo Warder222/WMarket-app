@@ -109,7 +109,7 @@ async def add_product_post(
         session_token=Cookie(default=None),
         category: str = Form(),
         product_name: str = Form(),
-        product_price: int = Form(),
+        product_price: float = Form(),
         product_description: str = Form(),
         product_images: List[UploadFile] = File(...)
 ):

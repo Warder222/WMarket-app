@@ -797,6 +797,17 @@
         height: 16px;
         fill: var(--error-color);
     }
+
+    .rub-actions, .ton-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .hidden {
+        display: none !important;
+}
 </style>
 {% endblock %}
 
@@ -1043,7 +1054,7 @@
                 
                 <div class="product-info">
                     <div class="product-title">{{ product['product_title'] }}</div>
-                    <div class="product-price">{{ product['product_price'] }} ₽</div>
+                    <div class="product-price">{{ product['product_price'] }} TON</div>
                     <div class="product-category">Категория: {{ product['category_name'] }}</div>
                     <div class="product-description">{{ product['product_description'] }}</div>
                 </div>
@@ -1147,10 +1158,19 @@
                 <div class="deal-info">
                     <div><strong>Продавец:</strong> <a href="/profile/{{ deal.seller_id }}" class="user-link">{{ deal.seller_first_name }}</a></div>
                     <div><strong>Покупатель:</strong> <a href="/profile/{{ deal.buyer_id }}" class="user-link">{{ deal.buyer_first_name }}</a></div>
-                    <div><strong>Сумма:</strong> {{ deal.amount }} {{ deal.currency.upper() }}</div>
+                    
+                    <!-- Исправленное отображение суммы -->
+                    {% if deal.currency == 'rub' %}
+                        <div><strong>Сумма сделки:</strong> {{ deal.rub_amount }} ₽</div>
+                        <div><strong>Залог:</strong> {{ deal.amount }} TON</div>
+                    {% else %}
+                        <div><strong>Сумма:</strong> {{ deal.amount }} {{ deal.currency.upper() }}</div>
+                    {% endif %}
+                    
                     <div><strong>Статус:</strong> {{ deal.status }}</div>
-                    <div><strong>Тип оплаты:</strong> {% if deal.currency == 'meet' %}При встрече{% else %}Онлайн{% endif %}</div>
-                    {% if deal.currency != 'meet' %}
+                    <div><strong>Тип оплаты:</strong> {% if deal.currency == 'meet' %}При встрече{% elif deal.currency == 'rub' %}Рубли{% else %}TON{% endif %}</div>
+                    
+                    {% if deal.currency != 'meet' and deal.pending_cancel %}
                         <div class="cancel-reason">
                             <strong>Причина отмены:</strong> {{ deal.cancel_reason }}
                         </div>
@@ -1185,9 +1205,8 @@
             <!-- Основные действия -->
             <div id="main-actions">
                 <h3 style="margin-top: 0;">Действия со сделкой</h3>
-                <div id="deal-info-container" class="deal-info-modal" style="margin-bottom: 16px; font-size: 14px;">
-                    <!-- Информация о сделке будет подгружаться динамически -->
-                </div>
+                <!-- <div id="deal-info-container" class="deal-info-modal" style="margin-bottom: 16px; font-size: 14px;">
+                </div> -->
                 
                 <div class="modal-actions-column">
                     <button class="modal-button action-option" data-action="complete-deal" style="background-color: var(--primary-color);">
@@ -1209,14 +1228,27 @@
                     <label for="complete-reason">Причина решения</label>
                     <textarea id="complete-reason" rows="3" placeholder="Опишите причину решения" style="width: 100%;"></textarea>
                 </div>
-                <div style="display: flex; gap: 8px; margin-top: 12px;">
-                    <button class="modal-button" id="complete-for-seller" style="background-color: var(--success-color); flex: 1;">
-                        В пользу продавца
+                
+                <!-- Кнопки для рублевых сделок -->
+                <div id="rub-actions" class="hidden" style="display: flex; gap: 8px; margin-top: 12px; flex-direction: column;">
+                    <button class="modal-button" id="return-to-seller" style="background-color: var(--success-color);">
+                        Вернуть залог продавцу
                     </button>
-                    <button class="modal-button" id="complete-for-buyer" style="background-color: var(--primary-color); flex: 1;">
+                    <button class="modal-button" id="return-to-buyer" style="background-color: var(--primary-color);">
+                        Отправить залог покупателю
+                    </button>
+                </div>
+                
+                <!-- Кнопки для TON сделок -->
+                <div id="ton-actions" class="hidden" style="display: flex; gap: 8px; margin-top: 12px; flex-direction: column;">
+                    <button class="modal-button" id="complete-for-seller" style="background-color: var(--success-color);">
+                        Отправить средства продавцу
+                    </button>
+                    <button class="modal-button" id="complete-for-buyer" style="background-color: var(--primary-color);">
                         Вернуть средства покупателю
                     </button>
                 </div>
+                
                 <button class="modal-button" id="back-to-main-actions" style="background-color: var(--secondary-text); margin-top: 12px;">
                     Назад
                 </button>
@@ -1529,7 +1561,6 @@
                 
                 if (data.status === "success") {
                     showNotification('Администратор успешно добавлен', 'success');
-                    // Перезагружаем страницу для обновления списка
                     setTimeout(() => window.location.reload(), 1000);
                 } else {
                     showNotification(data.message || 'Ошибка при добавлении администратора', 'error');
@@ -1771,8 +1802,8 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.status === "success") {
-                            event.target.closest('.product-item').remove();
-                            checkEmptyContainer('moderationTab', 'Нет объявлений на модерации');
+                            showNotification('Объявление одобрено', 'success');
+                            setTimeout(() => window.location.reload(), 1000);
                         }
                     } else {
                         showNotification('Ошибка при одобрении объявления', 'error');
@@ -1796,8 +1827,8 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.status === "success") {
-                            event.target.closest('.report-item').remove();
-                            checkEmptyContainer('reportsTab', 'Нет активных жалоб');
+                            showNotification('Жалоба обработана', 'success');
+                            setTimeout(() => window.location.reload(), 1000);
                         }
                     } else {
                         showNotification('Ошибка при обработке запроса', 'error');
@@ -1884,8 +1915,8 @@
                     if (response.ok) {
                         const data = await response.json();
                         if (data.status === "success") {
-                            event.target.closest('.review-item').remove();
-                            checkEmptyContainer('reviewsTab', 'Нет отзывов на модерации');
+                            showNotification('Отзыв одобрен', 'success');
+                            setTimeout(() => window.location.reload(), 1000);
                         }
                     } else {
                         showNotification('Ошибка при одобрении отзыва', 'error');
@@ -1933,13 +1964,10 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.status === "success") {
+                        showNotification('Отзыв отклонен', 'success');
                         document.getElementById('reject-review-modal').style.display = 'none';
                         document.getElementById('reject-review-reason').value = '';
-                        const item = document.querySelector(`.review-item[data-id="${reviewId}"]`);
-                        if (item) {
-                            item.remove();
-                            checkEmptyContainer('reviewsTab', 'Нет отзывов на модерации');
-                        }
+                        setTimeout(() => window.location.reload(), 1000);
                     }
                 } else {
                     showNotification('Ошибка при отклонении отзыва', 'error');
@@ -1958,7 +1986,19 @@
             }
         });
 
-        // Функция для открытия модального окна действий со сделкой
+        function updateCurrencyInfo(currency) {
+            const rubActions = document.getElementById('rub-actions');
+            const tonActions = document.getElementById('ton-actions');
+            
+            if (currency === 'rub') {
+                rubActions.classList.remove('hidden');
+                tonActions.classList.add('hidden');
+            } else {
+                rubActions.classList.add('hidden');
+                tonActions.classList.remove('hidden');
+            }
+        }
+
         function openDealActionsModal(dealId) {
             const modal = document.getElementById('deal-actions-modal');
             modal.style.display = 'flex';
@@ -1968,18 +2008,8 @@
             fetch(`/admin/get_deal_info/${dealId}`)
                 .then(response => response.json())
                 .then(data => {
-                    const container = document.getElementById('deal-info-container');
-                    container.innerHTML = `
-                        <div><strong>Товар:</strong> ${data.product_name}</div>
-                        <div><strong>Сумма:</strong> ${data.amount} ${data.currency.toUpperCase()}</div>
-                        <div><strong>Продавец:</strong> ID ${data.seller_id}</div>
-                        <div><strong>Покупатель:</strong> ID ${data.buyer_id}</div>
-                        ${data.pending_cancel ? `
-                            <div style="margin-top: 8px; color: var(--error-color);">
-                                <strong>Запрос на отмену:</strong> ${data.cancel_reason}
-                            </div>
-                        ` : ''}
-                    `;
+                    updateCurrencyInfo(data.currency);
+                    modal.dataset.currency = data.currency;
                 });
         }
 
@@ -2014,7 +2044,8 @@
 
         // Завершение сделки в пользу продавца
         document.getElementById('complete-for-seller').addEventListener('click', function() {
-            const dealId = document.getElementById('deal-actions-modal').dataset.dealId;
+            const modal = document.getElementById('deal-actions-modal');
+            const dealId = modal.dataset.dealId;
             const reason = document.getElementById('complete-reason').value.trim();
             
             if (!reason) {
@@ -2033,25 +2064,19 @@
                 })
             }).then(response => {
                 if (response.ok) {
-                    const data = response.json();
-                    if (data.status === "success") {
-                        document.getElementById('deal-actions-modal').style.display = 'none';
-                        const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
-                        window.location.reload();
-                        if (item) {
-                            item.remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
-                        }
-                    }
+                    showNotification('Сделка успешно завершена', 'success');
+                    document.getElementById('deal-actions-modal').style.display = 'none';
+                    setTimeout(() => window.location.reload(), 1000);
                 } else {
                     showNotification('Ошибка при завершении сделки', 'error');
                 }
             });
         });
 
-        // Возврат средств покупателю
+        // Возврат средств покупателю (для TON)
         document.getElementById('complete-for-buyer').addEventListener('click', function() {
-            const dealId = document.getElementById('deal-actions-modal').dataset.dealId;
+            const modal = document.getElementById('deal-actions-modal');
+            const dealId = modal.dataset.dealId;
             const reason = document.getElementById('complete-reason').value.trim();
             
             if (!reason) {
@@ -2070,20 +2095,77 @@
                 })
             }).then(response => {
                 if (response.ok) {
-                    const data = response.json();
-                    if (data.status === "success") {
-                        document.getElementById('deal-actions-modal').style.display = 'none';
-                        const item = document.querySelector(`.deal-item[data-deal-id="${dealId}"]`);
-                        if (item) {
-                            item.remove();
-                            checkEmptyContainer('dealsTab', 'Нет сделок, ожидающих отмены');
-                        }
-                    }
+                    showNotification('Сделка успешно завершена', 'success');
+                    document.getElementById('deal-actions-modal').style.display = 'none';
+                    setTimeout(() => window.location.reload(), 1000);
                 } else {
                     showNotification('Ошибка при завершении сделки', 'error');
                 }
             });
         });
+
+
+        document.getElementById('return-to-seller').addEventListener('click', function() {
+            const modal = document.getElementById('deal-actions-modal');
+            const dealId = modal.dataset.dealId;
+            const reason = document.getElementById('complete-reason').value.trim();
+            
+            if (!reason) {
+                showNotification('Пожалуйста, укажите причину решения', 'info');
+                return;
+            }
+            
+            fetch(`/admin/complete_deal/${dealId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'return_collateral_to_seller',
+                    reason: reason
+                })
+            }).then(response => {
+                if (response.ok) {
+                    showNotification('Сделка успешно завершена', 'success');
+                    document.getElementById('deal-actions-modal').style.display = 'none';
+                    setTimeout(() => window.location.reload(), 1000);hAfterAction();
+                } else {
+                    showNotification('Ошибка при завершении сделки', 'error');
+                }
+            });
+        });
+
+        // Отправить залог покупателю (для RUB)
+        document.getElementById('return-to-buyer').addEventListener('click', function() {
+            const modal = document.getElementById('deal-actions-modal');
+            const dealId = modal.dataset.dealId;
+            const reason = document.getElementById('complete-reason').value.trim();
+            
+            if (!reason) {
+                showNotification('Пожалуйста, укажите причину решения', 'info');
+                return;
+            }
+            
+            fetch(`/admin/complete_deal/${dealId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'return_collateral_to_buyer',
+                    reason: reason
+                })
+            }).then(response => {
+                if (response.ok) {
+                    showNotification('Сделка успешно завершена', 'success');
+                    document.getElementById('deal-actions-modal').style.display = 'none';
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showNotification('Ошибка при завершении сделки', 'error');
+                }
+            });
+        });
+
 
         // Дать время на завершение
         document.getElementById('confirm-give-time').addEventListener('click', function() {

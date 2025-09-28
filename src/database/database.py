@@ -26,10 +26,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     plus_rep = Column(Integer, default=0)
     minus_rep = Column(Integer, default=0)
-    rub_balance = Column(Float, default=0.0)
     ton_balance = Column(Float, default=0.0)
-    current_currency = Column(String, default='rub')
-    earned_rub = Column(Float, default=0.0)
     earned_ton = Column(Float, default=0.0)
 
 
@@ -48,7 +45,7 @@ class Product(Base):
     tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
     category_name = Column(String, ForeignKey("categories.category_name", ondelete="CASCADE"))
     product_name = Column(String)
-    product_price = Column(Integer)
+    product_price = Column(Float)
     product_description = Column(String)
     product_image_url = Column(String)
     created_at = Column(DateTime(timezone=True), default=func.now())
@@ -149,7 +146,8 @@ class Deal(Base):
     seller_id = Column(BigInteger, ForeignKey('users.tg_id'))
     buyer_id = Column(BigInteger, ForeignKey('users.tg_id'))
     currency = Column(String)
-    amount = Column(Float)
+    amount = Column(Float)  # Сумма в основной валюте (TON для RUB сделок - залог)
+    rub_amount = Column(Float, nullable=True)  # Добавляем поле для суммы в рублях
     status = Column(String, default="active")
     pending_cancel = Column(Boolean, default=False)
     cancel_reason = Column(String, nullable=True)
@@ -164,6 +162,8 @@ class Deal(Base):
     is_reserved = Column(Boolean, default=False)
     reservation_amount = Column(Float, nullable=True)
     reservation_until = Column(DateTime(timezone=True), nullable=True)
+    rub_payment_confirmed = Column(Boolean, default=False, nullable=True)
+    collateral_amount = Column(Float, nullable=True)  # Сумма залога в TON
 
 
 class Review(Base):

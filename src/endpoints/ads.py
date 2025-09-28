@@ -124,8 +124,8 @@ async def check_chat_exists(product_id: int, session_token=Cookie(default=None))
 
 @wmarket_router.post("/create_deal")
 async def create_deal(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -135,6 +135,7 @@ async def create_deal(
     product_id = data.get("product_id")
     amount = data.get("amount")
     currency = data.get("currency")
+    rub_amount = data.get("rub_amount")  # Получаем рублевую сумму
 
     product = await get_product_info_new(product_id, None)
     if not product:
@@ -148,67 +149,81 @@ async def create_deal(
 
     async with async_session_maker() as session:
         try:
-            if currency != 'meet':
-                user = await session.execute(select(User).where(User.tg_id == buyer_id))
-                user = user.scalar_one_or_none()
+            user = await session.execute(select(User).where(User.tg_id == buyer_id))
+            user = user.scalar_one_or_none()
 
-                if currency == 'rub':
-                    if user.rub_balance < amount:
-                        return JSONResponse(
-                            {"status": "error", "message": "Недостаточно средств на рублёвом балансе"},
-                            status_code=400
-                        )
-                    user.rub_balance -= amount
-                else:  # TON
-                    if user.ton_balance < amount:
-                        return JSONResponse(
-                            {"status": "error", "message": "Недостаточно средств на TON балансе"},
-                            status_code=400
-                        )
-                    user.ton_balance -= amount
+            # Для рублевой оплаты проверяем залог у продавца
+            if currency == 'rub':
+                seller = await session.execute(select(User).where(User.tg_id == seller_id))
+                seller = seller.scalar_one_or_none()
+
+                # Сумма залога = 100% стоимости товара в TON
+                collateral_amount = product["product_price"]
+
+                if seller.ton_balance < collateral_amount:
+                    return JSONResponse(
+                        {"status": "error",
+                         "message": "У продавца недостаточно TON для обеспечения безопасности сделки. Оплата рублями невозможна."},
+                        status_code=400
+                    )
+
+                # Блокируем залог у продавца
+                seller.ton_balance -= collateral_amount
+                amount = collateral_amount  # Сохраняем сумму в TON как залог
+
+            elif currency == 'ton':
+                if user.ton_balance < amount:
+                    return JSONResponse(
+                        {"status": "error", "message": "Недостаточно средств на TON балансе"},
+                        status_code=400
+                    )
+                user.ton_balance -= amount
 
             deal = Deal(
                 product_id=product_id,
                 product_name=product["product_name"],
                 seller_id=seller_id,
                 buyer_id=buyer_id,
-                amount=amount,
+                amount=amount,  # Для RUB - сумма залога в TON, для TON - сумма оплаты
                 currency=currency,
                 status="active",
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc),
+                rub_payment_confirmed=False if currency == 'rub' else None,
+                collateral_amount=collateral_amount if currency == 'rub' else None,
+                rub_amount=rub_amount if currency == 'rub' else None  # Сохраняем рублевую сумму
             )
             session.add(deal)
             await session.commit()
 
             buyer_info = await get_user_info_new(buyer_id)
 
-            if currency == 'meet':
+            if currency == 'rub':
                 await send_notification_to_user(
                     seller_id,
-                    f"💰 Покупатель хочет встретиться для оплаты!\n\n"
-                    f"📌 Название: {product["product_name"]}\n"
-                    f"💰 Сумма: {product["product_price"]} ₽ (оплата при встрече)\n"
-                    f"👤 Покупатель: {buyer_info["first_name"] or 'без username'}\n\n"
-                    f"Договоритесь о времени и месте встречи в чате."
+                    f"💰 Товар оплачен рублями, ожидает подтверждения!\n\n"
+                    f"📌 Название: {product['product_name']}\n"
+                    f"💰 Сумма в рублях: {rub_amount} ₽\n"  # Используем rub_amount
+                    f"💎 Залог: {collateral_amount} TON\n"
+                    f"👤 Покупатель: {buyer_info['first_name'] or 'без username'}\n\n"
+                    f"После получения рублевого платежа подтвердите оплату в разделе 'Сделки'."
+                )
+
+                await send_notification_to_user(
+                    buyer_id,
+                    f"💰 Сделка создана! Оплата рублями.\n\n"
+                    f"📌 Товар: {product['product_name']}\n"
+                    f"💰 Сумма: {rub_amount} ₽\n"  # Используем rub_amount
+                    f"💎 Залог продавца: {collateral_amount} TON\n\n"
+                    f"Переведите средства продавцу по реквизитам из чата и ожидайте подтверждения оплаты."
                 )
             else:
                 await send_notification_to_user(
                     seller_id,
-                    f"💰 Товар оплачен, и ждёт подтверждения!\n\n"
-                    f"📌 Название: {product["product_name"]}\n"
-                    f"💰 Сумма: {amount} {currency.upper()}\n"
-                    f"👤 Покупатель: {buyer_info["first_name"] or 'без username'}\n\n"
+                    f"💰 Товар оплачен в TON, и ждёт подтверждения!\n\n"
+                    f"📌 Название: {product['product_name']}\n"
+                    f"💰 Сумма: {amount} TON\n"
+                    f"👤 Покупатель: {buyer_info['first_name'] or 'без username'}\n\n"
                     f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
-                )
-
-            if currency == 'meet':
-                await send_notification_to_user(
-                    buyer_id,
-                    f"✅ Вы создали сделку с оплатой при встрече!\n\n"
-                    f"📌 Товар: {product["product_name"]}\n"
-                    f"💰 Сумма: {product["product_price"]} ₽\n"
-                    f"👤 Продавец: {product["tg_id"]}\n\n"
-                    f"Договоритесь о времени и месте встречи в чате."
                 )
 
             return JSONResponse({"status": "success"})
@@ -256,14 +271,7 @@ async def reserve_product(
             if not user:
                 return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
 
-            if currency == 'rub':
-                if user.rub_balance < amount:
-                    return JSONResponse(
-                        {"status": "error", "message": "Insufficient RUB balance"},
-                        status_code=400
-                    )
-                user.rub_balance -= amount
-            else:
+            if currency == 'ton':
                 if user.ton_balance < amount:
                     return JSONResponse(
                         {"status": "error", "message": "Insufficient TON balance"},
@@ -277,18 +285,16 @@ async def reserve_product(
             product.reservation_amount = amount
             product.reservation_currency = currency
 
-            product_price = product.product_price
-            if currency == "ton":
-                ton_rate = await get_ton_to_rub_rate()
-                product_price = round(product_price / ton_rate, 4)
+            # Для бронирования используем TON как основную валюту
+            deal_amount = product.product_price  # Основная цена в TON
 
             deal = Deal(
                 product_id=product.id,
                 product_name=product.product_name,
                 seller_id=product.tg_id,
                 buyer_id=payload.get("tg_id"),
-                amount=product_price,
-                currency=currency,
+                amount=deal_amount,
+                currency='ton',  # Всегда TON для бронированных сделок
                 status="reserved",
                 is_reserved=True,
                 reservation_amount=amount,
@@ -303,7 +309,7 @@ async def reserve_product(
                 product.tg_id,
                 f"🔒 Ваш товар '{product.product_name}' был забронирован!\n\n"
                 f"👤 Покупатель: {user.first_name or 'без username'}\n"
-                f"💰 Сумма брони: {amount} {currency.upper()}\n"
+                f"💰 Сумма брони: {amount} TON\n"
                 f"⏳ Бронь действует до: {product.reserved_until.strftime('%d.%m.%Y %H:%M')}\n\n"
                 f"В течение 48 часов покупатель должен завершить сделку."
             )

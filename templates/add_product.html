@@ -214,6 +214,23 @@
         display: none;
     }
 
+    /* Стили для отображения цены в рублях */
+    .rub-price {
+        margin-top: 5px;
+        font-size: 14px;
+        color: var(--text-secondary);
+        text-align: right;
+    }
+
+    .rub-price .value {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .rub-price.loading {
+        opacity: 0.7;
+    }
+
     @media (max-width: 480px) {
         .image-gallery {
             grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
@@ -248,8 +265,11 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="product_price">Цена (руб.)</label>
-                <input class="form-input" type="number" id="product_price" name="product_price" min="1" max="100000000" pattern="\d*" required>
+                <label class="form-label" for="product_price">Цена (TON)</label>
+                <input class="form-input" type="text" id="product_price" name="product_price" min="0.1" step="0.1" pattern="^\d+(\.\d{1,2})?$" required>
+                <div id="rubPriceDisplay" class="rub-price">
+                    ≈ <span class="value">0</span> ₽
+                </div>
             </div>
 
             <div class="form-group">
@@ -285,8 +305,105 @@
         const imageInput = document.getElementById('product_images');
         const imageGallery = document.getElementById('imageGallery');
         const imagesCounter = document.getElementById('images-counter');
+        const priceInput = document.getElementById('product_price');
+        const rubPriceDisplay = document.getElementById('rubPriceDisplay');
+        const rubPriceValue = rubPriceDisplay.querySelector('.value');
         const maxImages = 10;
         let uploadedImages = [];
+        let currentTonRate = null;
+
+        // Функция для получения курса TON/RUB
+        async function getTonToRubRate() {
+            try {
+                const response = await fetch('/get_ton_to_rub_rate');
+                const data = await response.json();
+                
+                if (response.ok && data.rate) {
+                    currentTonRate = data.rate;
+                    return data.rate;
+                } else {
+                    throw new Error(data.message || 'Не удалось получить курс');
+                }
+            } catch (error) {
+                console.error('Ошибка при получении курса TON/RUB:', error);
+                rubPriceDisplay.innerHTML = 'Курс недоступен';
+                return null;
+            }
+        }
+
+        // Функция для обновления отображения цены в рублях
+        function updateRubPrice(tonPrice) {
+            if (!currentTonRate || !tonPrice) {
+                rubPriceValue.textContent = '0';
+                return;
+            }
+
+            const rubPrice = tonPrice * currentTonRate;
+            rubPriceValue.textContent = rubPrice.toFixed(2);
+        }
+
+        // Функция для валидации и форматирования цены в TON
+        function validateAndFormatTonPrice(value) {
+            // Удаляем все символы, кроме цифр и точки
+            let cleaned = value.replace(/[^\d.]/g, '');
+            
+            // Удаляем лишние точки (оставляем только первую)
+            const parts = cleaned.split('.');
+            if (parts.length > 2) {
+                cleaned = parts[0] + '.' + parts.slice(1).join('');
+            }
+            
+            // Ограничиваем количество знаков после запятой до 2
+            if (parts.length === 2) {
+                cleaned = parts[0] + '.' + parts[1].slice(0, 2);
+            }
+            
+            return cleaned;
+        }
+
+        // Обработчик ввода цены
+        priceInput.addEventListener('input', function(e) {
+            const formattedValue = validateAndFormatTonPrice(this.value);
+            
+            // Обновляем значение в поле ввода
+            if (formattedValue !== this.value) {
+                this.value = formattedValue;
+            }
+            
+            // Обновляем цену в рублях
+            const tonPrice = parseFloat(formattedValue) || 0;
+            updateRubPrice(tonPrice);
+        });
+
+        // Валидация при потере фокуса
+        priceInput.addEventListener('blur', function(e) {
+            let value = this.value.trim();
+            
+            if (value === '') {
+                this.value = '0.1';
+                value = '0.1';
+            }
+            
+            const numericValue = parseFloat(value) || 0;
+            
+            if (numericValue < 0.1) {
+                this.value = '0.1';
+                showNotification('Цена не может быть меньше 0.1 TON', 'info');
+            } else if (numericValue > 100000000) {
+                this.value = '100000000';
+                showNotification('Цена не может превышать 100 млн TON', 'info');
+            }
+            
+            // Обновляем цену в рублях после валидации
+            updateRubPrice(parseFloat(this.value) || 0);
+        });
+
+        // Загружаем курс при загрузке страницы
+        getTonToRubRate().then(rate => {
+            if (rate) {
+                console.log('Курс TON/RUB загружен:', rate);
+            }
+        });
 
         // Функция для обновления счетчика изображений
         function updateImagesCounter() {
@@ -525,35 +642,6 @@
             }
         });
 
-        const priceInput = document.getElementById('product_price');
-        
-        // Очищаем поле от нечисловых символов при вводе, но позволяем пустое поле
-        priceInput.addEventListener('input', function(e) {
-            // Разрешаем пустое поле для удобства редактирования
-            if (this.value === '') {
-                return;
-            }
-            
-            // Удаляем все нечисловые символы
-            this.value = this.value.replace(/[^0-9]/g, '');
-        });
-
-        // Валидация при потере фокуса
-        priceInput.addEventListener('blur', function(e) {
-            if (this.value === '') {
-                return;
-            }
-            
-            const value = parseInt(this.value) || 0;
-            if (value < 1) {
-                this.value = 1;
-                showNotification('Цена не может быть меньше 1 рубля', 'info');
-            } else if (value > 100000000) {
-                this.value = 100000000;
-                showNotification('Цена не может превышать 100 млн рублей', 'info');
-            }
-        });
-
         // Проверка при отправке формы
         document.getElementById('add-product-form').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -581,15 +669,15 @@
                 return;
             }
             
-            const price = parseInt(priceValue) || 0;
-            if (price < 1) {
-                showNotification('Цена не может быть меньше 1 рубля', 'error');
+            const price = parseFloat(priceValue) || 0;
+            if (price < 0.1) {
+                showNotification('Цена не может быть меньше 0.1 TON', 'error');
                 priceInput.focus();
                 return;
             }
             
             if (price > 100000000) {
-                showNotification('Цена не может превышать 100 000 000 рублей', 'error');
+                showNotification('Цена не может превышать 100 000 000 TON', 'error');
                 priceInput.focus();
                 return;
             }

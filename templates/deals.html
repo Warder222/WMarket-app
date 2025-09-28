@@ -66,8 +66,8 @@
     .deal-card {
         background-color: var(--card-bg);
         border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
+        padding: 12px;
+        margin-bottom: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         border: 1px solid var(--border-color);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -81,24 +81,39 @@
     .deal-header {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    
+    .deal-id {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: inline-block;
     }
     
     .deal-title {
         font-weight: 600;
-        font-size: 16px;
+        font-size: 15px;
         color: var(--text-color);
+        margin-bottom: 6px;
+        line-height: 1.3;
     }
     
     .deal-status {
-        padding: 4px 10px;
-        border-radius: 12px;
+        padding: 3px 8px;
+        border-radius: 10px;
         font-size: 10px;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         word-break: break-word;
+        white-space: nowrap;
+        margin-left: 8px;
     }
     
     .status-active {
@@ -114,9 +129,9 @@
     }
 
     .status-admin-completed {
-        background-color: rgba(85, 79, 0, 0.479);
+        background-color: rgba(255, 193, 7, 0.15);
         color: #e9c918;
-        border: 1px solid rgba(255, 240, 105, 0.712);
+        border: 1px solid rgba(255, 193, 7, 0.4);
     }
 
     .status-cancelled {
@@ -128,15 +143,16 @@
     .deal-info {
         display: flex;
         justify-content: space-between;
-        margin-top: 12px;
-        font-size: 14px;
+        margin-top: 8px;
+        font-size: 13px;
         color: var(--text-secondary);
     }
 
     .deal-amount {
         font-weight: 600;
         color: var(--text-color);
-        margin: 8px 0;
+        margin: 6px 0;
+        font-size: 14px;
     }
 
     .deal-currency {
@@ -154,17 +170,18 @@
     .deal-counterparty {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
     }
 
     .deal-counterparty-username {
         font-weight: 500;
         color: var(--text-color);
+        font-size: 13px;
     }
 
     .deal-time {
         color: var(--text-secondary);
-        font-size: 13px;
+        font-size: 12px;
     }
     
     .empty-state {
@@ -206,15 +223,15 @@
 
     .deal-actions {
         display: flex;
-        gap: 10px;
-        margin-top: 16px;
+        gap: 8px;
+        margin-top: 12px;
     }
 
     .deal-btn {
         flex: 1;
-        padding: 10px 12px;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 13px;
         font-weight: 500;
         text-align: center;
         cursor: pointer;
@@ -431,14 +448,15 @@
     }
 
     .deal-pending-notice {
-        padding: 8px;
+        padding: 6px;
         background-color: rgba(255, 193, 7, 0.1);
         border: 1px solid rgba(255, 193, 7, 0.3);
-        border-radius: 8px;
+        border-radius: 6px;
         color: #ffc107;
-        font-size: 14px;
-        margin-bottom: 12px;
+        font-size: 12px;
+        margin-bottom: 8px;
         text-align: center;
+        margin-top: 1vh;
     }
 
     .status-pending {
@@ -479,8 +497,8 @@
     }
 
     .deal-reservation-info {
-        margin-top: 8px;
-        font-size: 14px;
+        margin-top: 6px;
+        font-size: 13px;
         color: var(--text-secondary);
     }
 
@@ -493,13 +511,26 @@
         color: #ff9800;
     }
 
-    .deal-num {
-        background-color: var(--primary-color);
-        color: white;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 14px;
-        margin-right: 6px;
+    .deal-payment-info {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+    
+    .deal-collateral {
+        color: #ff9800;
+        font-weight: 500;
+    }
+
+    .deal-content {
+        margin-top: 4px;
+    }
+
+    .admin-completed-note {
+        color: #e9c918;
+        font-size: 12px;
+        margin-top: 4px;
+        font-style: italic;
     }
 </style>
 {% endblock %}
@@ -520,67 +551,124 @@
             {% if active_deals %}
                 {% for deal in active_deals %}
                 <div class="deal-card {% if deal.pending_cancel %}deal-pending{% endif %}">
-                    {% if deal.pending_cancel %}
-                    <div class="deal-pending-notice">
-                        Сделка на проверке у модератора
-                    </div>
-                    {% endif %}
-                    <div class="deal-header">
-                        <div class="deal-title"><span class="deal-num">#{{ deal.id }}</span> {{ deal.product_name }}</div>
-                        <div class="deal-status {% if deal.pending_cancel %}status-pending{% else %}status-active{% endif %}">
-                            {% if deal.pending_cancel %}
-                                На модерации
-                            {% elif deal.buyer_id == user_tg_id %}
-                                {% if deal.currency == 'meet' %}
-                                    Ожидает подтверждения
+                    <div class="deal-id">#{{ deal.id }}</div>
+                    <div class="deal-content">
+                        <!-- {% if deal.pending_cancel %}
+                        <div class="deal-pending-notice">
+                            Сделка на проверке у модератора
+                        </div>
+                        {% endif %} -->
+                        <div class="deal-header">
+                            <div class="deal-title">{{ deal.product_name }}</div>
+                            <div class="deal-status {% if deal.pending_cancel %}status-pending{% else %}status-active{% endif %}">
+                                {% if deal.pending_cancel %}
+                                    На модерации
+                                {% elif deal.currency == 'rub' %}
+                                    {% if not deal.rub_payment_confirmed and deal.seller_id == user_tg_id %}
+                                        Ожидает подтверждения оплаты
+                                    {% elif not deal.rub_payment_confirmed and deal.buyer_id == user_tg_id %}
+                                        Ожидает подтверждения продавцом
+                                    {% elif deal.rub_payment_confirmed and deal.buyer_id == user_tg_id %}
+                                        Ожидает получения
+                                    {% else %}
+                                        Ожидает подтверждения покупателем
+                                    {% endif %}
                                 {% else %}
-                                    Ожидает получения
+                                    {% if deal.buyer_id == user_tg_id %}
+                                        Ожидает получения
+                                    {% else %}
+                                        Требует подтверждения
+                                    {% endif %}
                                 {% endif %}
-                            {% else %}
-                                Требует подтверждения
-                            {% endif %}
+                            </div>
                         </div>
-                    </div>
-                    <div class="deal-amount">
-                        Способ оплаты: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% elif deal.currency == 'ton' %}ton{% else %}meet{% endif %}">
-                            {% if deal.currency == 'rub' %}
-                                {{ deal.amount }} ₽
-                            {% elif deal.currency == 'ton' %}
-                                {{ deal.amount }} TON
-                            {% else %}
-                                Личная встреча ({{ deal.amount }} ₽)
+                        
+                        <div class="deal-amount">
+                            Сумма: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
+                                {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
+                            </span>
+                        </div>
+                        
+                        {% if deal.currency == 'rub' %}
+                        <div class="deal-payment-info">
+                            Залог продавца: <span class="deal-collateral">{{ deal.original_amount }} TON</span>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="deal-info">
+                            <div class="deal-counterparty">
+                                {% if deal.buyer_id == user_tg_id %}
+                                    <span>Продавец:</span>
+                                    <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
+                                {% else %}
+                                    <span>Покупатель:</span>
+                                    <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="deal-time" data-utc-time="{{ deal.created_at.isoformat() }}"></div>
+                        </div>
+                        
+                        <!-- Кнопки действий для рублевых сделок -->
+                        {% if deal.currency == 'rub' %}
+                            {% if deal.seller_id == user_tg_id and not deal.rub_payment_confirmed %}
+                                <!-- Продавец: подтверждение получения рублей -->
+                                <div class="deal-actions">
+                                    <button class="deal-btn confirm confirm-rub-payment-btn" data-deal-id="{{ deal.id }}">
+                                        Подтвердить получение рублей
+                                    </button>
+                                    {% if not deal.pending_cancel %}
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    {% endif %}
+                                </div>
+                            {% elif deal.seller_id == user_tg_id and deal.rub_payment_confirmed %}
+                                <!-- Продавец: ожидание подтверждения получения товара покупателем -->
+                                {% if not deal.pending_cancel %}
+                                    <div class="deal-actions">
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    </div>
+                                {% endif %}
+                            {% elif deal.buyer_id == user_tg_id and deal.rub_payment_confirmed %}
+                                <!-- Покупатель: подтверждение получения товара (после подтверждения оплаты продавцом) -->
+                                {% if not deal.pending_cancel %}
+                                    <div class="deal-actions">
+                                        <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">
+                                            Подтвердить получение
+                                        </button>
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    </div>
+                                {% endif %}
+                            {% elif deal.buyer_id == user_tg_id and not deal.rub_payment_confirmed %}
+                                <!-- Покупатель: ожидание подтверждения оплаты -->
+                                <div class="deal-pending-notice">
+                                    Ожидайте подтверждения оплаты от продавца
+                                </div>
+                                {% if not deal.pending_cancel %}
+                                    <div class="deal-actions">
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    </div>
+                                {% endif %}
                             {% endif %}
-                        </span>
-                    </div>
-                    <div class="deal-info">
-                        <div class="deal-counterparty">
+                        {% else %}
+                            <!-- Кнопки для TON сделок (старая логика) -->
                             {% if deal.buyer_id == user_tg_id %}
-                                <span>Продавец:</span>
-                                <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
-                            {% else %}
-                                <span>Покупатель:</span>
-                                <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
+                                {% if not deal.pending_cancel %}
+                                    <div class="deal-actions">
+                                        <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}">
+                                            Подтвердить получение
+                                        </button>
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    </div>
+                                {% endif %}
+                            {% elif deal.seller_id == user_tg_id %}
+                                <!-- Кнопки отмены для продавца (не рублевые сделки) -->
+                                {% if not deal.pending_cancel %}
+                                    <div class="deal-actions">
+                                        <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
+                                    </div>
+                                {% endif %}
                             {% endif %}
-                        </div>
-                        <div class="deal-time" data-utc-time="{{ deal.created_at.isoformat() }}"></div>
+                        {% endif %}
                     </div>
-                    {% if not deal.pending_cancel and not deal.time_extension_until %}
-                        <div class="deal-actions">
-                            {% if deal.buyer_id == user_tg_id %}
-                                <button class="deal-btn confirm confirm-deal-btn" data-deal-id="{{ deal.id }}" 
-                                    {% if deal.currency == 'meet' %}data-meet-type="true"{% endif %}>
-                                    Подтвердить получение
-                                </button>
-                                {% if not deal.admin_gave_time %}
-                                    <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
-                                {% endif %}
-                            {% else %}
-                                {% if not deal.admin_gave_time %}
-                                    <button class="deal-btn cancel cancel-deal-btn" data-deal-id="{{ deal.id }}">Отменить сделку</button>
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    {% endif %}
                 </div>
                 {% endfor %}
             {% endif %}
@@ -589,40 +677,43 @@
             {% if reserved_deals %}
                 {% for deal in reserved_deals %}
                 <div class="deal-card reserved-deal" data-deal-id="{{ deal.id }}" data-reserved-until="{{ deal.reservation_until.isoformat() }}">
-                    <div class="deal-header">
-                        <div class="deal-title"><span class="deal-num">#{{ deal.id }}</span> {{ deal.product_name }}</div>
-                        <div class="deal-status status-reserved">
-                            Забронирован
+                    <div class="deal-id">#{{ deal.id }}</div>
+                    <div class="deal-content">
+                        <div class="deal-header">
+                            <div class="deal-title">{{ deal.product_name }}</div>
+                            <div class="deal-status status-reserved">
+                                Забронирован
+                            </div>
                         </div>
-                    </div>
-                    <div class="deal-amount">
-                        Способ оплаты: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
-                            {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
-                        </span>
-                    </div>
-                    <div class="deal-info">
-                        <div class="deal-counterparty">
-                            {% if deal.buyer_id == user_tg_id %}
-                                <span>Продавец:</span>
-                                <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
-                            {% else %}
-                                <span>Покупатель:</span>
-                                <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
-                            {% endif %}
+                        <div class="deal-amount">
+                            Сумма: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
+                                {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
+                            </span>
                         </div>
-                        <div class="deal-time-left">
-                            Осталось: <span class="time-left" data-until="{{ deal.reservation_until.isoformat() }}"></span>
+                        <div class="deal-info">
+                            <div class="deal-counterparty">
+                                {% if deal.buyer_id == user_tg_id %}
+                                    <span>Продавец:</span>
+                                    <span class="deal-counterparty-username">{{ deal.seller_first_name or deal.seller_username }}</span>
+                                {% else %}
+                                    <span>Покупатель:</span>
+                                    <span class="deal-counterparty-username">{{ deal.buyer_first_name or deal.buyer_username }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="deal-time-left">
+                                Осталось: <span class="time-left" data-until="{{ deal.reservation_until.isoformat() }}"></span>
+                            </div>
                         </div>
+                        <div class="deal-reservation-info">
+                            Внесено: <strong>{{ deal.reservation_amount }} {{ deal.currency.upper() }}</strong>
+                        </div>
+                        {% if deal.buyer_id == user_tg_id %}
+                        <div class="deal-actions">
+                            <button class="deal-btn confirm complete-reservation-btn" data-deal-id="{{ deal.id }}">Выкупить товар</button>
+                            <button class="deal-btn cancel cancel-reservation-btn" data-deal-id="{{ deal.id }}">Отменить бронь</button>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="deal-reservation-info">
-                        Внесено: <strong>{{ deal.reservation_amount }} {{ deal.currency.upper() }}</strong>
-                    </div>
-                    {% if deal.buyer_id == user_tg_id %}
-                    <div class="deal-actions">
-                        <button class="deal-btn confirm complete-reservation-btn" data-deal-id="{{ deal.id }}">Выкупить товар</button>
-                        <button class="deal-btn cancel cancel-reservation-btn" data-deal-id="{{ deal.id }}">Отменить бронь</button>
-                    </div>
-                    {% endif %}
                 </div>
                 {% endfor %}
             {% endif %}
@@ -639,51 +730,54 @@
             {% if completed_deals %}
                 {% for deal in completed_deals %}
                 <div class="deal-card">
-                    <div class="deal-header">
-                        <div class="deal-title"><span class="deal-num">#{{ deal.id }}</span> {{ deal.product_name }}</div>
-                        <div class="deal-status 
-                            {% if deal.status == 'completed' %}status-completed
-                            {% elif deal.status == 'completed_by_admin' %}status-admin-completed
-                            {% elif deal.is_reserved %}status-cancelled
-                            {% else %}status-cancelled{% endif %}">
-                            {% if deal.status == 'completed' %}
-                                Завершена
-                            {% elif deal.status == 'completed_by_admin' %}
-                                {% if deal.admin_decision == 'for_seller' %}
-                                    Завершена администратором
-                                {% elif deal.admin_decision == 'for_buyer' %}
-                                    Завершена администратором
-                                {% else %}
+                    <div class="deal-id">#{{ deal.id }}</div>
+                    <div class="deal-content">
+                        <div class="deal-header">
+                            <div class="deal-title">{{ deal.product_name }}</div>
+                            <div class="deal-status 
+                                {% if deal.status == 'completed' %}status-completed
+                                {% elif deal.status == 'completed_by_admin' %}status-admin-completed
+                                {% elif deal.is_reserved %}status-cancelled
+                                {% else %}status-cancelled{% endif %}">
+                                {% if deal.status == 'completed' %}
                                     Завершена
+                                {% elif deal.status == 'completed_by_admin' %}
+                                    Завершена администратором
+                                {% elif deal.is_reserved %}
+                                    Бронь отменена
+                                {% else %}
+                                    Отменена
                                 {% endif %}
-                            {% elif deal.is_reserved %}
-                                Бронь отменена
-                            {% else %}
-                                Отменена
+                            </div>
+                        </div>
+                        
+                        <div class="deal-amount">
+                            Сумма: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
+                                {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% else %}TON{% endif %}
+                            </span>
+                            {% if deal.is_reserved and deal.reservation_amount %}
+                            <div class="deal-reservation-info">
+                                Внесено: <strong>{{ deal.reservation_amount }} TON</strong>
+                            </div>
                             {% endif %}
                         </div>
-                    </div>
-                    <div class="deal-amount">
-                        Способ оплаты: <span class="deal-currency {% if deal.currency == 'rub' %}rub{% else %}ton{% endif %}">
-                            {{ deal.amount }} {% if deal.currency == 'rub' %}₽{% elif deal.currency == 'meet' %}₽{% else %}TON{% endif %}
-                        </span>
-                        {% if deal.is_reserved and deal.reservation_amount %}
-                        <div class="deal-reservation-info">
-                            Внесено: <strong>{{ deal.reservation_amount }} {{ deal.currency.upper() }}</strong>
+                        {% if deal.currency == 'rub' %}
+                        <div class="deal-payment-info">
+                            Залог продавца: <span class="deal-collateral">{{ deal.original_amount }} TON</span>
                         </div>
                         {% endif %}
-                    </div>
-                    <div class="deal-info">
-                        <div class="deal-counterparty">
-                            {% if deal.buyer_id == user_tg_id %}
-                                <span>Продавец:</span>
-                                <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['seller_id'] }}">{{ deal.seller_first_name or deal.seller_username }}</a></b></span>
-                            {% else %}
-                                <span>Покупатель:</span>
-                                <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['buyer_id'] }}">{{ deal.buyer_first_name or deal.buyer_username }}</a></b></span>
-                            {% endif %}
+                        <div class="deal-info">
+                            <div class="deal-counterparty">
+                                {% if deal.buyer_id == user_tg_id %}
+                                    <span>Продавец:</span>
+                                    <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['seller_id'] }}">{{ deal.seller_first_name or deal.seller_username }}</a></b></span>
+                                {% else %}
+                                    <span>Покупатель:</span>
+                                    <span class="deal-counterparty-username"><b><a href="/profile/{{ deal['buyer_id'] }}">{{ deal.buyer_first_name or deal.buyer_username }}</a></b></span>
+                                {% endif %}
+                            </div>
+                            <div class="deal-time" data-utc-time="{% if deal.completed_at %}{{ deal.completed_at.isoformat() }}{% else %}{{ deal.created_at.isoformat() }}{% endif %}"></div>
                         </div>
-                        <div class="deal-time" data-utc-time="{% if deal.completed_at %}{{ deal.completed_at.isoformat() }}{% else %}{{ deal.created_at.isoformat() }}{% endif %}"></div>
                     </div>
                 </div>
                 {% endfor %}
@@ -738,33 +832,6 @@
         let selectedDealId = null;
         let selectedRating = null;
         let cancelDealId = null;
-        
-        // Обработчики для кнопок отмены сделки
-        document.querySelectorAll('.cancel-deal-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const dealId = btn.dataset.dealId;
-                
-                // Проверяем статус сделки
-                const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
-                const result = await response.json();
-                
-                if (result.status !== 'active') {
-                    showNotification('Сделка уже завершена или отменена', 'info');
-                    window.location.reload();
-                    return;
-                }
-                
-                if (result.pending_cancel) {
-                    showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
-                    window.location.reload();
-                    return;
-                }
-                
-                cancelDealId = dealId;
-                document.getElementById('cancelModal').style.display = 'flex';
-            });
-        });
         
         // Проверка готовности формы отмены
         document.getElementById('closeCancelModal').addEventListener('click', () => {
@@ -821,42 +888,109 @@
                 document.getElementById('cancelText').value = '';
             }
         });
-        
-        // Обновленная функция подтверждения сделки с проверкой статуса
-        document.querySelectorAll('.confirm-deal-btn, .cancel-deal-btn').forEach(btn => {
+
+        document.querySelectorAll('.confirm-rub-payment-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const dealId = btn.dataset.dealId;
+                
+                if (confirm('Вы подтверждаете, что получили рублевый платеж от покупателя?')) {
+                    try {
+                        const response = await fetch('/confirm_rub_payment', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ deal_id: parseInt(dealId) })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            showNotification('Оплата подтверждена! Покупатель может теперь подтвердить получение товара.', 'success');
+                            window.location.reload();
+                        } else {
+                            showNotification(result.message || 'Произошла ошибка', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Произошла ошибка при подтверждении оплаты', 'error');
+                    }
+                }
+            });
+        });
+            
+        // Обработчик только для кнопок подтверждения сделки
+        document.querySelectorAll('.confirm-deal-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const dealId = btn.dataset.dealId;
                 
-                // Проверяем статус сделки
-                const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
-                const result = await response.json();
-                
-                // Проверяем истекло ли время расширения
-                if (result.time_extension_until && new Date(result.time_extension_until) < new Date()) {
-                    showNotification('Время на завершение сделки истекло. Сделка отправлена на модерацию', 'info');
-                    window.location.reload();
-                    return;
-                }
-                
-                if (result.status !== 'active') {
-                    showNotification('Сделка уже завершена или отменена', 'info');
-                    window.location.reload();
-                    return;
-                }
-                
-                if (result.pending_cancel) {
-                    showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
-                    window.location.reload();
-                    return;
-                }
-                
-                if (btn.classList.contains('cancel-deal-btn')) {
-                    cancelDealId = dealId;
-                    document.getElementById('cancelModal').style.display = 'flex';
-                } else {
+                try {
+                    // Проверяем статус сделки
+                    const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
+                    const result = await response.json();
+                    
+                    // Проверяем истекло ли время расширения
+                    if (result.time_extension_until && new Date(result.time_extension_until) < new Date()) {
+                        showNotification('Время на завершение сделки истекло. Сделка отправлена на модерацию', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    if (result.status !== 'active') {
+                        showNotification('Сделка уже завершена или отменена', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    if (result.pending_cancel) {
+                        showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    // Для рублевых сделок проверяем подтверждение оплаты
+                    if (result.currency === 'rub' && !result.rub_payment_confirmed) {
+                        showNotification('Ожидайте подтверждения оплаты продавцом', 'info');
+                        return;
+                    }
+                    
                     selectedDealId = dealId;
                     document.getElementById('reviewModal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error checking deal status:', error);
+                    showNotification('Ошибка при проверке статуса сделки', 'error');
+                }
+            });
+        });
+
+        // Обработчик для кнопок отмены сделки остается отдельным
+        document.querySelectorAll('.cancel-deal-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const dealId = btn.dataset.dealId;
+                
+                try {
+                    // Проверяем статус сделки
+                    const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
+                    const result = await response.json();
+                    
+                    if (result.status !== 'active') {
+                        showNotification('Сделка уже завершена или отменена', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    if (result.pending_cancel) {
+                        showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    cancelDealId = dealId;
+                    document.getElementById('cancelModal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error checking deal status:', error);
+                    showNotification('Ошибка при проверке статуса сделки', 'error');
                 }
             });
         });
@@ -888,61 +1022,133 @@
         // Отправка отзыва
         document.getElementById('submitReview').addEventListener('click', async () => {
             const reviewText = document.getElementById('reviewText').value.trim();
-            const isPositive = selectedRating === 'plus';
-            const dealId = selectedDealId;
+            
+            if (!selectedRating || !reviewText) {
+                showNotification('Пожалуйста, выберите оценку и напишите отзыв', 'info');
+                return;
+            }
             
             try {
-                // Проверяем, есть ли уже отзыв по этой сделке
-                const checkResponse = await fetch(`/api/check_review_exists?deal_id=${dealId}`);
-                const checkResult = await checkResponse.json();
-                
-                if (checkResult.exists) {
-                    showNotification('Вы уже оставили отзыв по этой сделке. Нельзя отправить повторный отзыв', 'info');
-                    return;
-                }
-
-                const dealResponse = await fetch(`/api/deal_info/${dealId}`);
-                const dealInfo = await dealResponse.json();
-                const isMeetType = dealInfo.currency === 'meet';
-
-                const response = await fetch('/confirm_deal', {
+                const response = await fetch('/complete_deal', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ 
-                        deal_id: dealId,
-                        rating: isPositive ? 1 : -1,
-                        review_text: reviewText
+                    body: JSON.stringify({
+                        deal_id: parseInt(selectedDealId),
+                        rating: selectedRating,
+                        review: reviewText
                     })
                 });
                 
                 const result = await response.json();
                 if (result.status === 'success') {
-                    if (isMeetType) {
-                        showNotification('Сделка и ваш отзыв отправлены на модерацию администратору. Мы уведомим вас о результате проверки', 'success');
-                    } else {
-                        showNotification('Сделка подтверждена! Отзыв отправлен на модерацию', 'success');
-                    }
+                    showNotification('Сделка успешно завершена!', 'success');
+                    document.getElementById('reviewModal').style.display = 'none';
                     window.location.reload();
                 } else {
-                    showNotification('Произошла непредвиденная ошибка', 'error');
+                    showNotification(result.message || 'Произошла ошибка', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showNotification('Произошла ошибка при подтверждении сделки', 'error');
+                showNotification('Произошла ошибка при завершении сделки', 'error');
             }
         });
-
         
-        // Закрытие модального окна при клике вне его
+        // Закрытие модального окна отзыва
         document.getElementById('reviewModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('reviewModal')) {
                 document.getElementById('reviewModal').style.display = 'none';
+                selectedRating = null;
+                document.getElementById('reviewText').value = '';
+                document.getElementById('plusRating').classList.remove('selected');
+                document.getElementById('minusRating').classList.remove('selected');
             }
         });
-
-        // Конвертация UTC времени в локальное
+        
+        // Обработчики для завершения брони
+        document.querySelectorAll('.complete-reservation-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const dealId = btn.dataset.dealId;
+                
+                if (confirm('Вы уверены, что хотите выкупить товар?')) {
+                    try {
+                        const response = await fetch('/complete_reservation', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ deal_id: parseInt(dealId) })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            showNotification('Товар успешно выкуплен!', 'success');
+                            window.location.reload();
+                        } else {
+                            showNotification(result.message || 'Произошла ошибка', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Произошла ошибка при выкупе товара', 'error');
+                    }
+                }
+            });
+        });
+        
+        // Обработчики для отмены брони
+        document.querySelectorAll('.cancel-reservation-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const dealId = btn.dataset.dealId;
+                
+                if (confirm('Вы уверены, что хотите отменить бронь?')) {
+                    try {
+                        const response = await fetch('/cancel_reservation', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ deal_id: parseInt(dealId) })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            showNotification('Бронь успешно отменена!', 'success');
+                            window.location.reload();
+                        } else {
+                            showNotification(result.message || 'Произошла ошибка', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Произошла ошибка при отмене брони', 'error');
+                    }
+                }
+            });
+        });
+        
+        // Обновление времени для бронированных сделок
+        function updateReservationTimes() {
+            document.querySelectorAll('.reserved-deal').forEach(card => {
+                const until = new Date(card.dataset.reservedUntil);
+                const now = new Date();
+                const diff = until - now;
+                
+                if (diff <= 0) {
+                    card.querySelector('.time-left').textContent = 'Время истекло';
+                    card.querySelector('.complete-reservation-btn').disabled = true;
+                    return;
+                }
+                
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                
+                card.querySelector('.time-left').textContent = `${hours}ч ${minutes}м`;
+            });
+        }
+        
+        // Конвертация UTC времени в локальное (возвращаем обычные даты)
         document.querySelectorAll('.deal-time[data-utc-time]').forEach(element => {
             const utcTime = element.dataset.utcTime;
             if (utcTime) {
@@ -957,111 +1163,11 @@
             }
         });
 
-        // Таймер для бронированных сделок
-        function updateReservationTimers() {
-            document.querySelectorAll('.time-left[data-until]').forEach(element => {
-                const until = new Date(element.dataset.until);
-                const now = new Date();
-                const diff = until - now;
-                
-                if (diff <= 0) {
-                    element.textContent = 'Время истекло';
-                    // Автоматически отменяем бронь при истечении времени
-                    const dealId = element.closest('.reserved-deal').dataset.dealId;
-                    cancelReservation(dealId, true);
-                } else {
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    element.textContent = `${hours}ч ${minutes}м`;
-                }
-            });
-        }
+        // Инициализация времени брони
+        updateReservationTimes();
         
-        // Обновляем таймер каждую минуту
-        updateReservationTimers();
-        setInterval(updateReservationTimers, 60000);
-        
-        // Обработчик для завершения бронирования
-        document.querySelectorAll('.complete-reservation-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const dealId = parseInt(btn.dataset.dealId);
-                
-                try {
-                    const response = await fetch('/complete_reservation', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ deal_id: dealId })
-                    });
-                    
-                    const result = await response.json();
-                    if (result.status === 'success') {
-                        showNotification('Товар успешно выкуплен!', 'success');
-                        window.location.reload();
-                    } else {
-                        showNotification('Произошла непредвиденная ошибка', 'error');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showNotification('Произошла ошибка при выкупе товара', 'error');
-                }
-            });
-        });
-
-        // Обработчик для отмены бронирования
-        document.querySelectorAll('.cancel-reservation-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const dealId = parseInt(btn.dataset.dealId);
-                
-                if (confirm('Вы уверены, что хотите отменить бронь? Вам вернётся 2/3 от суммы брони.')) {
-                    try {
-                        const response = await fetch('/cancel_reservation', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ deal_id: dealId })
-                        });
-                        
-                        const result = await response.json();
-                        if (result.status === 'success') {
-                            showNotification(`Бронь отменена. Вам возвращено ${result.refunded_amount} ${result.currency}`, 'success');
-                            window.location.reload();
-                        } else {
-                            showNotification('Произошла непредвиденная ошибка', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        showNotification('Произошла ошибка при отмене брони', 'error');
-                    }
-                }
-            });
-        });
-        
-        async function cancelReservation(dealId, isExpired = false) {
-            try {
-                const response = await fetch('/cancel_reservation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        deal_id: dealId,
-                        is_expired: isExpired
-                    })
-                });
-                
-                const result = await response.json();
-                if (result.status === 'success') {
-                    if (!isExpired) {
-                        window.location.reload();
-                    }
-                }
-            } catch (error) {
-                console.error('Error auto-canceling reservation:', error);
-            }
-        }
+        // Обновление времени брони каждую минуту
+        setInterval(updateReservationTimes, 60000);
     });
 </script>
 {% endblock %}

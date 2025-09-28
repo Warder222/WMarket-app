@@ -381,7 +381,7 @@
                 </svg>
             </button>
             <a href="/wallet" class="wallet-button" id="walletButton">
-                <span id="walletBalance">0 ₽</span>
+                <span id="walletBalance">0 TON</span>
             </a>
         </div>
     </header>
@@ -530,7 +530,7 @@
                                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                 </svg>
                             </div>` : ''}
-                            <div class="ad-price">${product["product_price"]} ₽</div>
+                            <div class="ad-price">${product["product_price"]} TON</div>
                             <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
                         </div>
                     </div>
@@ -647,14 +647,14 @@
     loadProducts(1, currentCategory);
     
     // Функция для форматирования баланса
-    function formatBalance(balance, currency) {
+    function formatBalance(balance) {
         if (balance === 0.0) {
-            return `0 ${currency === 'rub' ? '₽' : 'TON'}`;
+            return `0 TON`;
         }
         
         // Округляем до 2 знаков, убираем лишние нули
         const formatted = parseFloat(balance.toFixed(2));
-        return `${formatted} ${currency === 'rub' ? '₽' : 'TON'}`;
+        return `${formatted} TON`;
     }
 
     // Функция для обновления отображения баланса
@@ -667,7 +667,7 @@
             const walletBalance = document.getElementById('walletBalance');
             
             if (data.status === 'success') {
-                walletBalance.textContent = formatBalance(data.balance, data.currency);
+                walletBalance.textContent = formatBalance(data.ton_balance);
             }
         } catch (error) {
             console.error('Error updating wallet balance:', error);

@@ -703,12 +703,12 @@
             <div class="earned-title">Заработано</div>
             <div class="earned-amount">
                 <div class="earned-currency">
-                    <span class="currency-symbol">₽</span>
-                    <span>{{ "%.2f"|format(user_info["earned_rub"]) if user_info["rub_balance"] else "0.00" }}</span>
+                    <span class="currency-symbol">TON</span>
+                    <span id="earnedTon">{{ "%.2f"|format(user_info["earned_ton"]) if user_info["earned_ton"] else "0.00" }}</span>
                 </div>
                 <div class="earned-currency">
-                    <span class="currency-symbol">TON</span>
-                    <span>{{ "%.2f"|format(user_info["earned_ton"]) if user_info["ton_balance"] else "0.00" }}</span>
+                    <span class="currency-symbol">₽</span>
+                    <span id="earnedRub">загрузка...</span>
                 </div>
             </div>
         </div>
@@ -779,6 +779,24 @@
 {% block scripts %}
 <script src="/static/js/price_conv.js"></script>
 <script>
+    async function convertTonToRub() {
+        try {
+            const response = await fetch('/get_ton_to_rub_rate');
+            const data = await response.json();
+            
+            if (data.rate) {
+                const earnedTon = parseFloat(document.getElementById('earnedTon').textContent);
+                const earnedRub = earnedTon * data.rate;
+                document.getElementById('earnedRub').textContent = earnedRub.toFixed(2);
+            } else {
+                document.getElementById('earnedRub').textContent = 'ошибка';
+            }
+        } catch (error) {
+            console.error('Ошибка конвертации:', error);
+            document.getElementById('earnedRub').textContent = 'ошибка';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         {% if is_blocked %}
             // Отключаем все интерактивные элементы
@@ -866,7 +884,7 @@
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
                                 </div>`) : ''}
-                                <div class="ad-price">${product["product_price"]} ₽</div>
+                                <div class="ad-price">${product["product_price"]} TON</div>
                                 <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
                             </div>
                         </div>
@@ -1139,6 +1157,8 @@
                 prompt('Скопируйте реферальную ссылку:', message);
             }
         }
+
+        convertTonToRub();
     });
 </script>
 {% endblock %}

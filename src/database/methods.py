@@ -36,9 +36,7 @@ async def get_user_info_new(tg_id):
                 "photo_url": user.photo_url,
                 "plus_rep": user.plus_rep,
                 "minus_rep": user.minus_rep,
-                "rub_balance": user.rub_balance,
                 "ton_balance": user.ton_balance,
-                "earned_rub": user.earned_rub,
                 "earned_ton": user.earned_ton
             }
             return user_info
@@ -588,22 +586,37 @@ async def get_user_active_deals(tg_id: int):
             except TypeError:
                 pass
 
+            status_text = ""
+            if deal.status == 'completed':
+                if deal.admin_decision == 'for_seller':
+                    status_text = "Завершена администратором (в пользу продавца)"
+                else:
+                    status_text = "Завершена"
+            else:
+                if deal.admin_decision == 'for_buyer':
+                    status_text = "Отменена администратором (в пользу покупателя)"
+                else:
+                    status_text = "Отменена"
+
             deals_with_users.append({
                 "id": deal.id,
                 "product_name": deal.product_name,
                 "seller_id": deal.seller_id,
                 "buyer_id": deal.buyer_id,
-                "seller_first_name": seller.first_name if seller else None,
-                "seller_username": seller.username if seller else None,
-                "buyer_first_name": buyer.first_name if buyer else None,
-                "buyer_username": buyer.username if buyer else None,
-                "amount": deal.amount,
+                "seller_username": seller.first_name if seller else "Unknown",
+                "buyer_username": buyer.first_name if buyer else "Unknown",
                 "currency": deal.currency,
+                "amount": deal.rub_amount if deal.currency == 'rub' and deal.rub_amount else deal.amount,
                 "status": deal.status,
-                "pending_cancel": deal.pending_cancel,
-                "cancel_request_by": deal.cancel_request_by,
+                "status_text": status_text,
                 "created_at": deal.created_at,
-                "admin_gave_time": admin_gave_time
+                "completed_at": deal.completed_at,
+                "is_reserved": deal.is_reserved,
+                "reservation_amount": deal.reservation_amount,
+                "admin_decision": deal.admin_decision,
+                "original_amount": deal.amount,
+                "rub_payment_confirmed": deal.rub_payment_confirmed,
+                "pending_cancel": deal.pending_cancel
             })
 
         return deals_with_users
@@ -647,6 +660,7 @@ async def get_pending_deals():
                 "buyer_first_name": buyer_info["first_name"],
                 "currency": deal.currency,
                 "amount": deal.amount,
+                "rub_amount": deal.rub_amount,
                 "status": deal.status,
                 "pending_cancel": deal.pending_cancel,
                 "cancel_reason": deal.cancel_reason,
@@ -704,6 +718,21 @@ async def create_review(deal_id: int, from_user_id: int, to_user_id: int, produc
             await session.rollback()
             print(f"Error creating review: {e}")
             return None
+
+
+async def check_review_exists(deal_id: int, from_user_id: int):
+    async with async_session_maker() as session:
+        try:
+            result = await session.execute(
+                select(Review).where(
+                    Review.deal_id == deal_id,
+                    Review.from_user_id == from_user_id
+                )
+            )
+            return result.scalar_one_or_none() is not None
+        except Exception as e:
+            print(f"Error checking review existence: {e}")
+            return False
 
 
 async def get_deal_time_extension(deal_id: int):
