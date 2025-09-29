@@ -50,7 +50,7 @@ async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
             add_result = True
         except Exception as exc:
             print(exc)
-            add_result =  False
+            add_result = False
     if not add_result:
         async with async_session_maker() as db:
             try:
@@ -63,40 +63,41 @@ async def auth(oper: str, request: Request, session_token=Cookie(default=None)):
     ref_code = user_data.get("ref_code")
     if ref_code:
         ref_code = int(ref_code)
-        user_exists_result = False
+        current_user_id = user_data.get("tg_id")
 
-        async with async_session_maker() as session:
-            result = await session.execute(select(func.count()).select_from(User).where(User.tg_id == ref_code))
-            count = result.scalar()
-            if count > 0:
-                user_exists_result = True
+        is_new_user = oper == "reg"
 
-
-        if user_exists_result:
+        if is_new_user:
             async with async_session_maker() as session:
-                try:
-                    existing_ref = await session.execute(
-                        select(func.count()).select_from(Referral).where(
-                            (Referral.referrer_id == ref_code) &
-                            (Referral.referred_id == user_data.get("tg_id"))
-                        )
+                existing_ref = await session.execute(
+                    select(func.count()).select_from(Referral).where(
+                        Referral.referred_id == current_user_id
                     )
+                )
+                already_referred = existing_ref.scalar() > 0
 
-                    if existing_ref.scalar() > 0:
-                        return False
-
-                    if ref_code == user_data.get("tg_id"):
-                        return False
-
-                    referral = Referral(
-                        referrer_id=ref_code,
-                        referred_id=user_data.get("tg_id")
+            if not already_referred and ref_code != current_user_id:
+                async with async_session_maker() as session:
+                    referrer_exists = await session.execute(
+                        select(func.count()).select_from(User).where(User.tg_id == ref_code)
                     )
-                    session.add(referral)
-                    await session.commit()
-                except Exception as e:
-                    await session.rollback()
-                    print(f"Error recording referral: {e}")
+                    referrer_exists = referrer_exists.scalar() > 0
+
+                if referrer_exists:
+                    async with async_session_maker() as session:
+                        try:
+                            referral = Referral(
+                                referrer_id=ref_code,
+                                referred_id=current_user_id
+                            )
+                            session.add(referral)
+                            await session.commit()
+                            print(f"Реферал создан: {ref_code} -> {current_user_id}")
+                        except Exception as e:
+                            await session.rollback()
+                            print(f"Error recording referral: {e}")
+        else:
+            print(f"Пользователь {current_user_id} уже зарегистрирован, реферал не начислен")
 
     response = RedirectResponse(url="/store", status_code=303)
     response.set_cookie(key="session_token", value=new_session_token, httponly=True, secure=True)

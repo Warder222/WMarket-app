@@ -5,7 +5,7 @@ from sqlalchemy import and_, asc, delete, desc, exists, func, insert, or_, updat
 from sqlalchemy.future import select
 
 from .database import (Category, Chat, ChatParticipant, ChatReport, Deal, Fav, Message, Product, TonTransaction,
-                       User, UserBlock, async_session_maker, Review)
+                       User, UserBlock, async_session_maker, Review, Referral)
 
 
 #auth&users_____________________________________________________________________________________________________________
@@ -43,6 +43,20 @@ async def get_user_info_new(tg_id):
         except Exception as exc:
             print(f"Error: {exc}")
             return None
+
+
+async def check_user_already_referred(referred_id: int):
+    async with async_session_maker() as session:
+        try:
+            result = await session.execute(
+                select(func.count()).select_from(Referral).where(
+                    Referral.referred_id == referred_id
+                )
+            )
+            return result.scalar() > 0
+        except Exception as exc:
+            print(f"Error checking user referral status: {exc}")
+            return False
 #_______________________________________________________________________________________________________________________
 
 
