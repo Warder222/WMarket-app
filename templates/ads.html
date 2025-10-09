@@ -1138,6 +1138,277 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modal) modal.style.display = 'none';
     }
 
+    // === ФУНКЦИИ ДЛЯ ПОЛНОЭКРАННОГО ПРОСМОТРА С ПРИБЛИЖЕНИЕМ ===
+    const fullscreenImage = document.getElementById('fullscreenImage');
+    const closeFullscreen = document.getElementById('closeFullscreen');
+
+    // Переменные для масштабирования и перемещения
+    let currentScale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let isZooming = false;
+    let startX = 0;
+    let startY = 0;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let gestureCenter = { x: 0, y: 0 };
+    let lastTap = 0;
+
+    // Открытие изображения в полноэкранном режиме
+    const gallerySlides = document.querySelectorAll('.gallery-slide');
+    let currentSlide = 0;
+
+    gallerySlides.forEach(slide => {
+        slide.addEventListener('click', () => {
+            const activeImg = gallerySlides[currentSlide].querySelector('img');
+            if (activeImg) {
+                fullscreenImage.src = activeImg.src;
+                openModal(modals.fullscreen);
+                document.body.style.overflow = 'hidden';
+                
+                // Сброс масштаба и позиции при открытии
+                currentScale = 1;
+                translateX = 0;
+                translateY = 0;
+                fullscreenImage.style.transform = `scale(${currentScale})`;
+            }
+        });
+    });
+
+    // Закрытие полноэкранного режима
+    function closeFullscreenView() {
+        closeModal(modals.fullscreen);
+        document.body.style.overflow = '';
+        // Сброс состояния при закрытии
+        isDragging = false;
+        isZooming = false;
+        currentScale = 1;
+        translateX = 0;
+        translateY = 0;
+    }
+
+    if (closeFullscreen) closeFullscreen.addEventListener('click', closeFullscreenView);
+    if (modals.fullscreen) {
+        modals.fullscreen.addEventListener('click', e => {
+            if (e.target === modals.fullscreen) closeFullscreenView();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && modals.fullscreen.style.display === 'flex') closeFullscreenView();
+        });
+    }
+
+    // Масштабирование изображения (pinch zoom) с правильным центром
+    modals.fullscreen.addEventListener('touchstart', (e) => {
+        // Предотвращаем свайпы страницы когда изображение приближено
+        if (currentScale > 1) {
+            e.stopPropagation();
+        }
+        
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isZooming = true;
+            isDragging = false;
+            
+            // Определяем центр жеста
+            gestureCenter = getGestureCenter(e.touches[0], e.touches[1]);
+            initialDistance = getDistance(e.touches[0], e.touches[1]);
+            initialScale = currentScale;
+            
+            // Сохраняем текущее смещение для коррекции
+            startX = translateX;
+            startY = translateY;
+            
+        } else if (e.touches.length === 1 && currentScale > 1) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isDragging = true;
+            isZooming = false;
+            
+            // Начало перемещения
+            startX = e.touches[0].clientX - translateX;
+            startY = e.touches[0].clientY - translateY;
+        }
+        
+        // Двойной тап для сброса масштаба
+        if (e.touches.length === 1) {
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Сброс масштаба и позиции
+                currentScale = 1;
+                translateX = 0;
+                translateY = 0;
+                fullscreenImage.style.transform = `scale(${currentScale})`;
+                isDragging = false;
+                isZooming = false;
+            }
+            lastTap = now;
+        }
+    });
+
+    modals.fullscreen.addEventListener('touchmove', (e) => {
+        // Предотвращаем свайпы страницы когда изображение приближено
+        if (currentScale > 1) {
+            e.stopPropagation();
+        }
+        
+        if (e.touches.length === 2 && isZooming) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const currentDistance = getDistance(e.touches[0], e.touches[1]);
+            
+            if (initialDistance > 0) {
+                const scale = (currentDistance / initialDistance) * initialScale;
+                currentScale = Math.max(1, Math.min(scale, 5));
+                
+                // Вычисляем смещение для масштабирования от центра жеста
+                const rect = fullscreenImage.getBoundingClientRect();
+                const imageCenterX = rect.left + rect.width / 2;
+                const imageCenterY = rect.top + rect.height / 2;
+                
+                // Вычисляем как сместится точка жеста при новом масштабе
+                const scaleRatio = currentScale / initialScale;
+                
+                // Корректируем смещение так, чтобы точка жеста оставалась под пальцами
+                const newGestureCenter = getGestureCenter(e.touches[0], e.touches[1]);
+                const deltaX = newGestureCenter.x - gestureCenter.x;
+                const deltaY = newGestureCenter.y - gestureCenter.y;
+                
+                // Вычисляем смещение для сохранения точки жеста под пальцами
+                const offsetX = (gestureCenter.x - imageCenterX) * (scaleRatio - 1) + deltaX;
+                const offsetY = (gestureCenter.y - imageCenterY) * (scaleRatio - 1) + deltaY;
+                
+                // Применяем трансформацию
+                translateX = startX + offsetX;
+                translateY = startY + offsetY;
+                
+                // Ограничиваем перемещение
+                applyBounds();
+                
+                fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+            }
+        } else if (e.touches.length === 1 && currentScale > 1 && isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            translateX = e.touches[0].clientX - startX;
+            translateY = e.touches[0].clientY - startY;
+            
+            // Ограничиваем перемещение
+            applyBounds();
+            
+            fullscreenImage.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+        }
+    });
+
+    modals.fullscreen.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            isZooming = false;
+            initialDistance = 0;
+            initialScale = currentScale;
+        }
+        if (e.touches.length === 0) {
+            isDragging = false;
+        }
+    });
+
+    // Функция для ограничения перемещения в пределах изображения
+    function applyBounds() {
+        if (currentScale <= 1) {
+            translateX = 0;
+            translateY = 0;
+            return;
+        }
+        
+        const maxX = (fullscreenImage.offsetWidth * (currentScale - 1)) / 2;
+        const maxY = (fullscreenImage.offsetHeight * (currentScale - 1)) / 2;
+        
+        translateX = Math.max(-maxX, Math.min(translateX, maxX));
+        translateY = Math.max(-maxY, Math.min(translateY, maxY));
+    }
+
+    // Функция для определения центра жеста
+    function getGestureCenter(touch1, touch2) {
+        return {
+            x: (touch1.clientX + touch2.clientX) / 2,
+            y: (touch1.clientY + touch2.clientY) / 2
+        };
+    }
+
+    function getDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Предотвращаем прокрутку страницы когда открыт полноэкранный просмотр
+    modals.fullscreen.addEventListener('wheel', (e) => {
+        if (modals.fullscreen.style.display === 'flex') {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Также предотвращаем другие жесты
+    modals.fullscreen.addEventListener('gesturestart', (e) => {
+        e.preventDefault();
+    });
+    modals.fullscreen.addEventListener('gesturechange', (e) => {
+        e.preventDefault();
+    });
+    modals.fullscreen.addEventListener('gestureend', (e) => {
+        e.preventDefault();
+    });
+
+    // === ГАЛЕРЕЯ ===
+    const galleryDots = document.querySelectorAll('.gallery-dot');
+    const galleryPrev = document.querySelector('.gallery-prev');
+    const galleryNext = document.querySelector('.gallery-next');
+
+    if (gallerySlides.length <= 1) {
+        if (galleryPrev) galleryPrev.style.display = 'none';
+        if (galleryNext) galleryNext.style.display = 'none';
+    }
+
+    function showSlide(index) {
+        if (!gallerySlides.length) return;
+        currentSlide = Math.max(0, Math.min(index, gallerySlides.length - 1));
+        gallerySlides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === currentSlide);
+            if (i === currentSlide) {
+                const img = slide.querySelector('img');
+                if (img && img.complete) {
+                    img.classList.toggle('portrait', img.naturalHeight > img.naturalWidth);
+                    img.classList.toggle('landscape', img.naturalWidth >= img.naturalHeight);
+                }
+            }
+        });
+        galleryDots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
+        if (galleryPrev) galleryPrev.disabled = currentSlide === 0;
+        if (galleryNext) galleryNext.disabled = currentSlide === gallerySlides.length - 1;
+    }
+
+    if (galleryPrev) galleryPrev.addEventListener('click', () => showSlide(currentSlide - 1));
+    if (galleryNext) galleryNext.addEventListener('click', () => showSlide(currentSlide + 1));
+    galleryDots.forEach(dot => dot.addEventListener('click', () => showSlide(parseInt(dot.dataset.index))));
+
+    let touchStartX = 0;
+    const galleryContainer = document.querySelector('.gallery-container');
+    if (galleryContainer) {
+        galleryContainer.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
+        galleryContainer.addEventListener('touchend', e => {
+            const touchEndX = e.changedTouches[0].screenX;
+            if (touchEndX < touchStartX - 50) galleryNext?.click();
+            else if (touchEndX > touchStartX + 50) galleryPrev?.click();
+        });
+    }
+
     // === РЕДАКТИРОВАНИЕ ОБЪЯВЛЕНИЯ ===
     const editForm = document.getElementById('editForm');
     if (editForm) {
@@ -1312,80 +1583,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateRemainingSlots();
     }
 
-    // === ГАЛЕРЕЯ И ПОЛНОЭКРАННЫЙ ПРОСМОТР ===
-    const gallerySlides = document.querySelectorAll('.gallery-slide');
-    const galleryDots = document.querySelectorAll('.gallery-dot');
-    const galleryPrev = document.querySelector('.gallery-prev');
-    const galleryNext = document.querySelector('.gallery-next');
-    let currentSlide = 0;
-
-    if (gallerySlides.length <= 1) {
-        if (galleryPrev) galleryPrev.style.display = 'none';
-        if (galleryNext) galleryNext.style.display = 'none';
-    }
-
-    function showSlide(index) {
-        if (!gallerySlides.length) return;
-        currentSlide = Math.max(0, Math.min(index, gallerySlides.length - 1));
-        gallerySlides.forEach((slide, i) => {
-            slide.classList.toggle('active', i === currentSlide);
-            if (i === currentSlide) {
-                const img = slide.querySelector('img');
-                if (img && img.complete) {
-                    img.classList.toggle('portrait', img.naturalHeight > img.naturalWidth);
-                    img.classList.toggle('landscape', img.naturalWidth >= img.naturalHeight);
-                }
-            }
-        });
-        galleryDots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
-        if (galleryPrev) galleryPrev.disabled = currentSlide === 0;
-        if (galleryNext) galleryNext.disabled = currentSlide === gallerySlides.length - 1;
-    }
-
-    if (galleryPrev) galleryPrev.addEventListener('click', () => showSlide(currentSlide - 1));
-    if (galleryNext) galleryNext.addEventListener('click', () => showSlide(currentSlide + 1));
-    galleryDots.forEach(dot => dot.addEventListener('click', () => showSlide(parseInt(dot.dataset.index))));
-
-    let touchStartX = 0;
-    const galleryContainer = document.querySelector('.gallery-container');
-    if (galleryContainer) {
-        galleryContainer.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
-        galleryContainer.addEventListener('touchend', e => {
-            const touchEndX = e.changedTouches[0].screenX;
-            if (touchEndX < touchStartX - 50) galleryNext?.click();
-            else if (touchEndX > touchStartX + 50) galleryPrev?.click();
-        });
-    }
-
-    const fullscreenImage = document.getElementById('fullscreenImage');
-    const closeFullscreen = document.getElementById('closeFullscreen');
-
-    gallerySlides.forEach(slide => {
-        slide.addEventListener('click', () => {
-            const img = gallerySlides[currentSlide]?.querySelector('img');
-            if (img) {
-                fullscreenImage.src = img.src;
-                openModal(modals.fullscreen);
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    });
-
-    function closeFullscreenView() {
-        closeModal(modals.fullscreen);
-        document.body.style.overflow = '';
-    }
-
-    if (closeFullscreen) closeFullscreen.addEventListener('click', closeFullscreenView);
-    if (modals.fullscreen) {
-        modals.fullscreen.addEventListener('click', e => {
-            if (e.target === modals.fullscreen) closeFullscreenView();
-        });
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape' && modals.fullscreen.style.display === 'flex') closeFullscreenView();
-        });
-    }
-
     // === БРОНИРОВАНИЕ ===
     document.getElementById('reserveButton')?.addEventListener('click', () => {
         openModal(modals.reservation);
@@ -1429,8 +1626,14 @@ document.addEventListener('DOMContentLoaded', () => {
             amountEl.textContent = `Сумма бронирования: ${reserveAmountTON.toFixed(4)} TON`;
         } else {
             const rate = await fetchTonRate();
-            const rubAmount = reserveAmountTON * rate;
-            amountEl.textContent = `Сумма бронирования: ~${rubAmount.toFixed(2)} ₽`;
+            if (rate) {
+                const rubAmount = reserveAmountTON * rate;
+                amountEl.textContent = `Сумма бронирования: ~${rubAmount.toFixed(2)} ₽`;
+            } else {
+                amountEl.textContent = `Сумма бронирования: ${reserveAmountTON.toFixed(4)} TON`;
+                showNotification('Курс недоступен, используйте TON', 'warning');
+                selectReserveCurrency('ton');
+            }
         }
     }
 
