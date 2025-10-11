@@ -207,93 +207,87 @@
         padding-left: 5px;
     }
 
-    .ads-grid {
+    /* ИСПРАВЛЕНО: Используем main-content вместо ads-grid для совместимости со store.html */
+    .main-content {
+        flex: 1;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
         gap: 16px;
     }
 
     .ad-card {
-        background-color: var(--card-bg);
-        border-radius: 8px;
+        background: linear-gradient(145deg, var(--card-bg), var(--secondary-color));
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 2px 4px var(--shadow-color);
+        box-shadow: 
+            0 4px 12px var(--shadow-color),
+            0 1px 3px rgba(0,0,0,0.1);
         cursor: pointer;
-        height: 300px;
+        height: 320px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 1px solid var(--border-color);
         position: relative;
+        opacity: 0;
+        transform: translateY(30px);
+        animation: cardAppear 0.6s ease forwards;
+    }
+
+    @keyframes cardAppear {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .ad-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 
+            0 8px 25px var(--shadow-color),
+            0 2px 6px rgba(0,0,0,0.1);
     }
 
     .ad-image {
         width: 100%;
-        height: 200px;
+        height: 180px;
         object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .ad-card:hover .ad-image {
+        transform: scale(1.05);
     }
 
     .ad-details {
-        padding: 12px;
+        padding: 14px;
+        position: relative;
     }
 
     .ad-price {
         font-weight: bold;
-        margin-bottom: 10px;
+        margin-bottom: 6px;
         color: var(--primary-color);
-    }
-
-    .ad-description {
-        font-size: 12px;
-        color: #999;
-    }
-
-    .ad-new-badge {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background-color: var(--primary-color);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-        z-index: 10;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .ad-title {
-        font-size: 18px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 170%;
-        display: block;
-        position: relative;
-        bottom: 0.55vh;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        line-height: 1.2em;
-    }
-
-    .ad-title::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 30%;
-        height: 1.2em;
-        background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
-        pointer-events: none;
+        font-size: 16px;
     }
 
     .ad-favorite, .ad-favorite-del {
-        float: right;
-        position: relative;
-        top: 20px;
-        z-index: 2;
-        pointer-events: auto;
+        position: absolute;
+        top: -20px;
+        right: 10px;
+        z-index: 3;
+        background: var(--card-bg);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px var(--shadow-color);
+        transition: all 0.3s ease;
+        border: 2px solid var(--primary-color);
     }
 
-    .ad-favorite-del svg {
-        fill: currentColor;
+    .ad-favorite:hover, .ad-favorite-del:hover {
+        transform: scale(1.1);
     }
 
     .no-results {
@@ -303,24 +297,71 @@
         color: #999;
     }
 
+    .ad-new-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
+        color: white;
+        padding: 6px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: bold;
+        z-index: 10;
+        box-shadow: 0 2px 8px rgba(63, 136, 248, 0.3);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .ad-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.3;
+        height: 2.6em;
+    }
+
+    .ad-location {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .ad-time {
+        font-size: 11px;
+        color: #999;
+        font-weight: 500;
+    }
+
     .avatar-container {
         position: relative;
         display: inline-block;
-        margin-top: 40px; /* Опускаем весь блок с аватаром ниже */
+        margin-top: 40px;
     }
 
     .admin-crown {
         position: absolute;
-        top: -50px; /* Поднимаем корону выше */
+        top: -50px;
         left: 50%;
         transform: translateX(-50%);
-        width: 120px; /* Увеличиваем размер короны */
+        width: 120px;
         height: 70px;
         z-index: 10;
         filter: drop-shadow(0 3px 6px rgba(33, 150, 243, 0.4));
         transition: all 0.3s ease;
         animation: crown-float 3s ease-in-out infinite alternate;
-        fill: #1976D2; /* Синий цвет короны */
+        fill: #1976D2;
     }
 
     .moderator-hat {
@@ -332,8 +373,8 @@
         height: 80px;
         z-index: 10;
         filter: 
-            drop-shadow(0 0 2px white) /* Белая обводка */
-            drop-shadow(0 0 2px white) /* Дублируем для лучшей видимости */
+            drop-shadow(0 0 2px white)
+            drop-shadow(0 0 2px white)
             drop-shadow(0 3px 6px rgba(25, 118, 210, 0.4));
         transition: all 0.3s ease;
         animation: hat-shine 2s ease-in-out infinite;
@@ -386,8 +427,8 @@
     }
 
     @media (max-width: 400px) {
-        .ads-grid {
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        .main-content {
+            grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
         }
     }
 
@@ -565,13 +606,13 @@
     .ad-favorite-del svg {
         fill: currentColor;
         stroke: currentColor;
-        animation: pulse 0.5s ease;
+        animation: heartPulse 0.5s ease;
     }
 
-    @keyframes pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.3); opacity: 0.8; }
-        100% { transform: scale(1); opacity: 1; }
+    @keyframes heartPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
     }
 
     .tooltip {
@@ -641,6 +682,12 @@
         pointer-events: none;
         opacity: 0.5;
         cursor: default;
+    }
+
+    /* Анимации появления карточек при скролле */
+    .ad-card.visible {
+        opacity: 1;
+        transform: translateY(0);
     }
 </style>
 {% endblock %}
@@ -749,7 +796,8 @@
         {% if user_info["tg_id"] != user_tg_id %}
         <div class="ads-section">
             <div class="ads-section-title">Объявления</div>
-            <div class="ads-grid" id="adsGrid">
+            <!-- ИСПРАВЛЕНО: Используем main-content вместо ads-grid -->
+            <div class="main-content" id="adsGrid">
                 <!-- Товары будут загружаться динамически -->
             </div>
             <div class="loading-indicator" id="loadingIndicator">
@@ -849,43 +897,59 @@
             }
         }
 
-        // Функция для форматирования даты
+        // ИСПРАВЛЕНО: Форматирование даты как в store.html (без секунд)
         function formatDate(dateString) {
             if (!dateString) return '';
-            const [datePart, timePart] = dateString.split(' ');
-            const [year, month, day] = datePart.split('-');
-            return `${day}.${month}.${year.slice(2)}`;
+            try {
+                const date = new Date(dateString);
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear().toString().slice(2);
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${day}.${month}.${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return dateString;
+            }
         }
 
         // Функция для отрисовки товаров
         function renderProducts(products) {
             const adsGrid = document.getElementById('adsGrid');
             
-            products.forEach(product => {
+            products.forEach((product, index) => {
                 const isNew = (new Date() - new Date(product["created_at"])) / (1000 * 60 * 60 * 24) < 1;
-                const isFavorite = product["is_fav"]; // Индекс 7 - это флаг избранного
+                const isFavorite = product["is_fav"];
                 
                 const productHtml = `
                     <div class="ads-container">
-                        <div class="ad-card" data-id="${product['product_id']}">
+                        <div class="ad-card" data-id="${product['product_id']}" style="animation-delay: ${index * 0.1}s">
                             ${isNew ? '<div class="ad-new-badge">Новое</div>' : ''}
                             <img src="/${product['product_image_url']}" class="ad-image">
                             <div class="ad-details">
                                 <div class="ad-title">${product["product_name"]}</div>
+                                ${product.location ? `<div class="ad-location">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    ${product.location}
+                                </div>` : ''}
+                                <div class="ad-price">${product["product_price"]} TON</div>
+                                <!-- ИСПРАВЛЕНО: Форматирование времени без секунд -->
+                                <div class="ad-time">${formatDate(product["created_at"])}</div>
                                 ${sellerId !== currentUserId ? 
                                 (isFavorite ?
                                 `<div class="ad-favorite-del" data-id="${product['product_id']}">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
                                 </div>` : 
                                 `<div class="ad-favorite" data-id="${product['product_id']}">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                     </svg>
                                 </div>`) : ''}
-                                <div class="ad-price">${product["product_price"]} TON</div>
-                                <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
                             </div>
                         </div>
                     </div>
@@ -902,7 +966,7 @@
         function updateFavoriteIcon(button, isFavorite) {
             if (isFavorite) {
                 button.innerHTML = `
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                     </svg>
                 `;
@@ -910,7 +974,7 @@
                 button.classList.add('ad-favorite-del');
             } else {
                 button.innerHTML = `
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                     </svg>
                 `;
@@ -975,7 +1039,9 @@
         });
 
         // Загружаем первую страницу товаров
-        loadProducts(1);
+        {% if user_info["tg_id"] != user_tg_id %}
+            loadProducts(1);
+        {% endif %}
 
         // Обработчик клика на контейнер репутации
         const reputationContainer = document.getElementById('reputationContainer');
@@ -1158,7 +1224,9 @@
             }
         }
 
-        convertTonToRub();
+        {% if user_info["tg_id"] == user_tg_id %}
+            convertTonToRub();
+        {% endif %}
     });
 </script>
 {% endblock %}

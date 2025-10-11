@@ -1,10 +1,11 @@
+import json
 from datetime import datetime, timezone
-
 from fastapi import Cookie, Request
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, select, or_
 from starlette.responses import JSONResponse
 
-from src.database.database import Deal, Review, User, async_session_maker
+from src.config import settings
+from src.database.database import Product, Review, User, async_session_maker, Deal
 from src.database.methods import (
     check_user_blocked_post,
     get_all_products_from_category_new,
@@ -24,6 +25,9 @@ async def get_products(
         page: int = 1,
         category: str = None,
         search: str = None,
+        cities: str = None,
+        price_min: float = None,
+        price_max: float = None,
         session_token=Cookie(default=None)
 ):
     if not session_token:
@@ -33,36 +37,67 @@ async def get_products(
     per_page = 20
 
     try:
-        if category:
-            products = await get_all_products_from_category_new(category, payload.get("tg_id"))
-        else:
-            products = await get_all_products_new(payload.get("tg_id"))
+        async with async_session_maker() as session:
+            # Базовый запрос
+            query = select(Product).where(Product.active == True)
 
-        if search:
-            search_lower = search.lower()
-            products = [p for p in products if search_lower in p["product_name"].lower()]
+            # Применяем фильтры
+            if category:
+                query = query.where(Product.category_name == category)
 
-        total = len(products)
-        start = (page - 1) * per_page
-        end = start + per_page
-        paginated_products = products[start:end]
+            if search:
+                search_filter = or_(
+                    Product.product_name.ilike(f"%{search}%"),
+                    Product.product_description.ilike(f"%{search}%")
+                )
+                query = query.where(search_filter)
 
-        formatted_products = []
-        for product in paginated_products:
-            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
-                product["created_at"], datetime) else \
-                product["created_at"]
-            product["is_new"] = (
-                (datetime.now(timezone.utc) - product["created_at"]).total_seconds() < 86400 if isinstance(
-                    product["created_at"],
-                    datetime) else False)
-            formatted_products.append(product)
+            if cities:
+                city_list = [city.strip() for city in cities.split(',')]
+                query = query.where(Product.location.in_(city_list))
 
-        return JSONResponse({
-            "status": "success",
-            "products": formatted_products,
-            "total": total
-        })
+            if price_min is not None:
+                query = query.where(Product.product_price >= price_min)
+
+            if price_max is not None:
+                query = query.where(Product.product_price <= price_max)
+
+            # Сортировка и пагинация
+            query = query.order_by(desc(Product.created_at))
+            query = query.offset((page - 1) * per_page).limit(per_page)
+
+            result = await session.execute(query)
+            products = result.scalars().all()
+
+            # Получаем избранные товары пользователя
+            all_favs = await get_all_user_favs(payload.get("tg_id"))
+
+            formatted_products = []
+            for product in products:
+                image_urls = json.loads(product.product_image_url) if product.product_image_url else []
+                first_image = image_urls[0] if image_urls else "static/img/zaglush.png"
+
+                is_new = (datetime.now(timezone.utc) - product.created_at).total_seconds() < 86400
+
+                formatted_products.append({
+                    'product_id': product.id,
+                    'product_name': product.product_name,
+                    'product_price': product.product_price,
+                    'product_description': product.product_description,
+                    'product_image_url': first_image,
+                    'created_at': product.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'tg_id': product.tg_id,
+                    'is_fav': product.id in all_favs,
+                    'location': product.location,
+                    'is_new': is_new
+                })
+
+            return JSONResponse({
+                "status": "success",
+                "products": formatted_products,
+                "total": len(formatted_products)
+            })
+
     except Exception as e:
         print(f"Error in get_products: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
@@ -93,8 +128,8 @@ async def get_favorites(
 
         formatted_products = []
         for product in paginated_products:
-            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(product["created_at"], datetime) else \
-            product["created_at"]
+            product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
+                product["created_at"], datetime) else product["created_at"]
             formatted_products.append(product)
 
         return JSONResponse({
@@ -105,7 +140,6 @@ async def get_favorites(
     except Exception as e:
         print(f"Error in get_favorites: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-
 
 
 @wmarket_api_router.get("/user_review_products")
@@ -119,7 +153,7 @@ async def get_user_review_products(
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
 
     payload = await decode_jwt(session_token)
-    per_page = 20  # Количество товаров на странице
+    per_page = 20
 
     try:
         if tab == 'active':
@@ -131,18 +165,15 @@ async def get_user_review_products(
         else:
             return JSONResponse({"status": "error", "message": "Invalid tab"}, status_code=400)
 
-        # Пагинация
         total = len(products)
         start = (page - 1) * per_page
         end = start + per_page
         paginated_products = products[start:end]
 
-        # Форматирование дат
         formatted_products = []
         for product in paginated_products:
             product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
-                product["created_at"], datetime) else \
-                product["created_at"]
+                product["created_at"], datetime) else product["created_at"]
             formatted_products.append(product)
 
         return JSONResponse({
@@ -179,8 +210,7 @@ async def get_user_products(
         formatted_products = []
         for product in paginated_products:
             product["created_at"] = product["created_at"].strftime('%Y-%m-%d %H:%M:%S') if isinstance(
-                product["created_at"], datetime) else \
-                product["created_at"]
+                product["created_at"], datetime) else product["created_at"]
             product["is_new"] = (
                 (datetime.now(timezone.utc) - product["created_at"]).total_seconds() < 86400 if isinstance(
                     product["created_at"],
@@ -302,12 +332,7 @@ async def api_check_review_exists(deal_id: int, session_token=Cookie(default=Non
 
     return JSONResponse({"exists": exists})
 
-# @wmarket_router.get("/user_info/{user_id}")
-# async def get_user_info_endpoint(user_id: int):
-#     user_info = await get_user_info(user_id)
-#     if user_info:
-#         return {
-#             "first_name": user_info[1],
-#             "photo_url": user_info[2]
-#         }
-#     return {}
+
+@wmarket_api_router.get("/get_cities")
+async def get_cities():
+    return JSONResponse({"cities": settings.RUSSIAN_CITIES})

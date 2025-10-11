@@ -63,11 +63,37 @@
             fill: white;
         }
 
+        .ad-price-location {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: -12px 0 16px 0;
+            gap: 12px;
+        }
+
         .ad-price {
             font-size: 24px;
             font-weight: bold;
             color: var(--primary-color);
-            margin: -12px 0 16px 0;
+            margin: 0;
+        }
+
+        .ad-location {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 16px;
+            color: var(--secondary-text);
+            background-color: var(--card-bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .ad-location svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
         }
 
         .ad-description-title {
@@ -244,26 +270,84 @@
 
         .form-group {
             margin-bottom: 15px;
+            position: relative;
         }
 
-        .form-group label {
+        .form-label {
             display: block;
             margin-bottom: 5px;
-            font-weight: bold;
+            font-weight: 500;
         }
 
-        .form-group input, .form-group textarea, .form-group select {
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-input, .form-select, .form-textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background-color: var(--card-bg);
             color: var(--text-color);
+            font-size: 16px;
         }
 
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(63, 136, 248, 0.2);
+        }
+
+        .location-input-container {
+            position: relative;
+        }
+
+        .cities-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 12px var(--shadow-color);
+        }
+
+        .cities-dropdown.active {
+            display: block;
+        }
+
+        .city-option {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        .city-option:hover {
+            background-color: var(--hover-color);
+        }
+
+        .city-option:last-child {
+            border-bottom: none;
+        }
+
+        .city-option.highlighted {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .location-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
         }
 
         .modal-actions {
@@ -300,6 +384,7 @@
             border-radius: 8px;
             cursor: pointer;
             margin-bottom: 15px;
+            transition: all 0.3s ease;
         }
 
         .file-input-label:hover {
@@ -576,6 +661,24 @@
             background-color: #1a1a1a; /* Темный фон для контейнера */
         }
 
+        .gallery-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .gallery-background-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(20px) brightness(0.7);
+            transform: scale(1.1); /* Немного увеличиваем чтобы не было серых краев */
+        }
+
         .gallery-slide {
             position: absolute;
             top: 0;
@@ -587,7 +690,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #1a1a1a; /* Темный фон для слайдов */
+            background-color: transparent; /* Убираем фон */
+            z-index: 2; /* Поверх бэкграунда */
         }
 
         .gallery-slide.active {
@@ -601,6 +705,8 @@
             height: auto;
             object-fit: contain;
             object-position: center;
+            z-index: 3;
+            position: relative;
         }
 
         /* Для вертикальных изображений */
@@ -729,25 +835,31 @@
         }
 
         .image-gallery {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
             gap: 10px;
             margin-bottom: 15px;
         }
 
         .gallery-item {
             position: relative;
-            width: 80px;
-            height: 80px;
+            width: 100%;
+            aspect-ratio: 1;
             border-radius: 8px;
             overflow: hidden;
             background-color: var(--card-bg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .gallery-item img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            display: block;
+        }
+
+        .gallery-item:hover .image-actions {
+            opacity: 1;
         }
 
         .remove-image-btn {
@@ -768,6 +880,8 @@
             padding: 0;
             font-size: 14px;
             line-height: 1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
         .image-actions {
@@ -787,6 +901,7 @@
             padding: 2px 5px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 12px;
         }
 
         .move-left-btn:disabled, .move-right-btn:disabled {
@@ -818,7 +933,6 @@
             100% { transform: scale(1); opacity: 1; }
         }
         
-        /* Остальные существующие стили остаются без изменений */
         .ad-container {
             padding: 16px;
             padding-bottom: 80px;
@@ -851,9 +965,20 @@
         </button>
         
         <div class="gallery-container">
-            {% set images = product_info["product_image_url"]|from_json %}
+            <!-- Размытый фон -->
+            <div class="gallery-background">
+                {% set images = product_info["product_image_url"]|from_json %}
+                {% for image in images %}
+                <img class="gallery-background-image {% if loop.first %}active{% endif %}" 
+                    src="/{{ image }}" 
+                    alt="{{ product_info['product_name'] }}"
+                    data-index="{{ loop.index0 }}">
+                {% endfor %}
+            </div>
+            
+            <!-- Основные изображения -->
             {% for image in images %}
-            <div class="gallery-slide {% if loop.first %}active{% endif %}">
+            <div class="gallery-slide {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}">
                 <img src="/{{ image }}" alt="{{ product_info['product_name'] }}">
             </div>
             {% endfor %}
@@ -926,8 +1051,18 @@
             </div>
         </div>
 
-        <div class="ad-price">{{ product_info["product_price"] }} TON</div>
-        
+        <div class="ad-price-location">
+            <div class="ad-price">{{ product_info["product_price"] }} TON</div>
+            {% if product_info["location"] %}
+            <div class="ad-location" title="Город продавца">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+                </svg>
+                {{ product_info["location"] }}
+            </div>
+            {% endif %}
+        </div>
+
         {% if product_info["reserved"] %}
             <div class="reservation-info">
                 {% if product_info["reserved_by"] == user_tg_id %}
@@ -1049,24 +1184,18 @@
 
     <!-- Модальное окно для редактирования объявления -->
     <div id="editModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-title">Редактировать объявление</div>
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: var(--primary-color);">Редактировать объявление</h2>
+                <button onclick="closeEditModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--primary-color);">✕</button>
+            </div>
+            
             <form id="editForm" enctype="multipart/form-data">
                 <input type="hidden" name="product_id" value="{{ product_info['product_id'] }}">
                 
                 <div class="form-group">
-                    <label for="editTitle">Название</label>
-                    <input type="text" id="editTitle" name="title" value="{{ product_info['product_name'] }}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editPrice">Цена (₽)</label>
-                    <input type="number" id="editPrice" name="price" value="{{ product_info['product_price'] }}" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="editCategory">Категория</label>
-                    <select id="editCategory" name="category" required>
+                    <label class="form-label" for="editCategory">Категория</label>
+                    <select class="form-select" id="editCategory" name="category" required>
                         {% for category in categories %}
                             <option value="{{ category }}" {% if category == product_info['category_name'] %}selected{% endif %}>{{ category }}</option>
                         {% endfor %}
@@ -1074,12 +1203,34 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="editDescription">Описание</label>
-                    <textarea id="editDescription" name="description" required>{{ product_info["product_description"] }}</textarea>
+                    <label class="form-label" for="editTitle">Название товара</label>
+                    <input class="form-input" type="text" id="editTitle" name="title" value="{{ product_info['product_name'] }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editPrice">Цена (TON)</label>
+                    <input class="form-input" type="number" id="editPrice" name="price" value="{{ product_info['product_price'] }}" min="0.1" step="0.1" required>
+                    <div class="rub-price">
+                        ≈ <span class="value">0</span> ₽
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="editLocation">Город</label>
+                    <div class="location-input-container">
+                        <input class="form-input" type="text" id="editLocation" name="location" value="{{ product_info['location'] or '' }}" placeholder="Начните вводить название города..." autocomplete="off">
+                        <div id="editCitiesDropdown" class="cities-dropdown"></div>
+                    </div>
+                    <div class="location-hint">Выберите город из списка или введите название</div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Фотографии товара</label>
+                    <label class="form-label" for="editDescription">Описание</label>
+                    <textarea class="form-textarea" id="editDescription" name="description" required>{{ product_info["product_description"] }}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Фотографии товара</label>
                     <div id="imageGallery" class="image-gallery">
                         {% set images = product_info["product_image_url"]|from_json %}
                         {% for image in images %}
@@ -1159,6 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gallerySlides = document.querySelectorAll('.gallery-slide');
     let currentSlide = 0;
 
+    // В обработчике клика по слайду для полноэкранного режима
     gallerySlides.forEach(slide => {
         slide.addEventListener('click', () => {
             const activeImg = gallerySlides[currentSlide].querySelector('img');
@@ -1379,6 +1531,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function showSlide(index) {
         if (!gallerySlides.length) return;
         currentSlide = Math.max(0, Math.min(index, gallerySlides.length - 1));
+        
+        // Обновляем основные слайды
         gallerySlides.forEach((slide, i) => {
             slide.classList.toggle('active', i === currentSlide);
             if (i === currentSlide) {
@@ -1389,6 +1543,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+        
+        // Обновляем размытый фон
+        const backgroundImages = document.querySelectorAll('.gallery-background-image');
+        backgroundImages.forEach((bgImg, i) => {
+            bgImg.classList.toggle('active', i === currentSlide);
+        });
+        
         galleryDots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
         if (galleryPrev) galleryPrev.disabled = currentSlide === 0;
         if (galleryNext) galleryNext.disabled = currentSlide === gallerySlides.length - 1;
@@ -1411,14 +1572,175 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === РЕДАКТИРОВАНИЕ ОБЪЯВЛЕНИЯ ===
     const editForm = document.getElementById('editForm');
-    if (editForm) {
-        const editPriceInput = document.getElementById('editPrice');
-        if (editPriceInput) {
-            editPriceInput.addEventListener('input', function(e) {
-                this.value = this.value.replace(/[^0-9.,]/g, ''); // разрешаем дробные значения
-            });
+    
+    // Загрузка курса TON → RUB для формы редактирования
+    async function getTonToRubRate() {
+        try {
+            const response = await fetch('/get_ton_to_rub_rate');
+            const data = await response.json();
+            
+            if (response.ok && data.rate) {
+                return data.rate;
+            } else {
+                throw new Error(data.message || 'Не удалось получить курс');
+            }
+        } catch (error) {
+            console.error('Ошибка при получении курса TON/RUB:', error);
+            return null;
         }
+    }
 
+    // Функция для обновления отображения цены в рублях
+    function updateEditRubPrice(tonPrice) {
+        const rubPriceElement = document.querySelector('#editModal .rub-price .value');
+        if (!rubPriceElement) return;
+
+        getTonToRubRate().then(rate => {
+            if (rate && tonPrice) {
+                const rubPrice = tonPrice * rate;
+                rubPriceElement.textContent = rubPrice.toFixed(2);
+            } else {
+                rubPriceElement.textContent = '0';
+            }
+        });
+    }
+
+    // Инициализация цены в рублях при открытии модального окна
+    document.querySelector('.ad-edit')?.addEventListener('click', () => {
+        const currentPrice = parseFloat(document.getElementById('editPrice').value) || 0;
+        updateEditRubPrice(currentPrice);
+        
+        // Инициализация выбора города
+        initCitySelection();
+    });
+
+    // Обработчик изменения цены в форме редактирования
+    document.getElementById('editPrice')?.addEventListener('input', function(e) {
+        const tonPrice = parseFloat(this.value) || 0;
+        updateEditRubPrice(tonPrice);
+    });
+
+    // === ФУНКЦИОНАЛ ВЫБОРА ГОРОДА ДЛЯ ФОРМЫ РЕДАКТИРОВАНИЯ ===
+    let allCities = [];
+    let editFilteredCities = [];
+    let editSelectedCityIndex = -1;
+
+    async function loadCities() {
+        try {
+            const response = await fetch('/api/get_cities');
+            const data = await response.json();
+            if (data.cities) {
+                allCities = data.cities;
+            }
+        } catch (error) {
+            console.error('Ошибка при загрузке городов:', error);
+        }
+    }
+
+    function filterCities(searchTerm) {
+        if (!searchTerm) {
+            return allCities.slice(0, 10);
+        }
+        
+        const term = searchTerm.toLowerCase();
+        return allCities.filter(city => 
+            city.toLowerCase().includes(term)
+        ).slice(0, 10);
+    }
+
+    function showEditCitiesDropdown(cities) {
+        const dropdown = document.getElementById('editCitiesDropdown');
+        if (!dropdown) return;
+        
+        dropdown.innerHTML = '';
+        
+        if (cities.length === 0) {
+            dropdown.classList.remove('active');
+            return;
+        }
+        
+        cities.forEach((city, index) => {
+            const option = document.createElement('div');
+            option.className = 'city-option';
+            option.textContent = city;
+            option.dataset.value = city;
+            
+            if (index === editSelectedCityIndex) {
+                option.classList.add('highlighted');
+            }
+            
+            option.addEventListener('click', function() {
+                document.getElementById('editLocation').value = this.dataset.value;
+                dropdown.classList.remove('active');
+                editSelectedCityIndex = -1;
+            });
+            
+            dropdown.appendChild(option);
+        });
+        
+        dropdown.classList.add('active');
+    }
+
+    function initCitySelection() {
+        const locationInput = document.getElementById('editLocation');
+        const dropdown = document.getElementById('editCitiesDropdown');
+        
+        if (!locationInput || !dropdown) return;
+
+        locationInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            editFilteredCities = filterCities(searchTerm);
+            editSelectedCityIndex = -1;
+            showEditCitiesDropdown(editFilteredCities);
+        });
+
+        locationInput.addEventListener('focus', function() {
+            if (this.value.trim() === '') {
+                editFilteredCities = filterCities('');
+                showEditCitiesDropdown(editFilteredCities);
+            }
+        });
+
+        // Навигация по выпадающему списку с клавиатуры
+        locationInput.addEventListener('keydown', function(e) {
+            if (!dropdown.classList.contains('active')) return;
+
+            const options = dropdown.querySelectorAll('.city-option');
+            
+            switch(e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    editSelectedCityIndex = Math.min(editSelectedCityIndex + 1, options.length - 1);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    editSelectedCityIndex = Math.max(editSelectedCityIndex - 1, -1);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (editSelectedCityIndex >= 0 && options[editSelectedCityIndex]) {
+                        locationInput.value = options[editSelectedCityIndex].dataset.value;
+                        dropdown.classList.remove('active');
+                        editSelectedCityIndex = -1;
+                    }
+                    break;
+                case 'Escape':
+                    dropdown.classList.remove('active');
+                    editSelectedCityIndex = -1;
+                    break;
+            }
+
+            // Обновляем подсветку
+            options.forEach((option, index) => {
+                option.classList.toggle('highlighted', index === editSelectedCityIndex);
+            });
+        });
+    }
+
+    // Загружаем города при инициализации
+    loadCities();
+
+    if (editForm) {
         editForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(editForm);
@@ -1452,70 +1774,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
-    // === ИЗБРАННОЕ / ЖАЛОБЫ / РЕДАКТИРОВАНИЕ ===
-    document.body.addEventListener('click', async (e) => {
-        const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
-        if (favBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            const isDel = favBtn.classList.contains('ad-favorite-del');
-            const action = isDel ? '/del_fav' : '/add_fav';
-            try {
-                const scrollPosition = window.scrollY;
-                favBtn.style.transform = 'scale(1.2)';
-                setTimeout(() => favBtn.style.transform = 'scale(1)', 300);
-                const response = await fetch(action, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `fav_id=${productId}`
-                });
-                if (response.ok) {
-                    favBtn.innerHTML = isDel ? `
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                        </svg>
-                    ` : `
-                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                        </svg>
-                    `;
-                    favBtn.classList.toggle('ad-favorite', isDel);
-                    favBtn.classList.toggle('ad-favorite-del', !isDel);
-                    window.scrollTo(0, scrollPosition);
-                }
-            } catch (err) {
-                console.error(err);
-                showNotification('Ошибка при обновлении избранного', 'error');
-            }
-        }
-
-        const reportBtn = e.target.closest('.ad-report');
-        if (reportBtn && confirm('Отправить на повторную проверку?')) {
-            try {
-                const res = await fetch('/report_product', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: productId })
-                });
-                const data = await res.json();
-                showNotification(
-                    data.status === 'success' ? 'Отправлено на проверку' : 'Ошибка',
-                    data.status === 'success' ? 'info' : 'error'
-                );
-            } catch (err) {
-                console.error(err);
-                showNotification('Ошибка при отправке жалобы', 'error');
-            }
-        }
-
-        const editBtn = e.target.closest('.ad-edit');
-        if (editBtn) openModal(modals.edit);
-
-        if (e.target.closest('[onclick="closePaymentModal()"]')) closeModal(modals.payment);
-        if (e.target.closest('[onclick="closeReservationModal()"]')) closeModal(modals.reservation);
-        if (e.target.closest('[onclick="closeEditModal()"]')) closeModal(modals.edit);
-    });
 
     // === УПРАВЛЕНИЕ ИЗОБРАЖЕНИЯМИ В РЕДАКТОРЕ ===
     const imageGallery = document.getElementById('imageGallery');
@@ -1582,6 +1840,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         updateRemainingSlots();
     }
+
+    // === ИЗБРАННОЕ / ЖАЛОБЫ / РЕДАКТИРОВАНИЕ ===
+    document.body.addEventListener('click', async (e) => {
+        const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+        if (favBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isDel = favBtn.classList.contains('ad-favorite-del');
+            const action = isDel ? '/del_fav' : '/add_fav';
+            try {
+                const scrollPosition = window.scrollY;
+                favBtn.style.transform = 'scale(1.2)';
+                setTimeout(() => favBtn.style.transform = 'scale(1)', 300);
+                const response = await fetch(action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `fav_id=${productId}`
+                });
+                if (response.ok) {
+                    favBtn.innerHTML = isDel ? `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    ` : `
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    `;
+                    favBtn.classList.toggle('ad-favorite', isDel);
+                    favBtn.classList.toggle('ad-favorite-del', !isDel);
+                    window.scrollTo(0, scrollPosition);
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('Ошибка при обновлении избранного', 'error');
+            }
+        }
+
+        const reportBtn = e.target.closest('.ad-report');
+        if (reportBtn && confirm('Отправить на повторную проверку?')) {
+            try {
+                const res = await fetch('/report_product', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: productId })
+                });
+                const data = await res.json();
+                showNotification(
+                    data.status === 'success' ? 'Отправлено на проверку' : 'Ошибка',
+                    data.status === 'success' ? 'info' : 'error'
+                );
+            } catch (err) {
+                console.error(err);
+                showNotification('Ошибка при отправке жалобы', 'error');
+            }
+        }
+
+        const editBtn = e.target.closest('.ad-edit');
+        if (editBtn) openModal(modals.edit);
+
+        if (e.target.closest('[onclick="closePaymentModal()"]')) closeModal(modals.payment);
+        if (e.target.closest('[onclick="closeReservationModal()"]')) closeModal(modals.reservation);
+        if (e.target.closest('[onclick="closeEditModal()"]')) closeModal(modals.edit);
+    });
 
     // === БРОНИРОВАНИЕ ===
     document.getElementById('reserveButton')?.addEventListener('click', () => {
@@ -1840,6 +2162,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ МОДАЛЬНЫХ ОКОН ===
+    function closePaymentModal() {
+        closeModal(modals.payment);
+    }
+
+    function closeReservationModal() {
+        closeModal(modals.reservation);
+    }
+
+    function closeEditModal() {
+        closeModal(modals.edit);
+    }
+
+    // Экспортируем функции для использования в HTML
+    window.closePaymentModal = closePaymentModal;
+    window.closeReservationModal = closeReservationModal;
+    window.closeEditModal = closeEditModal;
 });
 </script>
 {% endblock %}

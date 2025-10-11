@@ -39,7 +39,8 @@ async def ads_view(product_id: int, request: Request, session_token=Cookie(defau
                         Product.reserved_by,
                         Product.reserved_until,
                         Product.reservation_amount,
-                        Product.reservation_currency
+                        Product.reservation_currency,
+                        Product.location
                     ).where(Product.id == product_id)
                 )
 

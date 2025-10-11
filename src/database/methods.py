@@ -123,7 +123,8 @@ async def get_all_products_new(tg_id):
                     'product_image_url': first_image,
                     'created_at': prod.created_at,
                     'tg_id': prod.tg_id,
-                    'is_fav': False
+                    'is_fav': False,
+                    'location': prod.location
                 })
 
             all_favs = await get_all_user_favs(tg_id)
@@ -194,6 +195,7 @@ async def get_product_info_new(product_id: int, user_tg_id: int | None):
             Product.product_image_url,
             Product.category_name,
             Product.created_at,
+            Product.location,  # Добавляем location
             exists().where(
                 and_(
                     Fav.tg_id == user_tg_id,
@@ -263,7 +265,8 @@ async def get_user_archived_products_new(tg_id):
                     Product.product_image_url,
                     Product.id,
                     Product.created_at,
-                    Product.reserved
+                    Product.reserved,
+                    Product.location
                 )
                 .where(Product.tg_id == tg_id, Product.active == None)
                 .order_by(desc(Product.created_at))
@@ -280,7 +283,8 @@ async def get_user_archived_products_new(tg_id):
                     'product_price': prod.product_price,
                     'product_description': prod.product_description,
                     'product_image_url': first_image,
-                    'created_at': prod.created_at
+                    'created_at': prod.created_at,
+                    'location': prod.location
                 })
 
             return all_products
@@ -300,7 +304,8 @@ async def get_user_active_products_new(tg_id: int, current_user_id: int):
                     Product.product_image_url,
                     Product.id,
                     Product.created_at,
-                    Product.reserved
+                    Product.reserved,
+                    Product.location
                 )
                 .where(Product.tg_id == tg_id, Product.active == True)
                 .order_by(desc(Product.created_at))
@@ -321,7 +326,8 @@ async def get_user_active_products_new(tg_id: int, current_user_id: int):
                     'product_image_url': first_image,
                     'created_at': prod.created_at,
                     'reserved': prod.reserved,
-                    'is_fav': prod.id in all_favs
+                    'is_fav': prod.id in all_favs,
+                    'location': prod.location
                 })
 
             return all_products
@@ -343,7 +349,8 @@ async def get_user_moderation_products_new(tg_id):
                     Product.created_at,
                     Product.category_name,
                     Product.reserved,
-                    Product.tg_id
+                    Product.tg_id,
+                    Product.location
                 )
                 .where(Product.tg_id == tg_id, Product.active == False)
                 .order_by(desc(Product.created_at))
@@ -362,7 +369,8 @@ async def get_user_moderation_products_new(tg_id):
                     'product_image_url': first_image,
                     'created_at': prod.created_at,
                     'category_name': prod.category_name,
-                    'tg_id': prod.tg_id
+                    'tg_id': prod.tg_id,
+                    'location': prod.location
                 })
 
             return all_products

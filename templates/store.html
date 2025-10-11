@@ -6,6 +6,7 @@
     a {
         text-decoration: none;
     }
+    
     .header {
         position: sticky;
         top: 0;
@@ -13,67 +14,125 @@
         background-color: var(--bg-color);
         padding: 12px 16px;
         border-bottom: 1px solid var(--border-color);
+        backdrop-filter: blur(10px);
     }
 
     .search-container {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         margin-bottom: 12px;
+        align-items: center;
+    }
+
+    .search-input-wrapper {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
     }
 
     .search-input {
-        width: 12.5vh;
-        flex: 1;
-        padding: 10px 16px;
-        border-radius: 20px;
+        width: 100%;
+        padding: 12px 16px 12px 44px;
+        border-radius: 25px;
         border: 1px solid var(--border-color);
         background-color: var(--card-bg);
         color: var(--text-color);
         font-size: 14px;
         outline: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px var(--shadow-color);
     }
 
-    .search-input::placeholder {
+    .search-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 12px rgba(63, 136, 248, 0.15);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 16px;
         color: #999;
+        z-index: 2;
     }
 
-    .categories-button {
-        padding: 10px 16px;
-        border-radius: 20px;
-        background-color: var(--primary-color);
+    .filter-button {
+        padding: 12px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
         color: white;
         border: none;
-        font-size: 14px;
         cursor: pointer;
-        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(63, 136, 248, 0.3);
+    }
+
+    .filter-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(63, 136, 248, 0.4);
     }
 
     .wallet-button {
         padding: 10px 16px;
         border-radius: 20px;
-        background-color: var(--primary-color);
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
         color: white;
         border: none;
         font-size: 14px;
         cursor: pointer;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(63, 136, 248, 0.3);
+    }
+
+    .wallet-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(63, 136, 248, 0.4);
     }
 
     .main-content {
         flex: 1;
         padding: 16px;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
         gap: 16px;
     }
 
     .ad-card {
-        background-color: var(--card-bg);
-        border-radius: 8px;
+        background: linear-gradient(145deg, var(--card-bg), var(--secondary-color));
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 2px 4px var(--shadow-color);
+        box-shadow: 
+            0 4px 12px var(--shadow-color),
+            0 1px 3px rgba(0,0,0,0.1);
         cursor: pointer;
-        height: 300px;
+        height: 320px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 1px solid var(--border-color);
+        position: relative;
+        opacity: 0;
+        transform: translateY(30px);
+        animation: cardAppear 0.6s ease forwards;
+    }
+
+    @keyframes cardAppear {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .ad-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 
+            0 8px 25px var(--shadow-color),
+            0 2px 6px rgba(0,0,0,0.1);
     }
 
     .ad-description {
@@ -82,30 +141,51 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         overflow: hidden;
+        margin-top: 4px;
     }
 
     .ad-image {
         width: 100%;
-        height: 200px;
+        height: 180px;
         object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .ad-card:hover .ad-image {
+        transform: scale(1.05);
     }
 
     .ad-details {
-        padding: 12px;
+        padding: 14px;
+        position: relative;
     }
 
     .ad-price {
         font-weight: bold;
-        margin-bottom: 10px;
+        margin-bottom: 6px;
         color: var(--primary-color);
+        font-size: 16px;
     }
 
     .ad-favorite, .ad-favorite-del {
-        float: right;
-        position: relative;
-        top: 20px;
-        z-index: 2;
-        pointer-events: auto;
+        position: absolute;
+        top: -20px;
+        right: 5px; /* Изменили с 20px на 10px */
+        z-index: 3;
+        background: var(--card-bg);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px var(--shadow-color);
+        transition: all 0.3s ease;
+        border: 2px solid var(--primary-color);
+    }
+
+    .ad-favorite:hover, .ad-favorite-del:hover {
+        transform: scale(1.1);
     }
 
     .no-results {
@@ -117,57 +197,250 @@
 
     @media (max-width: 400px) {
         .main-content {
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+        }
+
+        .price-inputs {
+            gap: 8px;
+        }
+        
+        .price-input {
+            padding: 8px 10px;
+            font-size: 13px;
+            max-width: calc(50% - 4px);
+        }
+        
+        .filter-panel {
+            padding: 16px;
+        }
+        
+        .filter-section {
+            margin-bottom: 20px;
         }
     }
-    
-    .categories-panel {
+
+    /* Убедимся, что контейнер фильтров не выходит за пределы */
+    .filter-panel {
         position: fixed;
         bottom: 60px;
         left: 0;
         right: 0;
         background: var(--card-bg);
-        border-radius: 12px 12px 0 0;
-        padding: 16px;
-        box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+        box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
         transform: translateY(100%);
-        transition: transform 0.3s ease;
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         z-index: 1000;
-        max-height: 60vh;
+        max-height: 80vh;
         overflow-y: auto;
+        box-sizing: border-box;
+        width: 100%;
     }
 
-    .categories-panel.show {
+
+    .filter-panel.show {
         transform: translateY(0);
     }
 
-    .categories-header {
+    .filter-panel::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .filter-panel::-webkit-scrollbar-track {
+        background: var(--secondary-color);
+        border-radius: 2px;
+    }
+
+    .filter-panel::-webkit-scrollbar-thumb {
+        background: var(--primary-color);
+        border-radius: 2px;
+    }
+
+    .filter-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
         border-bottom: 1px solid var(--border-color);
     }
 
-    .categories-title {
+    .filter-title {
         font-weight: bold;
-        font-size: 18px;
+        font-size: 20px;
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
-    .close-categories {
+    .close-filter {
         background: none;
         border: none;
-        padding: 4px;
+        padding: 8px;
+        border-radius: 50%;
+        transition: background 0.3s ease;
     }
 
-    .category-item {
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border-color);
+    .close-filter:hover {
+        background: var(--hover-color);
     }
 
-    .category-item:last-child {
-        border-bottom: none;
+    .filter-section {
+        margin-bottom: 24px;
+    }
+
+    .filter-section-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .category-item, .city-item {
+        padding: 12px 16px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        margin-top: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 1px solid var(--border-color);
+    }
+
+    .category-item:hover, .city-item:hover {
+        background: var(--hover-color);
+        transform: translateX(4px);
+    }
+
+    .category-item.active, .city-item.active {
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
+        color: white;
+        border-color: var(--primary-color);
+    }
+
+    .price-range-container {
+        padding: 0 8px;
+        margin-top: 10px;
+    }
+
+    .price-range {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--border-color);
+        outline: none;
+        -webkit-appearance: none;
+    }
+
+    .price-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .price-range::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        cursor: pointer;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .price-inputs {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .price-input {
+        flex: 1;
+        min-width: 0; /* Важно для правильного сжатия */
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text-color);
+        font-size: 14px;
+        box-sizing: border-box;
+        max-width: calc(50% - 6px); /* Учитываем gap */
+    }
+
+
+    .selected-cities {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+        margin-bottom: 12px;
+    }
+
+    .selected-city {
+        background: var(--primary-color);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .remove-city {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 2px;
+    }
+
+    .apply-filters {
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
+        color: white;
+        border: none;
+        padding: 14px 24px;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s ease;
+        margin-top: 20px;
+    }
+
+    .apply-filters:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(63, 136, 248, 0.4);
+    }
+
+    .reset-filters {
+        background: var(--secondary-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        padding: 14px 24px;
+        border-radius: 25px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+    }
+
+    .reset-filters:hover {
+        background: var(--hover-color);
+        transform: translateY(-2px);
     }
 
     .ads-container {
@@ -179,66 +452,66 @@
         position: absolute;
         top: 10px;
         left: 10px;
-        background-color: var(--primary-color);
+        background: linear-gradient(135deg, var(--primary-color), #6aa1ff);
         color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 12px;
+        font-size: 11px;
         font-weight: bold;
         z-index: 10;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 8px rgba(63, 136, 248, 0.3);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
     }
 
     .ad-title {
-        font-size: 18px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.3;
+        height: 2.6em;
+    }
+
+    .ad-location {
+        font-size: 12px;
+        color: #666;
         margin-bottom: 4px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
-    .ad-title {
-        font-size: 18px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 170%;
-        display: block;
-        position: relative;
-        bottom: 0.55vh;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        line-height: 1.2em;
+    .ad-time {
+        font-size: 11px;
+        color: #999;
+        font-weight: 500;
     }
 
-    .ad-title::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 30%;
-        height: 1.2em;
-        background: linear-gradient(90deg, rgba(255,255,255,0), var(--card-bg) 70%);
-        pointer-events: none;
-    }
-
-    /* Стили для группировки категорий */
     .category-group {
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }
 
     .category-group-title {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 0;
-        font-weight: bold;
+        padding: 14px 0;
+        font-weight: 600;
         cursor: pointer;
         border-bottom: 1px solid var(--border-color);
+        transition: color 0.3s ease;
+    }
+
+    .category-group-title:hover {
+        color: var(--primary-color);
     }
 
     .category-group-title svg {
@@ -261,77 +534,55 @@
     }
 
     .subcategory-item {
-        padding: 10px 0;
+        padding: 12px 0;
         border-bottom: 1px solid var(--border-color-light);
         cursor: pointer;
+        transition: all 0.3s ease;
     }
 
     .subcategory-item:hover {
         background-color: var(--hover-color);
+        padding-left: 8px;
     }
 
     .subcategory-item:last-child {
         border-bottom: none;
     }
 
-     .wallet-button {
-        padding: 10px 16px;
-        border-radius: 20px;
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
-        font-size: 14px;
-        cursor: pointer;
-        white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .wallet-button svg {
-        width: 18px;
-        height: 18px;
-    }
-
     .category-indicator {
         text-align: center;
-        padding: 8px 16px;
-        font-size: 14px;
+        padding: 12px 16px;
+        font-size: 15px;
         color: var(--text-secondary-color);
         letter-spacing: 0.5px;
-        text-transform: capitalize;
-        background-color: var(--card-bg);
+        background: linear-gradient(135deg, var(--card-bg), var(--secondary-color));
         border-bottom: 1px solid var(--border-color-light);
-    }
-
-    .category-indicator span {
-        position: relative;
-        padding: 0 10px;
-    }
-
-    .category-indicator span:before,
-    .category-indicator span:after {
-        content: "—";
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        opacity: 0.3;
-    }
-
-    .category-indicator span:before {
-        left: -15px;
-    }
-
-    .category-indicator span:after {
-        right: -15px;
+        font-weight: 500;
     }
 
     .loading-indicator {
         grid-column: 1 / -1;
         text-align: center;
-        padding: 20px;
+        padding: 30px;
         color: #999;
         display: none;
+    }
+
+    .loading-indicator::after {
+        content: '';
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-left: 10px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
 
     .ad-favorite, .ad-favorite-del {
@@ -349,22 +600,19 @@
     .ad-favorite-del svg {
         fill: currentColor;
         stroke: currentColor;
-        animation: pulse 0.5s ease;
+        animation: heartPulse 0.5s ease;
     }
 
-    @keyframes pulse {
-        0% {
-            transform: scale(1);
-            opacity: 1;
-        }
-        50% {
-            transform: scale(1.3);
-            opacity: 0.8;
-        }
-        100% {
-            transform: scale(1);
-            opacity: 1;
-        }
+    @keyframes heartPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
+
+    /* Анимации появления карточек при скролле */
+    .ad-card.visible {
+        opacity: 1;
+        transform: translateY(0);
     }
 </style>
 {% endblock %}
@@ -372,12 +620,24 @@
 {% block content %}
     <header class="header">
         <div class="search-container">
-            <input type="text" class="search-input" id="searchInput" placeholder="Поиск объявлений">
-            <button class="categories-button" id="categoriesButton">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="Поиск товаров...">
+            </div>
+            <button class="filter-button" id="filterButton" title="Фильтры">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
                 </svg>
             </button>
             <a href="/wallet" class="wallet-button" id="walletButton">
@@ -392,10 +652,11 @@
     </div>
     {% endif %}
 
-    <div class="categories-panel" id="categoriesPanel">
-        <div class="categories-header">
-            <div class="categories-title">Категории</div>
-            <button class="close-categories" id="closeCategories">
+    <!-- Панель фильтров -->
+    <div class="filter-panel" id="filterPanel">
+        <div class="filter-header">
+            <div class="filter-title">Фильтры</div>
+            <button class="close-filter" id="closeFilter">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -403,35 +664,96 @@
             </button>
         </div>
         
-        <!-- Группа "Физический товар" -->
-        <div class="category-group" id="physicalGroup">
-            <div class="category-group-title">
-                Физические товары
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
+        <!-- Фильтр по категориям -->
+        <div class="filter-section">
+            <div class="filter-section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 7H4"></path>
+                    <path d="M16 12H8"></path>
+                    <path d="M13 17h-2"></path>
                 </svg>
+                Категории
             </div>
-            <div class="subcategories">
-                {% for cat in cats %}
-                    <div class="subcategory-item">{{ cat }}</div>
+            
+            <!-- Группа "Физический товар" -->
+            <div class="category-group" id="physicalGroup">
+                <div class="category-group-title">
+                    Физические товары
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="subcategories">
+                    {% for cat in cats %}
+                        <div class="category-item" data-category="{{ cat }}">{{ cat }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Группа "Цифровой товар" -->
+            <div class="category-group" id="digitalGroup">
+                <div class="category-group-title">
+                    Цифровые товары
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="subcategories">
+                    {% for dig_cat in dig_cats %}
+                        <div class="category-item" data-category="{{ dig_cat }}">{{ dig_cat }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Фильтр по городам -->
+        <div class="filter-section">
+            <div class="filter-section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                Города (до 5)
+            </div>
+            <div class="selected-cities" id="selectedCities"></div>
+            <input type="text" class="search-input" id="citySearch" placeholder="Поиск города..." style="padding-left: 12px; margin-bottom: 12px;">
+            <div id="citiesList" style="max-height: 200px; overflow-y: auto;">
+                {% for city in cities %}
+                    <div class="city-item" data-city="{{ city }}">{{ city }}</div>
                 {% endfor %}
             </div>
         </div>
-        
-        <!-- Группа "Цифровой товар" -->
-        <div class="category-group" id="digitalGroup">
-            <div class="category-group-title">
-                Цифровые товары
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
+
+        <!-- Фильтр по цене -->
+        <div class="filter-section">
+            <div class="filter-section-title">
+                Цена (TON)
             </div>
-            <div class="subcategories">
-                {% for dig_cat in dig_cats %}
-                    <div class="subcategory-item">{{ dig_cat }}</div>
-                {% endfor %}
+            <div class="price-inputs">
+                <input type="number" 
+                    class="price-input" 
+                    id="priceMin" 
+                    placeholder="От" 
+                    min="0" 
+                    max="9999999"
+                    inputmode="numeric"
+                    pattern="[0-9]*">
+                <input type="number" 
+                    class="price-input" 
+                    id="priceMax" 
+                    placeholder="До" 
+                    min="0" 
+                    max="9999999"
+                    inputmode="numeric"
+                    pattern="[0-9]*">
+            </div>
+            <div class="price-range-container">
+                <input type="range" class="price-range" id="priceRange" min="0" max="100000" step="100" style="width: 100%;">
             </div>
         </div>
+
+        <button class="apply-filters" id="applyFilters">Применить фильтры</button>
+        <button class="reset-filters" id="resetFilters">Сбросить фильтры</button>
     </div>
 
     <main class="main-content" id="mainContent">
@@ -446,371 +768,552 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
-    // Инициализация переменных для пагинации
-    let currentPage = 1;
-    let isLoading = false;
-    let hasMore = true;
-    let currentCategory = "{{ request.path.split('/')[-1] if request.path != '/store' else '' }}";
-    
-    // Функция для загрузки товаров
-    async function loadProducts(page, category = '', searchQuery = '') {
-        console.log(`Loading page ${page}, category: ${category}, search: ${searchQuery}`);
-        
-        if (isLoading || !hasMore) {
-            console.log('Already loading or no more products');
-            return;
-        }
-        
-        isLoading = true;
-        document.getElementById('loadingIndicator').style.display = 'block';
-        
-        try {
-            let url = `/api/products?page=${page}`;
-            if (category) url += `&category=${encodeURIComponent(category)}`;
-            if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
-            
-            console.log('Fetching from:', url);
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
-            const data = await response.json();
-            console.log('Received data:', data);
-            
-            if (data.products.length === 0) {
-                hasMore = false;
-                console.log('No more products available');
-            } else {
-                renderProducts(data.products);
-                currentPage = page;
+        // Инициализация переменных для пагинации и фильтров
+        let currentPage = 1;
+        let isLoading = false;
+        let hasMore = true;
+        let currentCategory = "{{ request.path.split('/')[-1] if request.path != '/store' else '' }}";
+        let currentFilters = {
+            category: '',
+            cities: [],
+            priceMin: null,
+            priceMax: null,
+            search: ''
+        };
+
+        // Инициализация элементов для цены
+        const priceMinInput = document.getElementById('priceMin');
+        const priceMaxInput = document.getElementById('priceMax');
+        const priceRange = document.getElementById('priceRange');
+
+        // Функция для загрузки диапазона цен
+        async function loadPriceRange(filters = {}) {
+            try {
+                let url = `/api/products?page=1&limit=1000`;
+                if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
+                if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
+                if (filters.cities && filters.cities.length > 0) {
+                    url += `&cities=${encodeURIComponent(filters.cities.join(','))}`;
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+                
+                let minPrice = 0;
+                let maxPrice = 100000;
+                
+                if (data.products && data.products.length > 0) {
+                    const prices = data.products.map(p => p.product_price).filter(p => p != null);
+                    if (prices.length > 0) {
+                        minPrice = Math.floor(Math.min(...prices));
+                        maxPrice = Math.ceil(Math.max(...prices));
+                    }
+                }
+                
+                // Обновляем диапазон ползунка
+                priceRange.min = minPrice;
+                priceRange.max = maxPrice;
+                priceRange.value = maxPrice;
+                
+                // Обновляем поля ввода
+                priceMinInput.value = minPrice;
+                priceMaxInput.value = maxPrice;
+                
+            } catch (error) {
+                console.error('Error loading price range:', error);
             }
-        } catch (error) {
-            console.error('Error loading products:', error);
-            // Показываем сообщение об ошибке пользователю
-            document.getElementById('mainContent').innerHTML = `
-                <div class="no-results">
-                    Ошибка загрузки товаров. Пожалуйста, попробуйте позже.
-                </div>
-            `;
-        } finally {
-            isLoading = false;
-            document.getElementById('loadingIndicator').style.display = 'none';
-            console.log('Loading completed');
         }
-    }
 
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        const [datePart, timePart] = dateString.split(' ');
-        const [year, month, day] = datePart.split('-');
-        return `${day}.${month}.${year.slice(2)}`;
-    }
+        // Функция для загрузки товаров с фильтрами
+        async function loadProducts(page, filters = {}) {
+            console.log(`Loading page ${page}, filters:`, filters);
+            
+            if (isLoading || !hasMore) {
+                console.log('Already loading or no more products');
+                return;
+            }
+            
+            isLoading = true;
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            try {
+                let url = `/api/products?page=${page}`;
+                if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
+                if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
+                // Добавляем фильтры по городам и цене
+                if (filters.cities && filters.cities.length > 0) {
+                    url += `&cities=${encodeURIComponent(filters.cities.join(','))}`;
+                }
+                if (filters.priceMin !== null) {
+                    url += `&price_min=${filters.priceMin}`;
+                }
+                if (filters.priceMax !== null) {
+                    url += `&price_max=${filters.priceMax}`;
+                }
+                
+                console.log('Fetching from:', url);
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+                console.log('Received data:', data);
+                
+                if (data.products.length === 0) {
+                    hasMore = false;
+                    console.log('No more products available');
+                } else {
+                    renderProducts(data.products);
+                    currentPage = page;
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="no-results">
+                        Ошибка загрузки товаров. Пожалуйста, попробуйте позже.
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
+                document.getElementById('loadingIndicator').style.display = 'none';
+                console.log('Loading completed');
+            }
+        }
 
-    // Функция для отрисовки товаров
-    function renderProducts(products) {
-        const mainContent = document.getElementById('mainContent');
-        
-        products.forEach(product => {
-            const productHtml = `
-                <div class="ads-container">
-                    <div class="ad-card" data-title="${product["product_name"]}" data-description="${product["product_description"]}" data-id="${product["product_id"]}">
-                        ${product["is_new"] ? '<div class="ad-new-badge">Новое</div>' : ''}
-                        <img src="/${product["product_image_url"]}" class="ad-image">
-                        <div class="ad-details">
-                            <div class="ad-title">${product["product_name"]}</div>
-                            ${product["tg_id"] !== {{ user_tg_id }} && product["is_fav"] === true ? 
-                            `<div class="ad-favorite-del" data-id="${product["product_id"]}">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                </svg>
-                            </div>` : 
-                            product["tg_id"] !== {{ user_tg_id }} && product["is_fav"] === false ? 
-                            `<div class="ad-favorite" data-id="${product["product_id"]}">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                </svg>
-                            </div>` : ''}
-                            <div class="ad-price">${product["product_price"]} TON</div>
-                            <div class="ad-description"><b>${formatDate(product["created_at"])}</b> ${product["created_at"].split(' ')[1]}</div>
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString);
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear().toString().slice(2);
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${day}.${month}.${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function isProductNew(createdAt) {
+            try {
+                const created = new Date(createdAt);
+                const now = new Date();
+                const diffTime = Math.abs(now - created);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays <= 1;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Функция для отрисовки товаров
+        function renderProducts(products) {
+            const mainContent = document.getElementById('mainContent');
+            
+            products.forEach((product, index) => {
+                const isNew = isProductNew(product.created_at);
+                
+                const productHtml = `
+                    <div class="ads-container">
+                        <div class="ad-card" data-title="${product["product_name"]}" data-description="${product["product_description"]}" data-id="${product["product_id"]}" style="animation-delay: ${index * 0.1}s">
+                            ${isNew ? '<div class="ad-new-badge">Новое</div>' : ''}
+                            <img src="/${product["product_image_url"]}" class="ad-image" alt="${product["product_name"]}">
+                            <div class="ad-details">
+                                <div class="ad-title">${product["product_name"]}</div>
+                                ${product.location ? `<div class="ad-location">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                    ${product.location}
+                                </div>` : ''}
+                                <div class="ad-price">${product["product_price"]} TON</div>
+                                <div class="ad-time">${formatDate(product["created_at"])}</div>
+                                ${product["tg_id"] !== {{ user_tg_id }} && product["is_fav"] === true ? 
+                                `<div class="ad-favorite-del" data-id="${product["product_id"]}">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>` : 
+                                product["tg_id"] !== {{ user_tg_id }} && product["is_fav"] === false ? 
+                                `<div class="ad-favorite" data-id="${product["product_id"]}">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                </div>` : ''}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+                
+                mainContent.insertAdjacentHTML('beforeend', productHtml);
+            });
             
-            mainContent.insertAdjacentHTML('beforeend', productHtml);
+            // Активируем наблюдение за видимостью карточек
+            setupIntersectionObserver();
+            setupProductClickHandlers();
+        }
+
+        // Intersection Observer для анимации появления карточек
+        function setupIntersectionObserver() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, {
+                threshold: 0.1,
+                rootMargin: '50px'
+            });
+
+            document.querySelectorAll('.ad-card').forEach(card => {
+                observer.observe(card);
+            });
+        }
+
+        function updateFavoriteIcon(button, isFavorite) {
+            if (isFavorite) {
+                button.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                `;
+                button.classList.remove('ad-favorite');
+                button.classList.add('ad-favorite-del');
+            } else {
+                button.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                `;
+                button.classList.remove('ad-favorite-del');
+                button.classList.add('ad-favorite');
+            }
+        }
+        
+        function setupProductClickHandlers() {
+            document.addEventListener('click', async (e) => {
+                const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+                
+                if (favBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const productId = favBtn.dataset.id;
+                    const isFavorite = favBtn.classList.contains('ad-favorite-del');
+                    const action = isFavorite ? '/del_fav' : '/add_fav';
+                    
+                    try {
+                        const scrollPosition = window.scrollY;
+                        
+                        favBtn.style.transform = 'scale(1.2)';
+                        setTimeout(() => {
+                            favBtn.style.transform = 'scale(1)';
+                        }, 300);
+                        
+                        const response = await fetch(action, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: `fav_id=${productId}`
+                        });
+                        
+                        if (response.ok) {
+                            updateFavoriteIcon(favBtn, !isFavorite);
+                            window.scrollTo(0, scrollPosition);
+                        }
+                    } catch (error) {
+                        console.error('Error updating favorite:', error);
+                    }
+                }
+                
+                const card = e.target.closest('.ad-card');
+                if (card && !e.target.closest('.ad-favorite, .ad-favorite-del')) {
+                    const productId = card.dataset.id;
+                    window.location.href = `/ads/${productId}`;
+                }
+            });
+        }
+
+        // Обработчик скролла для бесконечной подгрузки
+        window.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            
+            if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading && hasMore) {
+                loadProducts(currentPage + 1, currentFilters);
+            }
         });
         
-        // После отрисовки товаров устанавливаем обработчики событий
-        setupProductClickHandlers();
-    }
-
-    function updateFavoriteIcon(button, isFavorite) {
-        if (isFavorite) {
-            button.innerHTML = `
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                </svg>
-            `;
-            button.classList.remove('ad-favorite');
-            button.classList.add('ad-favorite-del');
-        } else {
-            button.innerHTML = `
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                </svg>
-            `;
-            button.classList.remove('ad-favorite-del');
-            button.classList.add('ad-favorite');
-        }
-    }
-    
-    function setupProductClickHandlers() {
-        document.addEventListener('click', async (e) => {
-            const favBtn = e.target.closest('.ad-favorite, .ad-favorite-del');
+        // Обработчик поиска
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+        
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
             
-            if (favBtn) {
-                e.preventDefault();
-                e.stopPropagation();
+            searchTimeout = setTimeout(() => {
+                const searchQuery = this.value.trim();
+                currentFilters.search = searchQuery;
+                currentPage = 1;
+                hasMore = true;
                 
-                const productId = favBtn.dataset.id;
-                const isFavorite = favBtn.classList.contains('ad-favorite-del');
-                const action = isFavorite ? '/del_fav' : '/add_fav';
+                document.getElementById('mainContent').innerHTML = '';
+                document.getElementById('loadingIndicator').style.display = 'block';
                 
-                try {
-                    // Сохраняем позицию скролла
-                    const scrollPosition = window.scrollY;
+                loadProducts(1, currentFilters);
+            }, 500);
+        });
+        
+        // Фильтрация городов
+        const citySearch = document.getElementById('citySearch');
+        citySearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const cityItems = document.querySelectorAll('.city-item');
+            
+            cityItems.forEach(item => {
+                const cityName = item.dataset.city.toLowerCase();
+                if (cityName.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+        
+        // Обработчики для групп категорий
+        document.querySelectorAll('.category-group-title').forEach(title => {
+            title.addEventListener('click', function() {
+                const group = this.parentElement;
+                group.classList.toggle('active');
+            });
+        });
+        
+        // Обработчики выбора категорий
+        document.querySelectorAll('.category-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const category = this.dataset.category;
+                const isActive = this.classList.contains('active');
+                
+                // Снимаем выделение со всех категорий
+                document.querySelectorAll('.category-item').forEach(i => {
+                    i.classList.remove('active');
+                });
+                
+                // Если категория была неактивна - выделяем её, если активна - снимаем выделение
+                if (!isActive) {
+                    this.classList.add('active');
+                    currentFilters.category = category;
+                } else {
+                    currentFilters.category = '';
+                }
+            });
+        });
+        
+        // Обработчики выбора городов
+        const selectedCities = [];
+        const selectedCitiesContainer = document.getElementById('selectedCities');
+        
+        function updateSelectedCities() {
+            selectedCitiesContainer.innerHTML = '';
+            selectedCities.forEach(city => {
+                const cityElement = document.createElement('div');
+                cityElement.className = 'selected-city';
+                cityElement.innerHTML = `
+                    ${city}
+                    <button class="remove-city" data-city="${city}">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                `;
+                selectedCitiesContainer.appendChild(cityElement);
+            });
+            
+            // Обновляем фильтр
+            currentFilters.cities = [...selectedCities];
+        }
+        
+        document.querySelectorAll('.city-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const city = this.dataset.city;
+                
+                if (selectedCities.length >= 5 && !selectedCities.includes(city)) {
+                    showNotification('Можно выбрать не более 5 городов', 'info');
+                    return;
+                }
+                
+                if (selectedCities.includes(city)) {
+                    // Удаляем город если уже выбран
+                    const index = selectedCities.indexOf(city);
+                    selectedCities.splice(index, 1);
+                    this.classList.remove('active');
+                } else {
+                    // Добавляем город
+                    selectedCities.push(city);
+                    this.classList.add('active');
+                }
+                
+                updateSelectedCities();
+            });
+        });
+        
+        // Обработчик удаления выбранного города
+        selectedCitiesContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-city');
+            if (removeBtn) {
+                const city = removeBtn.dataset.city;
+                const index = selectedCities.indexOf(city);
+                if (index > -1) {
+                    selectedCities.splice(index, 1);
+                    updateSelectedCities();
                     
-                    // Показываем анимацию
-                    favBtn.style.transform = 'scale(1.2)';
-                    setTimeout(() => {
-                        favBtn.style.transform = 'scale(1)';
-                    }, 300);
-                    
-                    const response = await fetch(action, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `fav_id=${productId}`
+                    // Снимаем выделение с города в списке
+                    document.querySelectorAll('.city-item').forEach(item => {
+                        if (item.dataset.city === city) {
+                            item.classList.remove('active');
+                        }
                     });
-                    
-                    if (response.ok) {
-                        // Обновляем иконку без перезагрузки страницы
-                        updateFavoriteIcon(favBtn, !isFavorite);
-                        
-                        // Восстанавливаем позицию скролла
-                        window.scrollTo(0, scrollPosition);
-                    }
-                } catch (error) {
-                    console.error('Error updating favorite:', error);
                 }
             }
-            
-            // Обработка клика по карточке (но игнорируем клики по звезде)
-            const card = e.target.closest('.ad-card');
-            if (card && !e.target.closest('.ad-favorite, .ad-favorite-del')) {
-                const productId = card.dataset.id;
-                window.location.href = `/ads/${productId}`;
-            }
         });
-    }
 
-    // Обработчик скролла для бесконечной подгрузки
-    window.addEventListener('scroll', () => {
-        const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-        
-        if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading && hasMore) {
-            loadProducts(currentPage + 1, currentCategory);
+        // Функции для работы с ценой
+        function syncPriceInputs() {
+            const min = parseInt(priceMinInput.value) || 0;
+            const max = parseInt(priceMaxInput.value) || parseInt(priceRange.max);
+            
+            // Обновляем диапазон ползунка
+            priceRange.min = min;
+            priceRange.max = max;
+            
+            currentFilters.priceMin = min;
+            currentFilters.priceMax = max;
         }
-    });
-    
-    // Обработчик поиска
-    const searchInput = document.getElementById('searchInput');
-    let searchTimeout;
-    
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
+
+        // Обработчики для полей цены
+        priceMinInput.addEventListener('change', syncPriceInputs);
+        priceMaxInput.addEventListener('change', syncPriceInputs);
         
-        searchTimeout = setTimeout(() => {
-            const searchQuery = this.value.trim();
+        priceMinInput.addEventListener('input', function() {
+            const min = parseInt(this.value) || 0;
+            const max = parseInt(priceMaxInput.value) || parseInt(priceRange.max);
+            
+            if (min > max) {
+                this.value = max;
+                return;
+            }
+            
+            currentFilters.priceMin = min;
+        });
+        
+        priceMaxInput.addEventListener('input', function() {
+            const min = parseInt(priceMinInput.value) || 0;
+            const max = parseInt(this.value) || parseInt(priceRange.max);
+            
+            if (max < min) {
+                this.value = min;
+                return;
+            }
+            
+            currentFilters.priceMax = max;
+            priceRange.value = max;
+        });
+        
+        priceRange.addEventListener('input', function() {
+            const max = parseInt(this.value);
+            priceMaxInput.value = max;
+            currentFilters.priceMax = max;
+        });
+        
+        // Обработчик применения фильтров
+        document.getElementById('applyFilters').addEventListener('click', async function() {
+            // Закрываем панель фильтров
+            document.getElementById('filterPanel').classList.remove('show');
+            
+            // Обновляем фильтры
+            currentFilters.priceMin = parseInt(priceMinInput.value) || null;
+            currentFilters.priceMax = parseInt(priceMaxInput.value) || null;
+            
+            // Сбрасываем пагинацию
             currentPage = 1;
             hasMore = true;
             
-            const mainContent = document.getElementById('mainContent');
-            mainContent.innerHTML = '';
+            // Очищаем контент и загружаем с новыми фильтрами
+            document.getElementById('mainContent').innerHTML = '';
+            document.getElementById('loadingIndicator').style.display = 'block';
             
-            loadProducts(1, currentCategory, searchQuery);
-        }, 500);
-    });
-    
-    // Загружаем первую страницу товаров
-    loadProducts(1, currentCategory);
-    
-    // Функция для форматирования баланса
-    function formatBalance(balance) {
-        if (balance === 0.0) {
-            return `0 TON`;
-        }
-        
-        // Округляем до 2 знаков, убираем лишние нули
-        const formatted = parseFloat(balance.toFixed(2));
-        return `${formatted} TON`;
-    }
-
-    // Функция для обновления отображения баланса
-    async function updateWalletBalance() {
-        try {
-            const response = await fetch('/get_wallet_balance');
-            if (!response.ok) throw new Error('Failed to fetch balance');
-            
-            const data = await response.json();
-            const walletBalance = document.getElementById('walletBalance');
-            
-            if (data.status === 'success') {
-                walletBalance.textContent = formatBalance(data.ton_balance);
-            }
-        } catch (error) {
-            console.error('Error updating wallet balance:', error);
-        }
-    }
-
-    // Обновляем баланс при загрузке
-    await updateWalletBalance();
-    
-    // Обновляем баланс при возвращении на страницу
-    window.addEventListener('focus', updateWalletBalance);
-});
-</script>
-<script src="https://unpkg.com/@tonconnect/ui@2.0.1/dist/tonconnect-ui.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Инициализация TonConnectUI
-        const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: 'https://gist.githubusercontent.com/Warder222/9c67c2e96851c412c58cca16923cf778/raw/a540ad5d6dbd714ce05e8c628cfd47fe22c10803/tonconnect-manifest.json',
-            buttonRootId: 'ton-connect',
-            language: 'ru',
-            uiPreferences: {
-                theme: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches 
-                    ? TON_CONNECT_UI.THEME.DARK 
-                    : TON_CONNECT_UI.THEME.LIGHT
-            }
+            await loadProducts(1, currentFilters);
         });
-
-        tonConnectUI.uiOptions = {
-            twaReturnUrl: 'https://t.me/test_tma8_bot?startapp',
-            actionsConfiguration: {
-                modals: 'never'
-            }
-        };
-
-        // Отслеживание изменения темы
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-            tonConnectUI.uiPreferences = {
-                theme: e.matches ? TON_CONNECT_UI.THEME.DARK : TON_CONNECT_UI.THEME.LIGHT
+        
+        // Обработчик сброса фильтров
+        document.getElementById('resetFilters').addEventListener('click', function() {
+            // Сбрасываем все фильтры
+            currentFilters = {
+                category: '',
+                cities: [],
+                priceMin: null,
+                priceMax: null,
+                search: ''
             };
-        });
-
-        // Обработчик для кнопки TonConnect
-        document.getElementById('ton-connect').addEventListener('click', async (e) => {
-            if (e.target.tagName === 'BUTTON') {
-                try {
-                    // Проверяем, подключен ли уже кошелек
-                    const connectedWallets = await tonConnectUI.getConnectedWallets();
-                    if (connectedWallets.length > 0) {
-                        // Кошелек уже подключен - ничего не делаем
-                        console.log('Кошелек уже подключен:', connectedWallets[0]);
-                        return;
-                    }
-                    
-                    // Если кошелек не подключен - открываем модальное окно подключения
-                    const connectedWallet = await tonConnectUI.connectWallet();
-                    console.log(connectedWallet);
-                } catch (error) {
-                    console.log(`Error connecting to wallet: ${error}`);
-                }
-            }
-        });
-
-        // Сохраняем состояние подключения в localStorage
-        tonConnectUI.connectionStateChange((state) => {
-            if (state) {
-                localStorage.setItem('tonWalletConnected', 'true');
-            } else {
-                localStorage.removeItem('tonWalletConnected');
-            }
-        });
-
-        // Проверяем состояние подключения при загрузке
-        (async () => {
-            const connectedWallets = await tonConnectUI.getConnectedWallets();
-            if (connectedWallets.length > 0) {
-                localStorage.setItem('tonWalletConnected', 'true');
-            }
-        })();
-    });
-</script>
-<script src="/static/js/price_conv.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const searchInput = document.querySelector('.search-input');
-        const allAds = Array.from(document.querySelectorAll('.ad-card'));
-        const panel = document.getElementById('categoriesPanel');
-        const catBtn = document.getElementById('categoriesButton');
-        const closeBtn = document.getElementById('closeCategories');
-        
-        catBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            panel.classList.toggle('show');
-        });
-        
-        catBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            panel.classList.toggle('show');
-        });
-
-        closeBtn.addEventListener('click', () => {
-            panel.classList.remove('show');
-        });
-
-        // Обработчики для раскрывающихся категорий
-        document.querySelectorAll('.category-group-title').forEach(title => {
-            title.addEventListener('click', function() {
-                this.classList.toggle('active');
-                this.parentElement.classList.toggle('active');
-            });
-        });
-
-        // Обработчик клика по подкатегории
-        document.querySelectorAll('.subcategory-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const loader = document.createElement('div');
-                loader.className = 'page-loader';
-                loader.innerHTML = 'Загрузка...';
-                document.body.appendChild(loader);
-                
-                window.location.href = `/store/${encodeURIComponent(this.textContent.trim())}`;
-            });
-        });
-        
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.trim().toLowerCase();
             
-            allAds.forEach(ad => {
-                const title = ad.dataset.title.toLowerCase();
-                ad.style.display = title.includes(searchTerm) ? '' : 'none';
+            // Сбрасываем UI
+            document.querySelectorAll('.category-item').forEach(item => {
+                item.classList.remove('active');
             });
-        });
-
-        document.querySelectorAll('.ad-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                const isFavoriteClick = e.target.closest('.ad-favorite, .ad-favorite-del');
-                
-                if (!isFavoriteClick) {
-                    const adId = card.dataset.id;
-                    window.location.href = `/ads/${adId}`;
-                }
+            
+            selectedCities.length = 0;
+            updateSelectedCities();
+            
+            document.querySelectorAll('.city-item').forEach(item => {
+                item.classList.remove('active');
             });
+            
+            // Сбрасываем поля цены
+            priceMinInput.value = '';
+            priceMaxInput.value = '';
+            priceRange.value = priceRange.max;
+            
+            // Сбрасываем пагинацию
+            currentPage = 1;
+            hasMore = true;
+            
+            // Очищаем контент и загружаем без фильтров
+            document.getElementById('mainContent').innerHTML = '';
+            document.getElementById('loadingIndicator').style.display = 'block';
+            
+            loadProducts(1, currentFilters);
         });
+        
+        // Обработчики открытия/закрытия панели фильтров
+        document.getElementById('filterButton').addEventListener('click', function() {
+            document.getElementById('filterPanel').classList.add('show');
+        });
+        
+        document.getElementById('closeFilter').addEventListener('click', function() {
+            document.getElementById('filterPanel').classList.remove('show');
+        });
+        
+        // Закрытие панели фильтров при клике вне её
+        document.addEventListener('click', function(e) {
+            const filterPanel = document.getElementById('filterPanel');
+            const filterButton = document.getElementById('filterButton');
+            
+            if (filterPanel.classList.contains('show') && 
+                !filterPanel.contains(e.target) && 
+                !filterButton.contains(e.target)) {
+                filterPanel.classList.remove('show');
+            }
+        });
+        
+        // Загружаем начальные данные
+        await loadPriceRange();
+        await loadProducts(1, currentFilters);
     });
 </script>
 {% endblock %}

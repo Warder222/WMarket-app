@@ -30,7 +30,8 @@ async def favs(request: Request, session_token=Cookie(default=None)):
                          'product_image_url': prod["product_image_url"],
                          'created_at': prod["created_at"],
                          'tg_id': prod["tg_id"],
-                         'is_fav': prod["is_fav"]} for prod in all_products if prod["product_id"] in all_favs]
+                         'is_fav': prod["is_fav"],
+                         'location': prod["location"]} for prod in all_products if prod["product_id"] in all_favs]
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False

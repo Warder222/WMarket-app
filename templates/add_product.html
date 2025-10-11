@@ -18,6 +18,7 @@
 
     .form-group {
         margin-bottom: 15px;
+        position: relative;
     }
 
     .form-label {
@@ -113,7 +114,6 @@
         font-weight: 600;
     }
 
-    /* Новые стили для галереи изображений как в ads.html */
     .image-gallery {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -214,7 +214,57 @@
         display: none;
     }
 
-    /* Стили для отображения цены в рублях */
+    /* Стили для выбора города */
+    .location-input-container {
+        position: relative;
+    }
+
+    .cities-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 4px 12px var(--shadow-color);
+    }
+
+    .cities-dropdown.active {
+        display: block;
+    }
+
+    .city-option {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+        transition: background-color 0.2s;
+    }
+
+    .city-option:hover {
+        background-color: var(--hover-color);
+    }
+
+    .city-option:last-child {
+        border-bottom: none;
+    }
+
+    .city-option.highlighted {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .location-hint {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 5px;
+    }
+
     .rub-price {
         margin-top: 5px;
         font-size: 14px;
@@ -240,6 +290,10 @@
         .image-upload-label {
             padding: 16px;
             margin-bottom: 16px;
+        }
+
+        .cities-dropdown {
+            max-height: 150px;
         }
     }
 </style>
@@ -273,6 +327,15 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label" for="location">Город</label>
+                <div class="location-input-container">
+                    <input class="form-input" type="text" id="location" name="location" placeholder="Начните вводить название города..." autocomplete="off">
+                    <div id="citiesDropdown" class="cities-dropdown"></div>
+                </div>
+                <div class="location-hint">Выберите город из списка или введите название</div>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label" for="product_description">Описание</label>
                 <textarea class="form-textarea" id="product_description" name="product_description" required></textarea>
             </div>
@@ -286,10 +349,7 @@
                     <input type="file" id="product_images" name="product_images" accept="image/*" multiple class="file-input">
                     <div class="images-counter" id="images-counter">Осталось: <span class="remaining">10</span></div>
                     
-                    <!-- Новая галерея изображений как в ads.html -->
-                    <div id="imageGallery" class="image-gallery">
-                        <!-- Контейнер для фотографий будет заполняться динамически -->
-                    </div>
+                    <div id="imageGallery" class="image-gallery"></div>
                 </div>
             </div>
 
@@ -308,9 +368,131 @@
         const priceInput = document.getElementById('product_price');
         const rubPriceDisplay = document.getElementById('rubPriceDisplay');
         const rubPriceValue = rubPriceDisplay.querySelector('.value');
+        const locationInput = document.getElementById('location');
+        const citiesDropdown = document.getElementById('citiesDropdown');
         const maxImages = 10;
         let uploadedImages = [];
         let currentTonRate = null;
+        let allCities = []; // Будет загружено с сервера
+        let filteredCities = [];
+        let selectedCityIndex = -1;
+
+        // Загружаем список городов с сервера
+        async function loadCities() {
+            try {
+                const response = await fetch('/api/get_cities');
+                const data = await response.json();
+                if (data.cities) {
+                    allCities = data.cities;
+                }
+            } catch (error) {
+                console.error('Ошибка при загрузке городов:', error);
+            }
+        }
+
+        // Функция для фильтрации городов
+        function filterCities(searchTerm) {
+            if (!searchTerm) {
+                return allCities.slice(0, 10); // Показываем первые 10 городов
+            }
+            
+            const term = searchTerm.toLowerCase();
+            return allCities.filter(city => 
+                city.toLowerCase().includes(term)
+            ).slice(0, 10); // Ограничиваем 10 результатами
+        }
+
+        // Функция для отображения выпадающего списка
+        function showCitiesDropdown(cities) {
+            citiesDropdown.innerHTML = '';
+            
+            if (cities.length === 0) {
+                citiesDropdown.classList.remove('active');
+                return;
+            }
+            
+            cities.forEach((city, index) => {
+                const option = document.createElement('div');
+                option.className = 'city-option';
+                option.textContent = city;
+                option.dataset.value = city;
+                
+                if (index === selectedCityIndex) {
+                    option.classList.add('highlighted');
+                }
+                
+                option.addEventListener('click', function() {
+                    locationInput.value = this.dataset.value;
+                    citiesDropdown.classList.remove('active');
+                    selectedCityIndex = -1;
+                });
+                
+                citiesDropdown.appendChild(option);
+            });
+            
+            citiesDropdown.classList.add('active');
+        }
+
+        // Обработчики для поля ввода города
+        locationInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            filteredCities = filterCities(searchTerm);
+            selectedCityIndex = -1;
+            showCitiesDropdown(filteredCities);
+        });
+
+        locationInput.addEventListener('focus', function() {
+            if (this.value.trim() === '') {
+                filteredCities = filterCities('');
+                showCitiesDropdown(filteredCities);
+            }
+        });
+
+        // Закрытие выпадающего списка при клике вне его
+        document.addEventListener('click', function(e) {
+            if (!locationInput.contains(e.target) && !citiesDropdown.contains(e.target)) {
+                citiesDropdown.classList.remove('active');
+                selectedCityIndex = -1;
+            }
+        });
+
+        // Навигация по выпадающему списку с клавиатуры
+        locationInput.addEventListener('keydown', function(e) {
+            if (!citiesDropdown.classList.contains('active')) return;
+
+            const options = citiesDropdown.querySelectorAll('.city-option');
+            
+            switch(e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectedCityIndex = Math.min(selectedCityIndex + 1, options.length - 1);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectedCityIndex = Math.max(selectedCityIndex - 1, -1);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (selectedCityIndex >= 0 && options[selectedCityIndex]) {
+                        locationInput.value = options[selectedCityIndex].dataset.value;
+                        citiesDropdown.classList.remove('active');
+                        selectedCityIndex = -1;
+                    }
+                    break;
+                case 'Escape':
+                    citiesDropdown.classList.remove('active');
+                    selectedCityIndex = -1;
+                    break;
+            }
+
+            // Обновляем подсветку
+            options.forEach((option, index) => {
+                option.classList.toggle('highlighted', index === selectedCityIndex);
+            });
+        });
+
+        // Загружаем города при инициализации
+        loadCities();
 
         // Функция для получения курса TON/RUB
         async function getTonToRubRate() {
@@ -650,10 +832,17 @@
             const productName = document.getElementById('product_name').value.trim();
             const productDescription = document.getElementById('product_description').value.trim();
             const priceValue = priceInput.value.trim();
+            const locationValue = locationInput.value.trim();
             
             if (!productName) {
                 showNotification('Пожалуйста, укажите название товара', 'error');
                 document.getElementById('product_name').focus();
+                return;
+            }
+
+            if (locationValue && !allCities.includes(locationValue)) {
+                showNotification('Пожалуйста, выберите город из списка', 'error');
+                locationInput.focus();
                 return;
             }
             

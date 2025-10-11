@@ -1024,7 +1024,7 @@
                 <div class="item-header">
                     <div>
                         <span class="item-id">Объявление #{{ product['product_id'] }}</span>
-                        <span>от пользователя <a href="/profile/{{ product['tg_id'] }}" class="user-link">{{ product['first_name'] }}</a> ({{ product["product_name"] }})</span>
+                        <span>от пользователя <a href="/profile/{{ product['tg_id'] }}" class="user-link">{{ product['first_name'] }}</a><br>{{ product["product_name"] }}</span>
                     </div>
                     <div class="item-time">{{ product['created_at'].strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
@@ -1056,6 +1056,7 @@
                     <div class="product-title">{{ product['product_title'] }}</div>
                     <div class="product-price">{{ product['product_price'] }} TON</div>
                     <div class="product-category">Категория: {{ product['category_name'] }}</div>
+                    <div class="product-category">Город: {{ product['location'] }}</div>
                     <div class="product-description">{{ product['product_description'] }}</div>
                 </div>
                 

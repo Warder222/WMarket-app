@@ -77,7 +77,8 @@ async def admin_chat_reports(
                                                 'created_at': prod.created_at,
                                                 'category_name': prod.category_name,
                                                 'tg_id': prod.tg_id,
-                                                'first_name': seller_info["first_name"]})
+                                                'first_name': seller_info["first_name"],
+                                                'location': prod.location})
             except Exception as exc:
                 print(f"Error: {exc}")
         print()

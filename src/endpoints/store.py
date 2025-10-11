@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
 
+from src.config import settings
 from src.database.methods import (all_count_unread_messages, get_all_digit_categories, get_all_not_digit_categories,
                                   get_all_products_from_category_new, get_all_products_new, get_all_users,
                                   get_user_active_deals_count)
@@ -29,6 +30,7 @@ async def store(request: Request, session_token=Cookie(default=None)):
             if admin_role:
                 admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+            cities = settings.RUSSIAN_CITIES
             context = {
                 "request": request,
                 "cats": cats,
@@ -38,7 +40,8 @@ async def store(request: Request, session_token=Cookie(default=None)):
                 "all_undread_count_message": all_undread_count_message,
                 "user_tg_id": payload.get("tg_id"),
                 "admin": admin_res,
-                "active_deals_count": active_deals_count
+                "active_deals_count": active_deals_count,
+                "cities": cities
             }
             return templates.TemplateResponse("store.html", context=context)
 
@@ -64,6 +67,7 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
             if admin_role:
                 admin_res = True
             active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+            cities = settings.RUSSIAN_CITIES
             context = {
                 "request": request,
                 "cats": cats,
@@ -73,7 +77,8 @@ async def store_get(category_name: str, request: Request, session_token=Cookie(d
                 "user_tg_id": payload.get("tg_id"),
                 "all_undread_count_message": all_undread_count_message,
                 "admin": admin_res,
-                "active_deals_count": active_deals_count
+                "active_deals_count": active_deals_count,
+                "cities": cities
             }
             return templates.TemplateResponse("store.html", context=context)
 

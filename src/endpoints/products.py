@@ -103,6 +103,7 @@ async def add_product(request: Request, session_token=Cookie(default=None)):
     return response
 
 
+# products.py - обновляем endpoint добавления товара
 @wmarket_router.post("/add_product")
 async def add_product_post(
         request: Request,
@@ -111,6 +112,7 @@ async def add_product_post(
         product_name: str = Form(),
         product_price: float = Form(),
         product_description: str = Form(),
+        location: str = Form(None),  # Новый параметр
         product_images: List[UploadFile] = File(...)
 ):
     if session_token:
@@ -120,6 +122,10 @@ async def add_product_post(
         if (payload.get("tg_id") in users
                 and datetime.fromtimestamp(payload.get("exp"), timezone.utc) > datetime.now(timezone.utc)):
             try:
+                # Проверяем валидность города
+                if location and location not in settings.RUSSIAN_CITIES:
+                    raise HTTPException(status_code=400, detail="Указан невалидный город")
+
                 image_urls = []
 
                 if len(product_images) > 10:
@@ -144,7 +150,8 @@ async def add_product_post(
                     "product_name": product_name,
                     "product_price": product_price,
                     "product_description": product_description,
-                    "product_image_url": json.dumps(image_urls)
+                    "product_image_url": json.dumps(image_urls),
+                    "location": location  # Сохраняем местоположение
                 }
 
                 async with async_session_maker() as db:
@@ -155,7 +162,8 @@ async def add_product_post(
                             product_name=product_data.get("product_name"),
                             product_price=product_data.get("product_price"),
                             product_description=product_data.get("product_description"),
-                            product_image_url=product_data.get("product_image_url")
+                            product_image_url=product_data.get("product_image_url"),
+                            location=product_data.get("location")  # Добавляем местоположение
                         )
                         db.add(product)
                         await db.commit()
@@ -167,6 +175,7 @@ async def add_product_post(
                     "✅ Ваше объявление отправлено на проверку\n\n"
                     f"📌 Название: {product_name}\n"
                     f"⚙️ Категория: {category}\n"
+                    f"📍 Город: {location if location else 'Не указан'}\n"
                     f"💰 Цена: {product_price} ₽\n"
                     f"📸 Фотографий: {len(image_urls)}\n\n"
                     "Обычно проверка занимает до 24 часов."
@@ -278,6 +287,7 @@ async def edit_product_post(
         price: int = Form(),
         category: str = Form(),
         description: str = Form(),
+        location: str = Form(None),  # ДОБАВЛЯЕМ ПАРАМЕТР location
         current_images: str = Form(),
         product_images: List[UploadFile] = File(None)
 ):
@@ -292,6 +302,10 @@ async def edit_product_post(
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
     try:
+        # ПРОВЕРЯЕМ ВАЛИДНОСТЬ ГОРОДА
+        if location and location not in settings.RUSSIAN_CITIES:
+            raise HTTPException(status_code=400, detail="Указан невалидный город")
+
         print(f"Raw current_images: {current_images}")
 
         existing_images = []
@@ -342,12 +356,14 @@ async def edit_product_post(
         if not all_images:
             raise HTTPException(status_code=400, detail="Должна быть хотя бы одна фотография")
 
+        # ОБНОВЛЯЕМ ДАННЫЕ, ВКЛЮЧАЯ location
         update_data = {
             "product_name": title,
             "product_price": price,
             "category_name": category,
             "product_description": description,
             "product_image_url": json.dumps(all_images),
+            "location": location,  # ДОБАВЛЯЕМ location
             "active": False
         }
 

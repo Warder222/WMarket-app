@@ -48,6 +48,7 @@ class Product(Base):
     product_price = Column(Float)
     product_description = Column(String)
     product_image_url = Column(String)
+    location = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     active = Column(Boolean, default=False)
     reserved = Column(Boolean, default=False)
