@@ -5,8 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WMarket</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/js/init_tg_theme.js"></script>
-    <style>
+    
+    <!-- Критический скрипт для немедленного применения темы Telegram -->
+    <script>
+        // ПРИМЕНЯЕМ ТЕМУ TELEGRAM СРАЗУ ЖЕ, ДО ЗАГРУЗКИ CSS
+        (function() {
+            // Функция для применения темы
+            function applyTelegramTheme() {
+                if (window.Telegram && Telegram.WebApp) {
+                    const isDark = Telegram.WebApp.colorScheme === 'dark';
+                    
+                    if (isDark) {
+                        document.documentElement.classList.add('dark-theme');
+                        document.body.classList.add('dark-theme');
+                    } else {
+                        document.documentElement.classList.remove('dark-theme');
+                        document.body.classList.remove('dark-theme');
+                    }
+                }
+                
+                // Всегда отмечаем что тема применена
+                document.documentElement.classList.add('theme-applied');
+                document.body.classList.add('theme-applied');
+            }
+            
+            // Пытаемся применить тему сразу
+            applyTelegramTheme();
+            
+            // Если Telegram WebApp еще не загружен, ждем его
+            if (!window.Telegram) {
+                window.addEventListener('telegram-ready', applyTelegramTheme);
+            }
+        })();
+    </script>
+    
+    <!-- Критический CSS для предотвращения флэшки -->
+    <style id="critical-css">
         /* Сброс стандартных стилей и базовые настройки */
         button, a {
             -webkit-tap-highlight-color: transparent;
@@ -19,7 +53,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
         }
 
-        /* Цветовые переменные для светлой темы */
+        /* Цветовые переменные для светлой темы по умолчанию */
         :root {
             --bg-color: #ffffff;
             --text-color: #333333;
@@ -32,6 +66,7 @@
         }
 
         /* Цветовые переменные для темной темы */
+        :root.dark-theme, 
         .dark-theme {
             --bg-color: #121212;
             --text-color: #e0e0e0;
@@ -43,7 +78,7 @@
             --hover-color: #2a2a2a;
         }
 
-        /* Основные стили body */
+        /* Основные стили body - применяются немедленно */
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
@@ -55,6 +90,21 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
+        /* Скрываем контент до инициализации темы */
+        body:not(.theme-applied) {
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        body.theme-applied {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity 0.1s ease;
+        }
+    </style>
+    
+    <!-- Остальные стили -->
+    <style>
         /* Стили для индикатора обновления (pull-to-refresh) */
         .ptr-element {
             position: fixed;
@@ -229,6 +279,7 @@
     <!-- Нижняя навигация (не отображается на странице чатов, кроме админа) -->
     {% if not is_chat_page or admin %}
     <nav class="bottom-nav">
+        <!-- Навигационные элементы остаются без изменений -->
         <a href="{{ url_for('store') }}" class="nav-item">
             <span class="nav-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -297,11 +348,44 @@
         </a>
     </nav>
     {% endif %}
+    
     <script src="/static/js/notification.js"></script>
+    
+    <!-- Дополнительная инициализация после загрузки -->
     <script>
-    // Сохранение позиции прокрутки перед обновлением страницы
+        // Убеждаемся что тема применена после полной загрузки
+        document.addEventListener('DOMContentLoaded', function() {
+            // Если тема еще не применена, применяем светлую по умолчанию
+            if (!document.body.classList.contains('theme-applied')) {
+                document.body.classList.add('theme-applied');
+                document.documentElement.classList.add('theme-applied');
+            }
+        });
+
+        // На случай если Telegram WebApp загрузился позже
+        window.addEventListener('load', function() {
+            if (window.Telegram && Telegram.WebApp) {
+                const isDark = Telegram.WebApp.colorScheme === 'dark';
+                
+                if (isDark) {
+                    document.documentElement.classList.add('dark-theme');
+                    document.body.classList.add('dark-theme');
+                } else {
+                    document.documentElement.classList.remove('dark-theme');
+                    document.body.classList.remove('dark-theme');
+                }
+            }
+            
+            // Всегда показываем контент после загрузки
+            document.body.classList.add('theme-applied');
+            document.documentElement.classList.add('theme-applied');
+        });
+    </script>
+    
+    <!-- Остальные скрипты -->
+    <script>
+        // Сохранение позиции прокрутки перед обновлением страницы
         window.addEventListener('beforeunload', function() {
-            // Сохраняем позицию только если это список объявлений или магазин
             const path = window.location.pathname;
             if (path === '/' || path === '/product_review' || path === '/favs' || path === '/deals') {
                 sessionStorage.setItem('scrollPosition', window.scrollY);
@@ -311,19 +395,16 @@
         // Восстановление позиции прокрутки после загрузки страницы
         document.addEventListener('DOMContentLoaded', function() {
             const savedPosition = sessionStorage.getItem('scrollPosition');
-            
-            // Восстанавливаем позицию ТОЛЬКО если мы на той же странице (например, после refresh)
             const path = window.location.pathname;
             if ((path === '/' || path === '/product_review' || path === '/favs' || path === '/deals') && savedPosition) {
-                // Задержка, чтобы контент успел загрузиться
                 setTimeout(() => {
                     window.scrollTo(0, parseInt(savedPosition));
                     sessionStorage.removeItem('scrollPosition');
                 }, 50);
             }
-            // ⚠️ На страницах вроде /ads/123 — НЕ восстанавливаем
         });
     </script>
+    
     <script>
         async function checkUserBlock() {
             try {
@@ -331,14 +412,12 @@
                 const data = await response.json();
                 
                 if (data.is_blocked) {
-                    // Сохраняем дату разблокировки в localStorage
                     if (data.unblock_at) {
                         localStorage.setItem('unblockDate', data.unblock_at);
                     } else {
                         localStorage.removeItem('unblockDate');
                     }
                     
-                    // Перенаправляем на страницу блокировки
                     if (!window.location.pathname.endsWith('/blocked')) {
                         window.location.href = '/blocked';
                     }
@@ -360,7 +439,6 @@
             let loaderTimeout;
             let pageLoaded = false;
             
-            // Функция для показа лоадера
             function showLoader() {
                 if (!pageLoaded) {
                     globalLoader.classList.add('visible');
@@ -370,7 +448,6 @@
                 }
             }
             
-            // Функция для скрытия лоадера
             function hideLoader() {
                 pageLoaded = true;
                 globalLoader.classList.remove('active');
@@ -379,35 +456,29 @@
                 }, 300);
             }
             
-            // Устанавливаем таймер на 2 секунды для показа лоадера
             loaderTimeout = setTimeout(showLoader, 2000);
             
-            // Если страница загрузилась раньше 2 секунд - отменяем показ лоадера
             window.addEventListener('load', function() {
                 clearTimeout(loaderTimeout);
                 hideLoader();
             });
             
-            // На случай, если страница загрузится очень быстро (до DOMContentLoaded)
             if (document.readyState === 'complete') {
                 clearTimeout(loaderTimeout);
                 hideLoader();
             }
 
-            // Инициализация Telegram WebApp
             if (window.Telegram && Telegram.WebApp) {
                 Telegram.WebApp.enableClosingConfirmation();
                 Telegram.WebApp.expand();
             }
 
-            // Система навигации между страницами
             const navItems = document.querySelectorAll('.bottom-nav .nav-item');
             const transitionOverlay = document.createElement('div');
             transitionOverlay.className = 'page-transition';
             transitionOverlay.innerHTML = '<div class="loader">W</div>';
             document.body.appendChild(transitionOverlay);
 
-            // Обработчик кликов по пунктам навигации
             navItems.forEach(item => {
                 item.addEventListener('click', function(e) {
                     const href = this.getAttribute('href');
@@ -424,7 +495,6 @@
                 });
             });
 
-            // Установка активного пункта меню
             function setActiveNavItem() {
                 const currentPath = window.location.pathname;
                 navItems.forEach(item => {
@@ -438,7 +508,6 @@
             
             setActiveNavItem();
 
-            // Предзагрузка ресурсов
             const resources = [
                 '/static/js/init_tg_theme.js'
             ];
@@ -451,13 +520,13 @@
                 document.head.appendChild(link);
             });
 
-            // Скрываем глобальный лоадер через 3 секунды на всякий случай
             setTimeout(() => {
                 clearTimeout(loaderTimeout);
                 hideLoader();
             }, 3000);
         });
     </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>
