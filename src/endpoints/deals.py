@@ -134,8 +134,13 @@ async def confirm_deal(
     payload = await decode_jwt(session_token)
     data = await request.json()
     deal_id = data.get("deal_id")
-    rating = data.get("rating")
     review_text = data.get("review_text")
+    rating = data.get("rating")
+
+    if rating == "plus":
+        rating = 1
+    else:
+        rating = -1
 
     async with async_session_maker() as session:
         try:
@@ -180,7 +185,6 @@ async def confirm_deal(
             seller = seller.scalar_one_or_none()
 
             if deal.currency == 'rub':
-                # Возвращаем продавцу 90% залога
                 seller.ton_balance += seller_amount
                 if seller.earned_ton is None:
                     seller.earned_ton = 0.0

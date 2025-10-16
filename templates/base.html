@@ -157,13 +157,6 @@
             opacity: 1;
         }
 
-        .global-loader .w-loader {
-            font-size: 48px;
-            font-weight: bold;
-            color: var(--primary-color);
-            animation: pulse 0.8s ease-in-out infinite;
-        }
-
         /* Стили для нижней навигации */
         .bottom-nav {
             position: fixed;
@@ -238,17 +231,98 @@
             pointer-events: all;
         }
         
-        .page-transition .loader {
-            font-size: 48px;
-            font-weight: bold;
-            color: var(--primary-color);
-            animation: pulse 0.8s ease-in-out infinite;
+        /* Улучшенная анимация W лоадера с ударом и частицами */
+        .w-animated-loader {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
-        /* Анимация пульсации для лоадера */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
+        .w-letter {
+            font-size: 80px;
+            font-weight: 900;
+            color: var(--primary-color);
+            position: relative;
+            z-index: 10;
+            transform: scale(0) translateZ(100px);
+            animation: w-impact 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            text-shadow: 0 0 0 transparent;
+        }
+        
+        .w-glow {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary-color) 0%, transparent 70%);
+            opacity: 0;
+            animation: w-glow-pulse 2s ease-in-out infinite 0.6s;
+            filter: blur(15px);
+            z-index: 5;
+        }
+        
+        .w-impact-shockwave {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--primary-color);
+            border-radius: 50%;
+            opacity: 0;
+            animation: shockwave 1s ease-out 0.3s;
+        }
+        
+        .w-particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        @keyframes w-impact {
+            0% {
+                transform: scale(0) translateZ(100px) rotate(-30deg);
+                text-shadow: 0 0 0 transparent;
+            }
+            70% {
+                transform: scale(1.2) translateZ(0) rotate(10deg);
+                text-shadow: 0 0 30px var(--primary-color);
+            }
+            85% {
+                transform: scale(0.9) translateZ(0) rotate(-5deg);
+                text-shadow: 0 0 50px var(--primary-color);
+            }
+            100% {
+                transform: scale(1) translateZ(0) rotate(0deg);
+                text-shadow: 0 0 20px rgba(63, 136, 248, 0.5);
+            }
+        }
+        
+        @keyframes w-glow-pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.4;
+            }
+        }
+        
+        @keyframes shockwave {
+            0% {
+                transform: scale(0.1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(4);
+                opacity: 0;
+            }
         }
         
         /* Анимация исчезновения контента при переходе */
@@ -265,12 +339,16 @@
 <body>
     <!-- Глобальный лоадер, который показывается только при долгой загрузке -->
     <div class="global-loader" id="globalLoader">
-        <div class="w-loader">W</div>
+        <div class="w-animated-loader">
+            <div class="w-impact-shockwave"></div>
+            <div class="w-glow"></div>
+            <div class="w-letter">W</div>
+        </div>
     </div>
 
     <!-- Индикатор pull-to-refresh -->
     <div class="ptr-element">
-        <div class="w-loader"></div>
+        <div class="w-loader">W</div>
     </div>
 
     <!-- Основное содержимое страницы -->
@@ -434,6 +512,64 @@
                 window.location.pathname.startsWith('/admin/chat/');
         }
 
+        // Функция для создания случайных частиц
+        function createRandomParticles(container, count = 8) {
+            // Очищаем существующие частицы
+            const existingParticles = container.querySelectorAll('.w-particle');
+            existingParticles.forEach(particle => particle.remove());
+            
+            // Создаем новые случайные частицы
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'w-particle';
+                
+                // Случайные параметры
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 30 + Math.random() * 70;
+                const duration = 0.8 + Math.random() * 1.2;
+                const delay = 0.6 + Math.random() * 0.4;
+                const size = 4 + Math.random() * 6;
+                
+                // Позиция вылета
+                const startX = Math.cos(angle) * distance;
+                const startY = Math.sin(angle) * distance;
+                
+                // Дополнительное случайное движение
+                const endX = startX * (1.5 + Math.random() * 1.0);
+                const endY = startY * (1.5 + Math.random() * 1.0);
+                
+                // Применяем стили
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.animation = `
+                    particle-fly ${duration}s ease-out infinite ${delay}s
+                `;
+                
+                // Создаем ключевые кадры для этой частицы
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes particle-fly-${i} {
+                        0% {
+                            transform: translate(0, 0) scale(0);
+                            opacity: 1;
+                        }
+                        20% {
+                            transform: translate(${startX}px, ${startY}px) scale(1);
+                            opacity: 1;
+                        }
+                        100% {
+                            transform: translate(${endX}px, ${endY}px) scale(0.3);
+                            opacity: 0;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                particle.style.animation = `particle-fly-${i} ${duration}s ease-out infinite ${delay}s`;
+                container.appendChild(particle);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const globalLoader = document.getElementById('globalLoader');
             let loaderTimeout;
@@ -445,6 +581,12 @@
                     setTimeout(() => {
                         globalLoader.classList.add('active');
                     }, 10);
+                    
+                    // Создаем случайные частицы для глобального лоадера
+                    const loaderContainer = globalLoader.querySelector('.w-animated-loader');
+                    if (loaderContainer) {
+                        createRandomParticles(loaderContainer, 10);
+                    }
                 }
             }
             
@@ -476,8 +618,17 @@
             const navItems = document.querySelectorAll('.bottom-nav .nav-item');
             const transitionOverlay = document.createElement('div');
             transitionOverlay.className = 'page-transition';
-            transitionOverlay.innerHTML = '<div class="loader">W</div>';
+            transitionOverlay.innerHTML = `
+                <div class="w-animated-loader">
+                    <div class="w-impact-shockwave"></div>
+                    <div class="w-glow"></div>
+                    <div class="w-letter">W</div>
+                </div>
+            `;
             document.body.appendChild(transitionOverlay);
+
+            // Гарантируем, что оверлей всегда будет поверх всего
+            transitionOverlay.style.zIndex = '10000';
 
             navItems.forEach(item => {
                 item.addEventListener('click', function(e) {
@@ -488,10 +639,39 @@
                     navItems.forEach(navItem => navItem.classList.remove('active'));
                     this.classList.add('active');
                     
+                    // Создаем случайные частицы для перехода
+                    const loaderContainer = transitionOverlay.querySelector('.w-animated-loader');
+                    if (loaderContainer) {
+                        createRandomParticles(loaderContainer, 12);
+                    }
+                    
+                    // Гарантируем видимость оверлея
+                    transitionOverlay.style.display = 'flex';
+                    transitionOverlay.style.opacity = '1';
+                    transitionOverlay.style.pointerEvents = 'all';
                     transitionOverlay.classList.add('active');
+                    
+                    // Дополнительная защита от исчезновения
                     setTimeout(() => {
-                        window.location.href = href;
-                    }, 150);
+                        if (transitionOverlay.style.opacity !== '1') {
+                            transitionOverlay.style.opacity = '1';
+                            transitionOverlay.style.display = 'flex';
+                        }
+                    }, 10);
+                    
+                    setTimeout(() => {
+                        // Проверяем, что оверлей все еще виден перед переходом
+                        if (transitionOverlay.style.opacity === '1') {
+                            window.location.href = href;
+                        } else {
+                            // Если оверлей исчез, показываем его снова
+                            transitionOverlay.style.display = 'flex';
+                            transitionOverlay.style.opacity = '1';
+                            setTimeout(() => {
+                                window.location.href = href;
+                            }, 50);
+                        }
+                    }, 400); // Увеличиваем время для гарантии показа анимации
                 });
             });
 
@@ -524,6 +704,31 @@
                 clearTimeout(loaderTimeout);
                 hideLoader();
             }, 3000);
+        });
+
+        // Защита от исчезновения анимации при быстрых переходах
+        let isTransitioning = false;
+        
+        window.addEventListener('beforeunload', function() {
+            isTransitioning = true;
+            const transitionOverlay = document.querySelector('.page-transition');
+            if (transitionOverlay) {
+                transitionOverlay.style.display = 'flex';
+                transitionOverlay.style.opacity = '1';
+                transitionOverlay.style.pointerEvents = 'all';
+            }
+        });
+
+        // Восстановление если переход прервался
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                const transitionOverlay = document.querySelector('.page-transition');
+                if (transitionOverlay) {
+                    transitionOverlay.style.display = 'none';
+                    transitionOverlay.style.opacity = '0';
+                }
+                isTransitioning = false;
+            }
         });
     </script>
     

@@ -1183,6 +1183,35 @@
             }
         });
 
+        function formatBalance(balance) {
+            if (balance === 0.0) {
+                return `0 TON`;
+            }
+            
+            // Округляем до 2 знаков, убираем лишние нули
+            const formatted = parseFloat(balance.toFixed(2));
+            return `${formatted} TON`;
+        }
+
+        async function updateWalletBalance() {
+            try {
+                const response = await fetch('/get_wallet_balance');
+                if (!response.ok) throw new Error('Failed to fetch balance');
+                
+                const data = await response.json();
+                const walletBalance = document.getElementById('walletBalance');
+                
+                if (data.status === 'success') {
+                    walletBalance.textContent = formatBalance(data.ton_balance);
+                }
+            } catch (error) {
+                console.error('Error updating wallet balance:', error);
+            }
+        }
+
+        // Обновляем баланс при загрузке
+        await updateWalletBalance();
+
         // Функции для работы с ценой
         function syncPriceInputs() {
             const min = parseInt(priceMinInput.value) || 0;
