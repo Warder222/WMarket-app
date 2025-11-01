@@ -1929,77 +1929,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    let currentReserveCurrency = 'ton';
-
-    function selectReserveCurrency(currency) {
-        currentReserveCurrency = currency;
-        document.getElementById('rubReserveBtn')?.classList.toggle('active', currency === 'rub');
-        document.getElementById('tonReserveBtn')?.classList.toggle('active', currency === 'ton');
-        updateReserveAmount();
-    }
-
-    async function updateReserveAmount() {
-        const reserveAmountTON = productPriceTON * 0.15;
-        const amountEl = document.getElementById('reserveAmountInfo');
-        if (!amountEl) return;
-
-        if (currentReserveCurrency === 'ton') {
-            amountEl.textContent = `Сумма бронирования: ${reserveAmountTON.toFixed(4)} TON`;
-        } else {
-            const rate = await fetchTonRate();
-            if (rate) {
-                const rubAmount = reserveAmountTON * rate;
-                amountEl.textContent = `Сумма бронирования: ~${rubAmount.toFixed(2)} ₽`;
-            } else {
-                amountEl.textContent = `Сумма бронирования: ${reserveAmountTON.toFixed(4)} TON`;
-                showNotification('Курс недоступен, используйте TON', 'warning');
-                selectReserveCurrency('ton');
-            }
-        }
-    }
-
-    // Добавляем кнопки выбора валюты, если их нет
-    const reserveAmountInfo = document.getElementById('reserveAmountInfo');
-    if (reserveAmountInfo && !document.getElementById('reserveCurrencyButtons')) {
-        const buttons = document.createElement('div');
-        buttons.id = 'reserveCurrencyButtons';
-        buttons.className = 'reservation-currency-buttons';
-        buttons.innerHTML = `
-            <button id="rubReserveBtn" class="reservation-currency-btn">RUB</button>
-            <button id="tonReserveBtn" class="reservation-currency-btn active">TON</button>
-        `;
-        reserveAmountInfo.parentNode.insertBefore(buttons, reserveAmountInfo);
-    }
-
-    document.getElementById('rubReserveBtn')?.addEventListener('click', () => selectReserveCurrency('rub'));
-    document.getElementById('tonReserveBtn')?.addEventListener('click', () => selectReserveCurrency('ton'));
-
     document.getElementById('confirmReserveBtn')?.addEventListener('click', async () => {
         const reserveAmountTON = productPriceTON * 0.15;
 
-        if (currentReserveCurrency === 'rub') {
-            try {
-                const res = await fetch('/reserve_product', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: productId, amount: reserveAmountTON, currency: 'rub' })
-                });
-                const result = await res.json();
-                if (result.status === 'success') {
-                    showNotification('Сделка создана! Переведите рубли продавцу и дождитесь подтверждения.', 'success');
-                    closeModal(modals.reservation);
-                    window.location.href = '/deals';
-                } else {
-                    showNotification(result.message || 'Ошибка бронирования', 'error');
-                }
-            } catch (err) {
-                console.error(err);
-                showNotification('Ошибка при бронировании в RUB', 'error');
-            }
-            return;
-        }
-
-        // Бронирование в TON
+        // Бронирование только в TON
         try {
             const balanceRes = await fetch('/get_wallet_balance');
             const balance = await balanceRes.json();
