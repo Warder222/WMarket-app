@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings
-from src.database.database import Deal, Product, Review, User, async_session_maker
+from src.database.database import Deal, Product, Review, User, async_session_maker, TonTransaction
 from src.database.methods import (all_count_unread_messages, archive_product_post, get_all_users,
                                   get_user_active_deals, get_user_active_deals_count, get_user_info_new)
 from src.endpoints._endpoints_config import templates, wmarket_router
@@ -125,8 +125,8 @@ async def deals(request: Request, session_token=Cookie(default=None)):
 
 @wmarket_router.post("/confirm_deal")
 async def confirm_deal(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -134,7 +134,7 @@ async def confirm_deal(
     payload = await decode_jwt(session_token)
     data = await request.json()
     deal_id = data.get("deal_id")
-    review_text = data.get("review_text")
+    review_text = data.get("review")
     rating = data.get("rating")
 
     if rating == "plus":
@@ -174,9 +174,31 @@ async def confirm_deal(
             if deal.currency == 'rub':
                 seller_amount = deal.amount * comsa
                 market_fee = deal.amount * (1 - comsa)
+
+                # Возвращаем залог продавцу (частично, с учетом комиссии)
+                seller_refund = seller_amount
+
+                # Создаем транзакцию для возврата залога продавцу
+                refund_transaction = TonTransaction(
+                    user_id=deal.seller_id,
+                    amount=seller_refund,
+                    transaction_type="collateral_refund",
+                    status="completed"
+                )
+                session.add(refund_transaction)
+
             else:
                 seller_amount = deal.amount * comsa
                 market_fee = deal.amount * (1 - comsa)
+
+                # Переводим средства продавцу
+                seller_payment_transaction = TonTransaction(
+                    user_id=deal.seller_id,
+                    amount=seller_amount,
+                    transaction_type="sale_revenue",
+                    status="completed"
+                )
+                session.add(seller_payment_transaction)
 
             deal.status = "completed"
             deal.completed_at = datetime.now(timezone.utc)
@@ -186,9 +208,6 @@ async def confirm_deal(
 
             if deal.currency == 'rub':
                 seller.ton_balance += seller_amount
-                if seller.earned_ton is None:
-                    seller.earned_ton = 0.0
-                seller.earned_ton += seller_amount
             elif deal.currency == 'ton':
                 if seller.earned_ton is None:
                     seller.earned_ton = 0.0
@@ -398,8 +417,8 @@ async def request_cancel_deal(
 
 @wmarket_router.post("/complete_reservation")
 async def complete_reservation(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -435,6 +454,25 @@ async def complete_reservation(
                     )
                 buyer.ton_balance -= remaining_amount
 
+                # Создаем транзакцию для оплаты оставшейся суммы
+                payment_transaction = TonTransaction(
+                    user_id=deal.buyer_id,
+                    amount=-remaining_amount,
+                    transaction_type="reservation_completion_payment",
+                    status="completed"
+                )
+                session.add(payment_transaction)
+
+                # Создаем транзакцию для перевода суммы бронирования продавцу
+                # (бронь уже была оплачена ранее при создании брони)
+                reservation_to_seller_transaction = TonTransaction(
+                    user_id=deal.seller_id,
+                    amount=deal.reservation_amount,
+                    transaction_type="reservation_transfer_to_seller",
+                    status="completed"
+                )
+                session.add(reservation_to_seller_transaction)
+
             deal.is_reserved = False
             deal.reservation_until = None
             deal.status = "active"
@@ -453,6 +491,7 @@ async def complete_reservation(
                 f"💰 Покупатель выкупил забронированный товар!\n\n"
                 f"📌 Товар: {deal.product_name}\n"
                 f"💰 Полная сумма: {deal.amount} {deal.currency.upper()}\n"
+                f"💰 Из них бронь: {deal.reservation_amount} {deal.currency.upper()}\n"
                 f"👤 Покупатель: {buyer.first_name or 'без username'}\n\n"
                 f"Выдайте товар покупателю, чтобы он мог подтвердить сделку."
             )
@@ -470,8 +509,8 @@ async def complete_reservation(
 
 @wmarket_router.post("/cancel_reservation")
 async def cancel_reservation(
-    request: Request,
-    session_token=Cookie(default=None)
+        request: Request,
+        session_token=Cookie(default=None)
 ):
     if not session_token:
         return JSONResponse({"status": "error", "message": "Unauthorized"}, status_code=401)
@@ -502,6 +541,15 @@ async def cancel_reservation(
 
             if deal.currency == 'ton':
                 buyer.ton_balance += refund_amount
+
+                # Создаем транзакцию для возврата средств при отмене брони
+                refund_transaction = TonTransaction(
+                    user_id=deal.buyer_id,
+                    amount=refund_amount,
+                    transaction_type="reservation_refund",
+                    status="completed"
+                )
+                session.add(refund_transaction)
 
             deal.is_reserved = False
             deal.reservation_until = None

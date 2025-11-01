@@ -218,7 +218,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 16px;
+        padding: 12px 16px;
         margin-bottom: 8px;
         background-color: var(--card-bg);
         border-radius: 8px;
@@ -237,6 +237,14 @@
     .history-item-title {
         font-weight: 500;
         margin-bottom: 4px;
+        font-size: 14px;
+    }
+
+    .history-item-description {
+        font-size: 12px;
+        color: var(--text-color);
+        opacity: 0.7;
+        margin-bottom: 2px;
     }
 
     .history-item-date {
@@ -247,7 +255,7 @@
 
     .history-item-amount {
         font-weight: bold;
-        font-size: 16px;
+        font-size: 14px;
     }
 
     .history-item-amount.positive {
@@ -259,7 +267,7 @@
     }
 
     .history-item-status {
-        font-size: 12px;
+        font-size: 11px;
         padding: 2px 6px;
         border-radius: 4px;
         margin-left: 8px;
@@ -408,6 +416,15 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
+
+    .transaction-type-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background-color: var(--primary-color);
+        color: white;
+        margin-left: 8px;
+    }
 </style>
 {% endblock %}
 
@@ -515,6 +532,31 @@
         });
     }
 
+    // Функция для округления до двух знаков (в меньшую сторону)
+    function formatAmount(amount) {
+        // Округляем до двух знаков после запятой
+        return Math.floor(amount * 100) / 100;
+    }
+
+    // Функция для получения читаемого названия типа транзакции
+    function getTransactionTypeTitle(transactionType) {
+        const typeTitles = {
+            'deposit': 'Пополнение',
+            'withdraw': 'Вывод средств',
+            'purchase_payment': 'Оплата покупки',
+            'collateral_lock': 'Блокировка залога',
+            'collateral_refund': 'Возврат залога',
+            'sale_revenue': 'Доход от продажи',
+            'reservation_payment': 'Оплата брони',
+            'reservation_refund': 'Возврат брони',
+            'reservation_penalty': 'Штраф за отмену',
+            'reservation_completion_payment': 'Оплата товара',
+            'reservation_transfer_to_seller': 'Получение брони'
+        };
+        
+        return typeTitles[transactionType] || 'Операция';
+    }
+
     // Функция для отображения истории операций
     async function updateTransactionHistory() {
         try {
@@ -527,15 +569,12 @@
                 if (data.status === 'success' && data.transactions.length > 0) {
                     historyContainer.innerHTML = '';
                     
-                    // Фильтруем только успешные транзакции
-                    const successfulTransactions = data.transactions.filter(tx => tx.status === 'completed');
+                    // Сортируем транзакции по дате (новые сверху)
+                    const sortedTransactions = data.transactions.sort((a, b) => 
+                        new Date(b.created_at) - new Date(a.created_at)
+                    );
                     
-                    if (successfulTransactions.length === 0) {
-                        historyContainer.innerHTML = '<div class="history-empty">Нет операций</div>';
-                        return;
-                    }
-                    
-                    successfulTransactions.forEach(tx => {
+                    sortedTransactions.forEach(tx => {
                         const txElement = document.createElement('div');
                         txElement.className = 'history-item';
                         
@@ -544,7 +583,7 @@
                         
                         const txTitle = document.createElement('div');
                         txTitle.className = 'history-item-title';
-                        txTitle.textContent = tx.type === 'deposit' ? 'Пополнение' : 'Вывод средств';
+                        txTitle.textContent = getTransactionTypeTitle(tx.type);
                         
                         const txDate = document.createElement('div');
                         txDate.className = 'history-item-date';
@@ -554,8 +593,10 @@
                         txInfo.appendChild(txDate);
                         
                         const txAmount = document.createElement('div');
-                        txAmount.className = `history-item-amount ${tx.type === 'deposit' ? 'positive' : 'negative'}`;
-                        txAmount.textContent = `${tx.type === 'deposit' ? '+' : '-'}${tx.amount} TON`;
+                        const isPositive = tx.amount > 0;
+                        const formattedAmount = formatAmount(tx.amount);
+                        txAmount.className = `history-item-amount ${isPositive ? 'positive' : 'negative'}`;
+                        txAmount.textContent = `${isPositive ? '+' : ''}${formattedAmount.toFixed(2)} TON`;
                         
                         txElement.appendChild(txInfo);
                         txElement.appendChild(txAmount);
@@ -568,6 +609,8 @@
             }
         } catch (error) {
             console.error('Error loading transaction history:', error);
+            const historyContainer = document.getElementById('tonHistoryContainer');
+            historyContainer.innerHTML = '<div class="history-empty">Ошибка загрузки истории</div>';
         }
     }
 

@@ -6,7 +6,7 @@ from sqlalchemy import and_, exists, func, select
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
-from src.database.database import (Chat, ChatParticipant, Deal, Fav, Product, User, async_session_maker)
+from src.database.database import (Chat, ChatParticipant, Deal, Fav, Product, User, async_session_maker, TonTransaction)
 from src.database.methods import (all_count_unread_messages, get_all_not_digit_categories, get_all_users,
                                   get_product_info_new, get_user_active_deals_count, get_user_info_new)
 from src.endpoints._endpoints_config import templates, wmarket_router
@@ -170,6 +170,16 @@ async def create_deal(
 
                 # Блокируем залог у продавца
                 seller.ton_balance -= collateral_amount
+
+                # Создаем транзакцию для залога продавца
+                collateral_transaction = TonTransaction(
+                    user_id=seller_id,
+                    amount=-collateral_amount,  # Отрицательная сумма - списание
+                    transaction_type="collateral_lock",
+                    status="completed"
+                )
+                session.add(collateral_transaction)
+
                 amount = collateral_amount  # Сохраняем сумму в TON как залог
 
             elif currency == 'ton':
@@ -179,6 +189,15 @@ async def create_deal(
                         status_code=400
                     )
                 user.ton_balance -= amount
+
+                # Создаем транзакцию для оплаты TON покупателем
+                payment_transaction = TonTransaction(
+                    user_id=buyer_id,
+                    amount=-amount,  # Отрицательная сумма - списание
+                    transaction_type="purchase_payment",
+                    status="completed"
+                )
+                session.add(payment_transaction)
 
             deal = Deal(
                 product_id=product_id,
@@ -279,6 +298,15 @@ async def reserve_product(
                         status_code=400
                     )
                 user.ton_balance -= amount
+
+                # Создаем транзакцию для бронирования
+                reservation_transaction = TonTransaction(
+                    user_id=payload.get("tg_id"),
+                    amount=-amount,
+                    transaction_type="reservation_payment",
+                    status="completed"
+                )
+                session.add(reservation_transaction)
 
             product.reserved = True
             product.reserved_until = datetime.now(timezone.utc) + timedelta(hours=48)

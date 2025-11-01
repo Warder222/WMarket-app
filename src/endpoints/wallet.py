@@ -213,18 +213,18 @@ async def deposit_ton(
                     user = user.scalar_one_or_none()
                     if user:
                         user.ton_balance += amount
+
+                        # Обновляем статус транзакции на completed
+                        await session.execute(
+                            update(TonTransaction)
+                            .where(TonTransaction.id == transaction.id)
+                            .values(status="completed")
+                        )
                         await session.commit()
 
                 except Exception as e:
                     print(f"Error updating TON balance: {e}")
                     return JSONResponse({"status": "error", "message": "Database error"}, status_code=500)
-
-            await session.execute(
-                update(TonTransaction)
-                .where(TonTransaction.id == transaction.id)
-                .values(status="completed")
-            )
-            await session.commit()
 
             await send_notification_to_user(
                 payload.get("tg_id"),

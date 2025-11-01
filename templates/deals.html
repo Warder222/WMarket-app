@@ -112,8 +112,16 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         word-break: break-word;
-        white-space: nowrap;
+        white-space: normal;
         margin-left: 8px;
+        max-width: 120px;
+        text-align: center;
+        line-height: 1.2;
+        min-height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
     
     .status-active {
@@ -454,9 +462,9 @@
         border-radius: 6px;
         color: #ffc107;
         font-size: 12px;
-        margin-bottom: 8px;
+        margin-bottom: 2vh;
         text-align: center;
-        margin-top: 1vh;
+        margin-top: 2vh;
     }
 
     .status-pending {
@@ -531,6 +539,28 @@
         font-size: 12px;
         margin-top: 4px;
         font-style: italic;
+    }
+
+    /* Новые стили для кнопки связи с модерацией */
+    .contact-moderator-btn {
+        width: 100%;
+        padding: 10px;
+        background-color: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 12px;
+        text-decoration: none;
+        display: block;
+        text-align: center;
+    }
+
+    .contact-moderator-btn:hover {
+        background-color: rgba(63, 136, 248, 0.1);
     }
 </style>
 {% endblock %}
@@ -816,6 +846,11 @@
             </div>
             <p>Пожалуйста, укажите причину отмены сделки. Заявка будет отправлена на модерацию администратору.</p>
             
+            <!-- Новая кнопка связи с модерацией -->
+            <a href="https://t.me/WMarket_app/44" target="_blank" class="contact-moderator-btn">
+                Связаться с модерацией
+            </a>
+            
             <textarea class="cancel-text" id="cancelText" 
                     placeholder="Укажите причину отмены..." required></textarea>
             
@@ -997,36 +1032,23 @@
         
         // Обработчики для кнопок рейтинга
         document.getElementById('plusRating').addEventListener('click', () => {
-            selectedRating = 'plus';
+            selectedRating = 'plus';  // Было 'positive', должно быть 'plus'
             document.getElementById('plusRating').classList.add('selected');
             document.getElementById('minusRating').classList.remove('selected');
-            checkReviewReady();
+            document.getElementById('submitReview').disabled = false;
         });
-        
+
         document.getElementById('minusRating').addEventListener('click', () => {
-            selectedRating = 'minus';
+            selectedRating = 'minus';  // Было 'negative', должно быть 'minus'
             document.getElementById('minusRating').classList.add('selected');
             document.getElementById('plusRating').classList.remove('selected');
-            checkReviewReady();
+            document.getElementById('submitReview').disabled = false;
         });
+
         
-        // Проверка готовности отзыва
-        document.getElementById('reviewText').addEventListener('input', checkReviewReady);
-        
-        function checkReviewReady() {
-            const text = document.getElementById('reviewText').value.trim();
-            const submitBtn = document.getElementById('submitReview');
-            submitBtn.disabled = !(selectedRating && text.length > 0);
-        }
-        
-        // Отправка отзыва
+        // Отправка оценки
         document.getElementById('submitReview').addEventListener('click', async () => {
             const reviewText = document.getElementById('reviewText').value.trim();
-            
-            if (!selectedRating || !reviewText) {
-                showNotification('Пожалуйста, выберите оценку и напишите отзыв', 'info');
-                return;
-            }
             
             try {
                 const response = await fetch('/confirm_deal', {
@@ -1034,7 +1056,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
+                    body: JSON.stringify({ 
                         deal_id: parseInt(selectedDealId),
                         rating: selectedRating,
                         review: reviewText
@@ -1055,7 +1077,7 @@
             }
         });
         
-        // Закрытие модального окна отзыва
+        // Закрытие модального окна оценки
         document.getElementById('reviewModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('reviewModal')) {
                 document.getElementById('reviewModal').style.display = 'none';
@@ -1063,13 +1085,13 @@
                 document.getElementById('reviewText').value = '';
                 document.getElementById('plusRating').classList.remove('selected');
                 document.getElementById('minusRating').classList.remove('selected');
+                document.getElementById('submitReview').disabled = true;
             }
         });
         
-        // Обработчики для завершения брони
+        // Обработчики для кнопок бронирования
         document.querySelectorAll('.complete-reservation-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
+            btn.addEventListener('click', async () => {
                 const dealId = btn.dataset.dealId;
                 
                 if (confirm('Вы уверены, что хотите выкупить товар?')) {
@@ -1097,10 +1119,8 @@
             });
         });
         
-        // Обработчики для отмены брони
         document.querySelectorAll('.cancel-reservation-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
+            btn.addEventListener('click', async () => {
                 const dealId = btn.dataset.dealId;
                 
                 if (confirm('Вы уверены, что хотите отменить бронь?')) {
@@ -1129,27 +1149,29 @@
         });
         
         // Обновление времени для бронированных сделок
-        function updateReservationTimes() {
+        function updateReservationTimers() {
             document.querySelectorAll('.reserved-deal').forEach(card => {
-                const until = new Date(card.dataset.reservedUntil);
+                const reservedUntil = new Date(card.dataset.reservedUntil);
                 const now = new Date();
-                const diff = until - now;
+                const timeLeft = reservedUntil - now;
                 
-                if (diff <= 0) {
+                if (timeLeft <= 0) {
                     card.querySelector('.time-left').textContent = 'Время истекло';
+                    card.classList.add('deal-pending');
                     card.querySelector('.complete-reservation-btn').disabled = true;
-                    return;
+                } else {
+                    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    card.querySelector('.time-left').textContent = `${hours}ч ${minutes}м`;
                 }
-                
-                const hours = Math.floor(diff / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                
-                card.querySelector('.time-left').textContent = `${hours}ч ${minutes}м`;
             });
         }
         
-        // Конвертация UTC времени в локальное (возвращаем обычные даты)
-        document.querySelectorAll('.deal-time[data-utc-time]').forEach(element => {
+        updateReservationTimers();
+        setInterval(updateReservationTimers, 60000);
+        
+        // Форматирование времени
+        document.querySelectorAll('.deal-time').forEach(element => {
             const utcTime = element.dataset.utcTime;
             if (utcTime) {
                 const localTime = new Date(utcTime);
@@ -1162,12 +1184,6 @@
                 });
             }
         });
-
-        // Инициализация времени брони
-        updateReservationTimes();
-        
-        // Обновление времени брони каждую минуту
-        setInterval(updateReservationTimes, 60000);
     });
 </script>
 {% endblock %}
