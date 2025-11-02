@@ -493,6 +493,7 @@ async def admin_chat_view(
         all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
         active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
 
+
         context = {
             "request": request,
             "chat_id": chat_id,
@@ -502,7 +503,9 @@ async def admin_chat_view(
             "current_user": {"id": 0, "is_admin": True},
             "all_undread_count_message": all_undread_count_message,
             "is_chat_page": True,
-            "active_deals_count": active_deals_count
+            "active_deals_count": active_deals_count,
+            "active_deal": None,  # Добавляем информацию о сделке
+            "is_blocked": False
         }
         return templates.TemplateResponse("chat.html", context=context)
 

@@ -35,7 +35,7 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                         (Deal.seller_id == query_user_id) | (Deal.buyer_id == query_user_id),
                         Deal.status.in_(["completed", "completed_by_admin", "cancelled", "cancelled_by_admin"])
                     )
-                    .order_by(desc(Deal.completed_at if Deal.completed_at is not None else Deal.created_at))
+                    .order_by(desc(Deal.created_at))
                 )
                 deals = result.scalars().all()
 
@@ -81,7 +81,7 @@ async def deals(request: Request, session_token=Cookie(default=None)):
                         "is_reserved": deal.is_reserved,
                         "reservation_amount": deal.reservation_amount,
                         "admin_decision": deal.admin_decision,
-                        "original_amount": deal.amount  # Сохраняем оригинальную сумму для внутренних расчетов
+                        "original_amount": deal.amount
                     })
 
                 completed_deals = deal_list

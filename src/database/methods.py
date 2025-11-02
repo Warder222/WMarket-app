@@ -699,6 +699,72 @@ async def get_pending_deals():
                 "reservation_until": deal.reservation_until,
             })
         return pending_deals
+
+
+async def get_active_deal_for_chat(chat_id: int, current_user_id: int):
+    """Получить активную сделку для чата"""
+    async with async_session_maker() as session:
+        try:
+            # Получаем информацию о чате и товаре
+            chat = await session.execute(
+                select(Chat).where(Chat.id == chat_id)
+            )
+            chat = chat.scalar_one_or_none()
+
+            if not chat:
+                return None
+
+            # Получаем участников чата
+            participants = await session.execute(
+                select(ChatParticipant.user_id)
+                .where(ChatParticipant.chat_id == chat_id)
+            )
+            participant_ids = [p[0] for p in participants.all()]
+
+            if len(participant_ids) != 2:
+                return None
+
+            # Ищем активную сделку по товару между участниками чата
+            result = await session.execute(
+                select(Deal).where(
+                    Deal.product_id == chat.product_id,
+                    Deal.status == 'active',
+                    or_(
+                        and_(Deal.seller_id == participant_ids[0], Deal.buyer_id == participant_ids[1]),
+                        and_(Deal.seller_id == participant_ids[1], Deal.buyer_id == participant_ids[0])
+                    )
+                )
+            )
+            deal = result.scalar_one_or_none()
+
+            if deal:
+                # Получаем информацию о пользователях
+                seller = await session.execute(select(User).where(User.tg_id == deal.seller_id))
+                seller = seller.scalar_one_or_none()
+                buyer = await session.execute(select(User).where(User.tg_id == deal.buyer_id))
+                buyer = buyer.scalar_one_or_none()
+
+                return {
+                    "id": deal.id,
+                    "product_name": deal.product_name,
+                    "seller_id": deal.seller_id,
+                    "buyer_id": deal.buyer_id,
+                    "seller_first_name": seller.first_name if seller else "Unknown",
+                    "buyer_first_name": buyer.first_name if buyer else "Unknown",
+                    "currency": deal.currency,
+                    "amount": deal.rub_amount if deal.currency == 'rub' and deal.rub_amount else deal.amount,
+                    "status": deal.status,
+                    "is_reserved": deal.is_reserved,
+                    "reservation_amount": deal.reservation_amount,
+                    "rub_payment_confirmed": deal.rub_payment_confirmed,
+                    "original_amount": deal.amount,
+                    "current_user_role": "seller" if current_user_id == deal.seller_id else "buyer"
+                }
+
+            return None
+        except Exception as exc:
+            print(f"Error getting active deal for chat: {exc}")
+            return None
 #_______________________________________________________________________________________________________________________
 
 

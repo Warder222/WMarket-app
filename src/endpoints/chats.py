@@ -10,7 +10,7 @@ from src.database.database import Chat, ChatParticipant, ChatReport, Message, Pr
 from src.database.methods import (all_count_unread_messages, check_user_block_post, check_user_blocked_post,
                                   get_all_users, get_chat_messages, get_user_active_deals_count, get_user_info_new,
                                   mark_messages_as_read, check_existing_report, create_system_message,
-                                  check_any_active_chat_report)
+                                  check_any_active_chat_report, get_active_deal_for_chat)
 from src.endpoints._endpoints_config import templates, wmarket_router
 from src.utils import decode_jwt, is_admin_new
 from src.websocket_config import manager
@@ -196,8 +196,12 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         else:
             is_blocked = False
 
+    # Получаем информацию об активной сделке
+    active_deal = await get_active_deal_for_chat(chat_id, payload.get("tg_id"))
+
     all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
     active_deals_count = await get_user_active_deals_count(payload.get("tg_id"))
+    print(f"Текущий id пользователя чата = {payload.get("tg_id")}")
 
     context = {
         "request": request,
@@ -210,7 +214,8 @@ async def chat_page(chat_id: int, request: Request, session_token=Cookie(default
         "all_undread_count_message": all_undread_count_message,
         "is_blocked": is_blocked,
         "unblock_at": unblock_at,
-        "active_deals_count": active_deals_count
+        "active_deals_count": active_deals_count,
+        "active_deal": active_deal  # Добавляем информацию о сделке
     }
     return templates.TemplateResponse("chat.html", context=context)
 

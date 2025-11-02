@@ -133,9 +133,8 @@
         border-radius: 8px;
         padding: 12px;
         margin-bottom: 16px;
-        display: flex;
-        gap: 12px;
         cursor: pointer;
+        position: relative;
     }
 
     .product-image {
@@ -371,6 +370,229 @@
         height: 24px;
         fill: white;
     }
+
+    /* Компактный стиль для действий сделки внутри product-info */
+    .deal-actions-compact {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .deal-status-compact {
+        font-size: 12px;
+        color: var(--secondary-text);
+        margin-bottom: 8px;
+        text-align: center;
+    }
+
+    .deal-btn-compact {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+        margin-bottom: 8px;
+    }
+
+    .deal-btn-compact.confirm {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .deal-btn-compact.confirm:hover {
+        background-color: #1a73e8;
+    }
+
+    .deal-btn-compact:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .deal-note-compact {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: center;
+        padding: 8px;
+        background-color: rgba(63, 136, 248, 0.1);
+        border-radius: 6px;
+        border: 1px solid rgba(63, 136, 248, 0.2);
+        margin-top: 8px;
+    }
+
+    .reservation-info-compact {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: center;
+        margin-top: 8px;
+        padding: 6px;
+        background-color: rgba(255, 193, 7, 0.1);
+        border-radius: 4px;
+        border: 1px solid rgba(255, 193, 7, 0.2);
+    }
+
+    .product-info-content {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .product-main-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .deal-id-compact {
+        font-size: 11px;
+        color: var(--secondary-text);
+        text-align: center;
+        margin-bottom: 8px;
+        opacity: 0.8;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .deal-action-buttons {
+        margin-top: 8px;
+    }
+
+    /* Стили для модального окна оценки (как в deals.html) */
+    .review-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .review-content {
+        background-color: var(--card-bg);
+        padding: 20px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .review-content h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-color);
+    }
+
+    .review-content p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+    }
+
+    .review-rating {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin: 16px 0;
+    }
+
+    .rating-btn {
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+        flex: 1;
+    }
+
+    .rating-btn.plus {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .rating-btn.minus {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+
+    .rating-btn.selected.plus {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .rating-btn.selected.minus {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .review-text {
+        width: 100%;
+        min-height: 80px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 16px;
+        font-size: 14px;
+        resize: vertical;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    .review-submit {
+        width: 100%;
+        padding: 12px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .review-submit:hover {
+        background-color: #1a73e8;
+    }
+
+    .review-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: var(--border-color);
+    }
+
+    .modal-header {
+        position: relative;
+        padding-right: 30px;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: -10px;
+        right: 0;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-secondary);
+        background: none;
+        border: none;
+        padding: 0;
+    }
+
+    .modal-close:hover {
+        color: var(--text-color);
+    }
 </style>
 {% endblock %}
 
@@ -415,20 +637,79 @@
 
     <div class="product-info {% if not product.active %}disabled-product{% endif %}" 
     {% if product.active %}onclick="window.location.href='/ads/{{ product.id }}'"{% endif %}>
-        <div class="product-image-container">
-            {% set images = product.product_image_url|from_json %}
-            <img src="/{{ images[0] }}" 
-                class="product-image {% if not product.active or product.active is none %}disabled{% endif %}" 
-                alt="{{ product.product_name }}">
-            {% if product.active is none %}
-                <div class="product-status">В архиве</div>
-            {% elif not product.active %}
-                <div class="product-status">На модерации</div>
-            {% endif %}
-        </div>
-        <div class="product-details">
-            <div class="product-title">{{ product.product_name }}</div>
-            <div class="product-price">{{ product.product_price }} TON</div>
+        <div class="product-info-content">
+            <div class="product-image-container">
+                {% set images = product.product_image_url|from_json %}
+                <img src="/{{ images[0] }}" 
+                    class="product-image {% if not product.active or product.active is none %}disabled{% endif %}" 
+                    alt="{{ product.product_name }}">
+                {% if product.active is none %}
+                    <div class="product-status">В архиве</div>
+                {% elif not product.active %}
+                    <div class="product-status">На модерации</div>
+                {% endif %}
+            </div>
+            <div class="product-main-info">
+                <div class="product-title">{{ product.product_name }}</div>
+                <div class="product-price">{{ product.product_price }} TON</div>
+                {% if active_deal %}
+                <div class="deal-actions-compact" id="dealActionsCompact">
+                    <div class="deal-id-compact">Сделка #{{ active_deal.id }}</div>
+                    
+                    <!-- Сделка за рубли -->
+                    {% if active_deal.currency == 'rub' %}
+                        {% if active_deal.current_user_role == 'seller' and not active_deal.rub_payment_confirmed %}
+                            <div class="deal-action-buttons">
+                                <button class="deal-btn-compact confirm confirm-rub-payment-chat" data-deal-id="{{ active_deal.id }}">
+                                    Подтвердить получение рублей
+                                </button>
+                                <div class="deal-note-compact">Ожидание подтверждения оплаты</div>
+                            </div>
+                        {% elif active_deal.current_user_role == 'seller' and active_deal.rub_payment_confirmed %}
+                            <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
+                        {% elif active_deal.current_user_role == 'buyer' and not active_deal.rub_payment_confirmed %}
+                            <div class="deal-note-compact">Ожидайте подтверждения оплаты от продавца</div>
+                        {% elif active_deal.current_user_role == 'buyer' and active_deal.rub_payment_confirmed %}
+                            <div class="deal-action-buttons">
+                                <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
+                                    Подтвердить получение товара
+                                </button>
+                            </div>
+                        {% endif %}
+                    
+                    <!-- Сделка за TON (не бронь) -->
+                    {% elif active_deal.currency == 'ton' and not active_deal.is_reserved %}
+                        {% if active_deal.current_user_role == 'buyer' %}
+                            <div class="deal-action-buttons">
+                                <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
+                                    Подтвердить получение товара
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
+                        {% endif %}
+                    
+                    <!-- Бронь TON -->
+                    {% elif active_deal.currency == 'ton' and active_deal.is_reserved %}
+                        {% if active_deal.current_user_role == 'buyer' %}
+                            <div class="deal-action-buttons">
+                                <button class="deal-btn-compact confirm complete-reservation-chat" data-deal-id="{{ active_deal.id }}">
+                                    Выкупить товар
+                                </button>
+                                <div class="reservation-info-compact">
+                                    Внесено: {{ active_deal.reservation_amount }} TON
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="deal-note-compact">Ожидание выкупа товара покупателем</div>
+                            <div class="reservation-info-compact">
+                                Внесено брони: {{ active_deal.reservation_amount }} TON
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
     
@@ -462,6 +743,29 @@
                 <button class="cancel-button" id="cancelReport">Отмена</button>
                 <button class="submit-button" id="submitReport">Отправить</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно оценки (такое же как в deals.html) -->
+    <div class="review-modal" id="reviewModal" style="display: none;">
+        <div class="review-content">
+            <div class="modal-header">
+                <h3>Оценка сделки</h3>
+                <button class="modal-close" id="closeReviewModal">&times;</button>
+            </div>
+            <p>Пожалуйста, оцените вашу сделку</p>
+            
+            <div class="review-rating">
+                <button class="rating-btn plus" id="plusRatingChat">👍 Положительно</button>
+                <button class="rating-btn minus" id="minusRatingChat">👎 Отрицательно</button>
+            </div>
+            
+            <textarea class="review-text" id="reviewTextChat" 
+                    placeholder="Расскажите о вашем опыте..."></textarea>
+            
+            <button class="review-submit" id="submitReviewChat" disabled>
+                Подтвердить сделку
+            </button>
         </div>
     </div>
 </div>
@@ -575,11 +879,20 @@
         // Основная логика чата (только если не заблокирован)
         const socket = new WebSocket(`wss://${window.location.host}/ws/{{ current_user.id }}`);
         const chatId = {{ chat_id }};
-        const currentUserId = {{ current_user.id }};
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const chatMessages = document.getElementById('chatMessages');
-        const isAdmin = currentUserId === 0;
+
+        const currentUserId = {{ current_user.id }};
+        const isAdmin = currentUserId === 0; // Добавляем проверку на админа
+
+        // Отключаем функционал отправки для админа
+        if (isAdmin) {
+            messageInput.disabled = true;
+            messageInput.placeholder = "Режим просмотра (админ)";
+            sendButton.disabled = true;
+            sendButton.style.opacity = "0.5";
+        }
 
         // Элементы для жалоб
         const reportChatButton = document.getElementById('reportChatButton');
@@ -599,14 +912,6 @@
                 .then(data => {
                     participantsInfo = data;
                 });
-        }
-
-        // Отключаем функционал отправки для админа
-        if (isAdmin) {
-            messageInput.disabled = true;
-            messageInput.placeholder = "Режим просмотра (админ)";
-            sendButton.disabled = true;
-            sendButton.style.opacity = "0.5";
         }
 
         // Обработчик входящих сообщений
@@ -658,7 +963,180 @@
                 messageInput.value = '';
             }
         }
-        
+
+        // Обработчики для компактных кнопок сделки
+        document.querySelectorAll('.confirm-rub-payment-chat').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const dealId = btn.dataset.dealId;
+                
+                if (confirm('Вы подтверждаете, что получили рублевый платеж от покупателя?')) {
+                    try {
+                        const response = await fetch('/confirm_rub_payment', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ deal_id: parseInt(dealId) })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            showNotification('Оплата подтверждена! Покупатель может теперь подтвердить получение товара.', 'success');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        } else {
+                            showNotification(result.message || 'Произошла ошибка', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Произошла ошибка при подтверждении оплаты', 'error');
+                    }
+                }
+            });
+        });
+
+        document.querySelectorAll('.confirm-deal-chat').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const dealId = btn.dataset.dealId;
+                
+                try {
+                    const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
+                    const result = await response.json();
+                    
+                    if (result.status !== 'active') {
+                        showNotification('Сделка уже завершена или отменена', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    if (result.pending_cancel) {
+                        showNotification('Запрос на отмену уже отправлен на модерацию', 'info');
+                        window.location.reload();
+                        return;
+                    }
+                    
+                    if (result.currency === 'rub' && !result.rub_payment_confirmed) {
+                        showNotification('Ожидайте подтверждения оплаты продавцом', 'info');
+                        return;
+                    }
+                    
+                    selectedDealId = dealId;
+                    document.getElementById('reviewModal').style.display = 'flex';
+                } catch (error) {
+                    console.error('Error checking deal status:', error);
+                    showNotification('Ошибка при проверке статуса сделки', 'error');
+                }
+            });
+        });
+
+        // Выкуп забронированного товара
+        document.querySelectorAll('.complete-reservation-chat').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const dealId = btn.dataset.dealId;
+                
+                if (confirm('Вы уверены, что хотите выкупить товар?')) {
+                    try {
+                        const response = await fetch('/complete_reservation', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ deal_id: parseInt(dealId) })
+                        });
+                        
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            showNotification('Товар успешно выкуплен!', 'success');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        } else {
+                            showNotification(result.message || 'Произошла ошибка', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Произошла ошибка при выкупе товара', 'error');
+                    }
+                }
+            });
+        });
+
+        // Логика для модального окна оценки в чате
+        let selectedRatingChat = null;
+        let selectedDealId = null;
+
+        document.getElementById('closeReviewModal').addEventListener('click', () => {
+            document.getElementById('reviewModal').style.display = 'none';
+            resetReviewForm();
+        });
+
+        document.getElementById('plusRatingChat').addEventListener('click', () => {
+            selectedRatingChat = 'plus';
+            document.getElementById('plusRatingChat').classList.add('selected');
+            document.getElementById('minusRatingChat').classList.remove('selected');
+            document.getElementById('submitReviewChat').disabled = false;
+        });
+
+        document.getElementById('minusRatingChat').addEventListener('click', () => {
+            selectedRatingChat = 'minus';
+            document.getElementById('minusRatingChat').classList.add('selected');
+            document.getElementById('plusRatingChat').classList.remove('selected');
+            document.getElementById('submitReviewChat').disabled = false;
+        });
+
+        document.getElementById('submitReviewChat').addEventListener('click', async () => {
+            const reviewText = document.getElementById('reviewTextChat').value.trim();
+            
+            try {
+                const response = await fetch('/confirm_deal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        deal_id: parseInt(selectedDealId),
+                        rating: selectedRatingChat,
+                        review: reviewText
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showNotification('Сделка успешно завершена!', 'success');
+                    document.getElementById('reviewModal').style.display = 'none';
+                    resetReviewForm();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showNotification(result.message || 'Произошла ошибка', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('Произошла ошибка при завершении сделки', 'error');
+            }
+        });
+
+        // Закрытие модального окна оценки при клике вне его
+        document.getElementById('reviewModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('reviewModal')) {
+                document.getElementById('reviewModal').style.display = 'none';
+                resetReviewForm();
+            }
+        });
+
+        function resetReviewForm() {
+            selectedRatingChat = null;
+            document.getElementById('reviewTextChat').value = '';
+            document.getElementById('plusRatingChat').classList.remove('selected');
+            document.getElementById('minusRatingChat').classList.remove('selected');
+            document.getElementById('submitReviewChat').disabled = true;
+        }
+
         // Обработчики событий
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
@@ -719,7 +1197,7 @@
             submitReport.addEventListener('click', async () => {
                 const reason = reportReason.value.trim();
                 if (!reason) {
-                    showNotification('Пожалуйста, укажите причину жалобы', 'info');
+                    showNotification('Пожалуйста, укажите причину жалобы', 'error');
                     return;
                 }
 
@@ -733,25 +1211,23 @@
                     });
 
                     const result = await response.json();
-                    
                     if (result.status === 'success') {
-                        showNotification('Жалоба отправлена администратору', 'success');
+                        showNotification('Жалоба отправлена', 'success');
                         closeReportModal();
                         
-                        // Делаем кнопку неактивной после успешной отправки
+                        // Отключаем кнопку после отправки жалобы
                         if (reportChatButton) {
                             reportChatButton.disabled = true;
                             reportChatButton.style.opacity = '0.5';
                             reportChatButton.style.cursor = 'not-allowed';
-                            reportChatButton.title = 'Жалоба отправлена. Ожидайте решения.';
+                            reportChatButton.title = 'Вы уже отправили жалобу на этот чат';
                         }
-                        
                     } else {
-                        showNotification(result.message || 'Ошибка при отправке жалобы', 'error');
+                        showNotification(result.message || 'Произошла ошибка', 'error');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    showNotification('Ошибка при отправке жалобы', 'error');
+                    showNotification('Произошла ошибка при отправке жалобы', 'error');
                 }
             });
         }
@@ -760,10 +1236,73 @@
             cancelReport.addEventListener('click', closeReportModal);
         }
 
-        // Инициализация фокуса при загрузке
-        if (messageInput) {
-            messageInput.focus();
+        // Закрытие модального окна при клике вне его
+        reportChatModal.addEventListener('click', (e) => {
+            if (e.target === reportChatModal) {
+                closeReportModal();
+            }
+        });
+
+        // Функция для показа уведомлений
+        function showNotification(message, type = 'info') {
+            // Создаем элемент уведомления
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            // Стили для уведомления
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 6px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                max-width: 300px;
+                word-wrap: break-word;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            // Цвета в зависимости от типа
+            if (type === 'success') {
+                notification.style.backgroundColor = '#4CAF50';
+            } else if (type === 'error') {
+                notification.style.backgroundColor = '#f44336';
+            } else if (type === 'info') {
+                notification.style.backgroundColor = '#2196F3';
+            } else {
+                notification.style.backgroundColor = '#666';
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Удаляем уведомление через 3 секунды
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
         }
+
+        // Добавляем стили для анимации
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     });
 </script>
 {% endblock %}
