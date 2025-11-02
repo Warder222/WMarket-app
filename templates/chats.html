@@ -33,6 +33,51 @@
         padding-bottom: 80px;
     }
 
+    .active-deals-section {
+        margin-bottom: 20px;
+        border: 2px solid var(--primary-color);
+        border-radius: 12px;
+        padding: 12px;
+        position: relative;
+        overflow: hidden;
+        animation: pulseBorder 3s ease-in-out infinite;
+    }
+
+    @keyframes pulseBorder {
+        0%, 100% {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0 rgba(63, 136, 248, 0.4);
+        }
+        50% {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 4px rgba(63, 136, 248, 0.2);
+        }
+    }
+
+    .active-deals-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(63, 136, 248, 0.3);
+    }
+
+    .active-deals-title {
+        font-weight: bold;
+        color: var(--primary-color);
+        font-size: 16px;
+    }
+
+    .active-deals-badge {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
     .chat-item {
         display: flex;
         justify-content: space-between;
@@ -40,6 +85,22 @@
         padding: 12px 0;
         border-bottom: 1px solid var(--border-color);
         cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .active-deals-section .chat-item {
+        border-bottom: 1px solid rgba(63, 136, 248, 0.2);
+    }
+
+    .active-deals-section .chat-item:last-child {
+        border-bottom: none;
+    }
+
+    .chat-item:hover {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 0 -12px;
     }
 
     .chat-info {
@@ -190,6 +251,29 @@
         font-size: 12px;
         text-align: center;
     }
+
+    .deal-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: linear-gradient(135deg, var(--primary-color), #1a73e8);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 500;
+        margin-left: 8px;
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glow {
+        from {
+            box-shadow: 0 0 2px var(--primary-color);
+        }
+        to {
+            box-shadow: 0 0 4px var(--primary-color), 0 0 8px rgba(63, 136, 248, 0.3);
+        }
+    }
 </style>
 {% endblock %}
 
@@ -202,8 +286,65 @@
 
 <main class="chats-container">
     {% if chats %}
+        {% set active_deals_chats = [] %}
+        {% set regular_chats = [] %}
+        
         {% for chat in chats %}
-            <div class="chat-item" data-chatid="{{ chat.id }}">
+            {% if chat.has_active_deal %}
+                {% set _ = active_deals_chats.append(chat) %}
+            {% else %}
+                {% set _ = regular_chats.append(chat) %}
+            {% endif %}
+        {% endfor %}
+
+        {% if active_deals_chats %}
+        <div class="active-deals-section" id="activeDealsSection">
+            <div class="active-deals-header">
+                <div class="active-deals-title">Активные сделки</div>
+                <div class="active-deals-badge">{{ active_deals_chats|length }}</div>
+            </div>
+            {% for chat in active_deals_chats %}
+                <div class="chat-item" data-chatid="{{ chat.id }}" data-has-deal="true">
+                    <div class="chat-info">
+                        <div style="display: flex; align-items: center;">
+                            <div class="chat-seller">{{ chat.seller_username }}</div>
+                            {% if chat.unread_count > 0 %}
+                                <div class="unread-badge">{{ chat.unread_count }}</div>
+                            {% endif %}
+                            
+                        </div>
+                        <div class="chat-product">{{ chat.product_title }}</div>
+                        <div class="chat-price">{{ chat.product_price }} TON</div>
+                        <div class="chat-preview">{{ chat.last_message|striptags|replace('\n', '  ') }}</div>
+                        <div class="chat-time" data-timestamp="{{ chat.last_message_timestamp }}">{{ chat.last_message_time }}</div>
+                    </div>
+                    <div class="chat-actions">
+                        <div class="product-image-container">
+                            <img src="/{{ chat.product_image }}" class="chat-image {% if not chat.product_active %}grayscale{% endif %}" alt="{{ chat.product_title }}">
+                            {% if chat.product_active is none %}
+                                <div class="product-status">В архиве</div>
+                            {% elif not chat.product_active %}
+                                <div class="product-status">На модерации</div>
+                            {% endif %}
+                        </div>
+                        <button class="leave-chat-button" data-chatid="{{ chat.id }}">
+                            <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="6" width="12" height="11" rx="1" fill="#777"/>
+                                <rect x="2" y="5" width="16" height="2" fill="#999"/>
+                                <rect x="8" y="2" width="4" height="2" fill="#bbb" rx="1"/>
+                                <rect x="5" y="8" width="10" height="1" fill="#555" rx="0.5"/>
+                                <rect x="5" y="11" width="10" height="1" fill="#555" rx="0.5"/>
+                                <rect x="5" y="14" width="10" height="1" fill="#555" rx="0.5"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for chat in regular_chats %}
+            <div class="chat-item" data-chatid="{{ chat.id }}" data-has-deal="false">
                 <div class="chat-info">
                     <div style="display: flex; align-items: center;">
                         <div class="chat-seller">{{ chat.seller_username }}</div>
@@ -214,7 +355,7 @@
                     <div class="chat-product">{{ chat.product_title }}</div>
                     <div class="chat-price">{{ chat.product_price }} TON</div>
                     <div class="chat-preview">{{ chat.last_message|striptags|replace('\n', '  ') }}</div>
-                    <div class="chat-time">{{ chat.last_message_time }}</div>
+                    <div class="chat-time" data-timestamp="{{ chat.last_message_timestamp }}">{{ chat.last_message_time }}</div>
                 </div>
                 <div class="chat-actions">
                     <div class="product-image-container">
@@ -259,7 +400,44 @@
 
 {% block scripts %}
 <script>
+    // Функция для форматирования времени в локальный формат
+    function formatLocalTime(timestamp) {
+        if (!timestamp) return '';
+        
+        try {
+            const messageTime = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - messageTime;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            }
+            else if (diffDays === 1) {
+                return `вчера ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+            else if (diffDays < 7) {
+                const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+                return `${days[messageTime.getDay()]} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+            else {
+                return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+        } catch (e) {
+            return timestamp;
+        }
+    }
+
+    // Обновляем все времена сообщений при загрузке страницы
     document.addEventListener('DOMContentLoaded', () => {
+        // Обновляем время для всех сообщений
+        document.querySelectorAll('.chat-time[data-timestamp]').forEach(element => {
+            const timestamp = element.getAttribute('data-timestamp');
+            if (timestamp) {
+                element.textContent = formatLocalTime(timestamp);
+            }
+        });
+
         const searchInput = document.querySelector('.search-input');
         const chatItems = Array.from(document.querySelectorAll('.chat-item'));
         
@@ -272,6 +450,14 @@
                 const matches = seller.includes(searchTerm) || product.includes(searchTerm);
                 chat.style.display = matches ? '' : 'none';
             });
+
+            // Скрываем/показываем секцию активных сделок в зависимости от результатов поиска
+            const activeDealsSection = document.getElementById('activeDealsSection');
+            if (activeDealsSection) {
+                const visibleDealChats = Array.from(activeDealsSection.querySelectorAll('.chat-item'))
+                    .filter(chat => chat.style.display !== 'none');
+                activeDealsSection.style.display = visibleDealChats.length > 0 ? 'block' : 'none';
+            }
         });
 
         // Обработка клика по чату
@@ -320,15 +506,14 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-Protection': '1'  // Защита от CSRF
+                        'X-CSRF-Protection': '1'
                     },
-                    credentials: 'include'  // Для передачи cookies
+                    credentials: 'include'
                 });
 
                 const data = await response.json();
                 
                 if (data.status === "success") {
-                    // Полностью перезагружаем страницу после успешного выхода
                     window.location.reload();
                 } else {
                     showNotification('Ошибка при выходе из чата', 'error');
@@ -341,6 +526,63 @@
                 currentChatIdToLeave = null;
             }
         });
+
+        // Функция для показа уведомлений
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 6px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                max-width: 300px;
+                word-wrap: break-word;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            if (type === 'success') {
+                notification.style.backgroundColor = '#4CAF50';
+            } else if (type === 'error') {
+                notification.style.backgroundColor = '#f44336';
+            } else if (type === 'info') {
+                notification.style.backgroundColor = '#2196F3';
+            } else {
+                notification.style.backgroundColor = '#666';
+            }
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Добавляем стили для анимации
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     });
 </script>
 {% endblock %}

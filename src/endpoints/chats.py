@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, desc, func, select, update
 
 from src.bot import send_notification_to_user
-from src.database.database import Chat, ChatParticipant, ChatReport, Message, Product, User, async_session_maker
+from src.database.database import Chat, ChatParticipant, ChatReport, Message, Product, User, async_session_maker, Deal
 from src.database.methods import (all_count_unread_messages, check_user_block_post, check_user_blocked_post,
                                   get_all_users, get_chat_messages, get_user_active_deals_count, get_user_info_new,
                                   mark_messages_as_read, check_existing_report, create_system_message,
@@ -16,6 +16,7 @@ from src.utils import decode_jwt, is_admin_new
 from src.websocket_config import manager
 
 
+# В функции chats добавим проверку активных сделок
 @wmarket_router.get("/chats")
 async def chats(request: Request, session_token=Cookie(default=None)):
     if session_token:
@@ -87,6 +88,18 @@ async def chats(request: Request, session_token=Cookie(default=None)):
                     )
                     count_unread_messages = count_unread_result.scalar() or 0
 
+                    # Проверяем наличие активной сделки для этого чата
+                    has_active_deal = False
+                    if product:
+                        deal_result = await session.execute(
+                            select(Deal)
+                            .where(
+                                Deal.product_id == product.id,
+                                Deal.status == 'active'
+                            )
+                        )
+                        has_active_deal = deal_result.scalar_one_or_none() is not None
+
                     chats_with_info.append({
                         "id": chat.id,
                         "product_id": chat.product_id,
@@ -97,10 +110,22 @@ async def chats(request: Request, session_token=Cookie(default=None)):
                         "seller_username": other_user.first_name if other_user else "Неизвестный",
                         "last_message": last_message.content if last_message else "Чат начат",
                         "last_message_time": last_message.created_at.strftime("%H:%M") if last_message else "",
-                        "unread_count": count_unread_messages
+                        "last_message_timestamp": last_message.created_at.isoformat() if last_message else "",
+                        "unread_count": count_unread_messages,
+                        "has_active_deal": has_active_deal
                     })
 
-            user_chats = chats_with_info
+            # Сортируем чаты: сначала с активными сделками, потом обычные
+            # Внутри каждой группы сортируем по времени последнего сообщения
+            chats_with_active_deals = [chat for chat in chats_with_info if chat["has_active_deal"]]
+            chats_without_active_deals = [chat for chat in chats_with_info if not chat["has_active_deal"]]
+
+            # Сортируем обе группы по времени последнего сообщения (новые сверху)
+            chats_with_active_deals.sort(key=lambda x: x.get("last_message_timestamp", ""), reverse=True)
+            chats_without_active_deals.sort(key=lambda x: x.get("last_message_timestamp", ""), reverse=True)
+
+            # Объединяем списки
+            user_chats = chats_with_active_deals + chats_without_active_deals
 
             all_undread_count_message = await all_count_unread_messages(payload.get("tg_id"))
             admin_res = False
@@ -515,3 +540,41 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     except Exception as e:
         print(f"WebSocket error: {e}")
         await websocket.close(code=1011)
+
+
+#deals__________________________________________________________________________________________________________________
+# Добавляем новую функцию для отправки системных сообщений о сделках
+async def create_deal_system_message(chat_id: int, content: str):
+    """Создать системное сообщение о сделке и отправить через WebSocket"""
+    async with async_session_maker() as db:
+        try:
+            system_message = Message(
+                chat_id=chat_id,
+                sender_id=0,  # 0 означает системное сообщение
+                receiver_id=0,
+                content=content,
+                is_read=False,
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(system_message)
+            await db.commit()
+            await db.refresh(system_message)
+
+            # Отправляем через WebSocket
+            broadcast_data = {
+                "type": "new_message",
+                "chat_id": system_message.chat_id,
+                "sender_id": system_message.sender_id,
+                "receiver_id": system_message.receiver_id,
+                "content": system_message.content,
+                "created_at": system_message.created_at.isoformat(),
+                "id": system_message.id,
+                "is_read": system_message.is_read
+            }
+            await manager.broadcast(json.dumps(broadcast_data))
+
+            return system_message
+        except Exception as exc:
+            print(f"Error creating deal system message: {exc}")
+            return None
+#_______________________________________________________________________________________________________________________

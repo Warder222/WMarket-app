@@ -925,10 +925,20 @@
                 }
                 
                 addMessageToUI(data, data.sender_id == currentUserId);
+                
+                // Если это системное сообщение о сделке, обновляем интерфейс сделки
+                if (data.sender_id === 0 && data.content.includes('сделк') || 
+                    data.content.includes('оплат') || 
+                    data.content.includes('бронь') ||
+                    data.content.includes('выкуп')) {
+                    // Обновляем информацию о сделке через 1 секунду (даем время на сохранение в БД)
+                    setTimeout(() => {
+                        updateDealInfo();
+                    }, 1000);
+                }
             }
             // Обработка истории сообщений при подключении
             else if (data.type === "chat_history") {
-                
                 // Затем добавляем сообщения
                 data.messages.forEach(msg => {
                     // Для админа добавляем имя отправителя
@@ -940,6 +950,16 @@
                 });
             }
         };
+
+        // Функция для обновления информации о сделке
+        async function updateDealInfo() {
+            try {
+                // Перезагружаем страницу для обновления данных о сделке
+                window.location.reload();
+            } catch (error) {
+                console.error('Error updating deal info:', error);
+            }
+        }
 
         // Инициализация соединения - запрос истории чата
         socket.onopen = () => {
@@ -972,6 +992,9 @@
                 
                 if (confirm('Вы подтверждаете, что получили рублевый платеж от покупателя?')) {
                     try {
+                        btn.disabled = true;
+                        btn.textContent = 'Подтверждается...';
+                        
                         const response = await fetch('/confirm_rub_payment', {
                             method: 'POST',
                             headers: {
@@ -983,15 +1006,17 @@
                         const result = await response.json();
                         if (result.status === 'success') {
                             showNotification('Оплата подтверждена! Покупатель может теперь подтвердить получение товара.', 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 2000);
+                            // Интерфейс обновится автоматически через системное сообщение
                         } else {
                             showNotification(result.message || 'Произошла ошибка', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Подтвердить получение рублей';
                         }
                     } catch (error) {
                         console.error('Error:', error);
                         showNotification('Произошла ошибка при подтверждении оплаты', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Подтвердить получение рублей';
                     }
                 }
             });
@@ -1003,6 +1028,9 @@
                 const dealId = btn.dataset.dealId;
                 
                 try {
+                    btn.disabled = true;
+                    btn.textContent = 'Проверка...';
+                    
                     const response = await fetch(`/check_deal_status?deal_id=${dealId}`);
                     const result = await response.json();
                     
@@ -1020,14 +1048,21 @@
                     
                     if (result.currency === 'rub' && !result.rub_payment_confirmed) {
                         showNotification('Ожидайте подтверждения оплаты продавцом', 'info');
+                        btn.disabled = false;
+                        btn.textContent = 'Подтвердить получение товара';
                         return;
                     }
                     
                     selectedDealId = dealId;
                     document.getElementById('reviewModal').style.display = 'flex';
+                    btn.disabled = false;
+                    btn.textContent = 'Подтвердить получение товара';
+                    
                 } catch (error) {
                     console.error('Error checking deal status:', error);
                     showNotification('Ошибка при проверке статуса сделки', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Подтвердить получение товара';
                 }
             });
         });
@@ -1040,6 +1075,9 @@
                 
                 if (confirm('Вы уверены, что хотите выкупить товар?')) {
                     try {
+                        btn.disabled = true;
+                        btn.textContent = 'Выкупается...';
+                        
                         const response = await fetch('/complete_reservation', {
                             method: 'POST',
                             headers: {
@@ -1051,19 +1089,22 @@
                         const result = await response.json();
                         if (result.status === 'success') {
                             showNotification('Товар успешно выкуплен!', 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 2000);
+                            // Интерфейс обновится автоматически через системное сообщение
                         } else {
                             showNotification(result.message || 'Произошла ошибка', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Выкупить товар';
                         }
                     } catch (error) {
                         console.error('Error:', error);
                         showNotification('Произошла ошибка при выкупе товара', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Выкупить товар';
                     }
                 }
             });
         });
+
 
         // Логика для модального окна оценки в чате
         let selectedRatingChat = null;

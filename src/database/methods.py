@@ -765,6 +765,34 @@ async def get_active_deal_for_chat(chat_id: int, current_user_id: int):
         except Exception as exc:
             print(f"Error getting active deal for chat: {exc}")
             return None
+
+
+async def check_chat_has_active_deal(chat_id: int, user_id: int) -> bool:
+    """Проверить, есть ли активная сделка для чата"""
+    async with async_session_maker() as session:
+        try:
+            # Получаем информацию о чате и товаре
+            chat = await session.execute(
+                select(Chat).where(Chat.id == chat_id)
+            )
+            chat = chat.scalar_one_or_none()
+
+            if not chat:
+                return False
+
+            # Проверяем наличие активной сделки для этого товара
+            deal_result = await session.execute(
+                select(Deal)
+                .where(
+                    Deal.product_id == chat.product_id,
+                    Deal.status == 'active'
+                )
+            )
+            return deal_result.scalar_one_or_none() is not None
+
+        except Exception as exc:
+            print(f"Error checking active deal for chat: {exc}")
+            return False
 #_______________________________________________________________________________________________________________________
 
 

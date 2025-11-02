@@ -1184,6 +1184,26 @@
                 });
             }
         });
+
+        const dealsSocket = new WebSocket(`wss://${window.location.host}/ws/{{ user_tg_id }}`);
+
+        dealsSocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Если пришло системное сообщение о сделке, обновляем страницу
+            if (data.type === "new_message" && data.sender_id === 0 && 
+                (data.content.includes('сделк') || data.content.includes('оплат') || 
+                data.content.includes('бронь') || data.content.includes('выкуп'))) {
+                // Обновляем страницу через 1 секунду
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        };
+
+        // При закрытии страницы отключаем WebSocket
+        window.addEventListener('beforeunload', () => {
+            dealsSocket.close();
+        });
     });
 </script>
 {% endblock %}

@@ -2,15 +2,17 @@ from datetime import datetime, timezone
 
 from fastapi import Cookie, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, func
 from starlette.responses import JSONResponse
 
 from src.bot import send_notification_to_user
 from src.config import settings
-from src.database.database import Deal, Product, Review, User, async_session_maker, TonTransaction
+from src.database.database import Deal, Product, Review, User, async_session_maker, TonTransaction, Chat, \
+    ChatParticipant
 from src.database.methods import (all_count_unread_messages, archive_product_post, get_all_users,
                                   get_user_active_deals, get_user_active_deals_count, get_user_info_new)
 from src.endpoints._endpoints_config import templates, wmarket_router
+from src.endpoints.chats import create_deal_system_message
 from src.utils import decode_jwt, is_admin_new
 
 
@@ -230,6 +232,24 @@ async def confirm_deal(
             buyer_info_arr = await get_user_info_new(deal.buyer_id)
             seller_info_arr = await get_user_info_new(deal.seller_id)
 
+            # Ищем чат между покупателем и продавцом для этого товара
+            chat_result = await session.execute(
+                select(Chat)
+                .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+                .where(
+                    Chat.product_id == deal.product_id,
+                    ChatParticipant.user_id.in_([deal.buyer_id, deal.seller_id])
+                )
+                .group_by(Chat.id)
+                .having(func.count(ChatParticipant.user_id) == 2)
+            )
+            chat = chat_result.scalar_one_or_none()
+
+            # Отправляем системное сообщение в чат, если он существует
+            if chat:
+                system_message_content = f"✅ Покупатель подтвердил получение товара. Сделка завершена!"
+                await create_deal_system_message(chat.id, system_message_content)
+
             await send_notification_to_user(
                 deal.seller_id,
                 f"✅ Сделка завершена!\n\n"
@@ -303,6 +323,25 @@ async def confirm_rub_payment(
             await session.commit()
 
             buyer_info = await get_user_info_new(deal.buyer_id)
+            seller_info = await get_user_info_new(deal.seller_id)
+
+            # Ищем чат между покупателем и продавцом для этого товара
+            chat_result = await session.execute(
+                select(Chat)
+                .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+                .where(
+                    Chat.product_id == deal.product_id,
+                    ChatParticipant.user_id.in_([deal.buyer_id, deal.seller_id])
+                )
+                .group_by(Chat.id)
+                .having(func.count(ChatParticipant.user_id) == 2)
+            )
+            chat = chat_result.scalar_one_or_none()
+
+            # Отправляем системное сообщение в чат, если он существует
+            if chat:
+                system_message_content = f"💰 Продавец подтвердил получение рублевого платежа"
+                await create_deal_system_message(chat.id, system_message_content)
 
             await send_notification_to_user(
                 deal.buyer_id,
@@ -387,6 +426,26 @@ async def request_cancel_deal(
             deal.cancel_request_by = payload.get("tg_id")
 
             await session.commit()
+
+            # Ищем чат между покупателем и продавцом для этого товара
+            chat_result = await session.execute(
+                select(Chat)
+                .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+                .where(
+                    Chat.product_id == deal.product_id,
+                    ChatParticipant.user_id.in_([deal.buyer_id, deal.seller_id])
+                )
+                .group_by(Chat.id)
+                .having(func.count(ChatParticipant.user_id) == 2)
+            )
+            chat = chat_result.scalar_one_or_none()
+
+            # Отправляем системное сообщение в чат, если он существует
+            if chat:
+                user_info = await get_user_info_new(payload.get("tg_id"))
+                user_name = user_info['first_name'] if user_info else "Пользователь"
+                system_message_content = f"⚠️ {user_name} подал запрос на отмену сделки. Причина: {reason}"
+                await create_deal_system_message(chat.id, system_message_content)
 
             other_user_id = deal.buyer_id if payload.get("tg_id") == deal.seller_id else deal.seller_id
 
@@ -486,6 +545,23 @@ async def complete_reservation(
 
             await session.commit()
 
+            chat_result = await session.execute(
+                select(Chat)
+                .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+                .where(
+                    Chat.product_id == deal.product_id,
+                    ChatParticipant.user_id.in_([deal.buyer_id, deal.seller_id])
+                )
+                .group_by(Chat.id)
+                .having(func.count(ChatParticipant.user_id) == 2)
+            )
+            chat = chat_result.scalar_one_or_none()
+
+            # Отправляем системное сообщение в чат, если он существует
+            if chat:
+                system_message_content = f"💰 Покупатель выкупил забронированный товар!"
+                await create_deal_system_message(chat.id, system_message_content)
+
             await send_notification_to_user(
                 deal.seller_id,
                 f"💰 Покупатель выкупил забронированный товар!\n\n"
@@ -563,6 +639,28 @@ async def cancel_reservation(
                 product.reserved_by = None
 
             await session.commit()
+
+            # В функции cancel_reservation после await session.commit():
+            # Ищем чат между покупателем и продавцом для этого товара
+            chat_result = await session.execute(
+                select(Chat)
+                .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
+                .where(
+                    Chat.product_id == deal.product_id,
+                    ChatParticipant.user_id.in_([deal.buyer_id, deal.seller_id])
+                )
+                .group_by(Chat.id)
+                .having(func.count(ChatParticipant.user_id) == 2)
+            )
+            chat = chat_result.scalar_one_or_none()
+
+            # Отправляем системное сообщение в чат, если он существует
+            if chat:
+                if not is_expired:
+                    system_message_content = f"❌ Покупатель отменил бронь товара"
+                else:
+                    system_message_content = f"⌛ Время бронирования истекло"
+                await create_deal_system_message(chat.id, system_message_content)
 
             if not is_expired:
                 await send_notification_to_user(
