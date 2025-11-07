@@ -135,6 +135,7 @@
         margin-bottom: 16px;
         cursor: pointer;
         position: relative;
+        width: 100%;
     }
 
     .product-image {
@@ -151,6 +152,7 @@
     .product-title {
         font-weight: bold;
         margin-bottom: 4px;
+        max-width: 45vw;
     }
 
     .product-price {
@@ -159,11 +161,11 @@
     }
 
     .shield-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    margin-left: 12px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+        margin-left: 12px;
     }
 
     .shield-button svg {
@@ -376,6 +378,11 @@
         margin-top: 12px;
         padding-top: 12px;
         border-top: 1px solid var(--border-color);
+        width: 107%;
+        margin-left: -12px;
+        margin-right: -12px;
+        padding-left: 12px;
+        padding-right: 12px;
     }
 
     .deal-status-compact {
@@ -387,15 +394,16 @@
 
     .deal-btn-compact {
         width: 100%;
-        padding: 10px 12px;
-        border-radius: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
         border: none;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s ease;
         text-align: center;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
     }
 
     .deal-btn-compact.confirm {
@@ -438,28 +446,31 @@
         display: flex;
         gap: 12px;
         align-items: flex-start;
+        width: 100%;
     }
 
     .product-main-info {
         flex: 1;
         min-width: 0;
+        position: relative;
+        width: 100%;
     }
 
     .deal-id-compact {
+        position: absolute;
+        top: 0;
+        right: 0;
         font-size: 11px;
-        color: var(--secondary-text);
-        text-align: center;
-        margin-bottom: 8px;
+        color: white;
         opacity: 0.8;
         background-color: var(--primary-color);
-        color: white;
         padding: 2px 6px;
         border-radius: 4px;
         display: inline-block;
     }
 
     .deal-action-buttons {
-        margin-top: 8px;
+        margin-top: 3px;
     }
 
     /* Стили для модального окна оценки (как в deals.html) */
@@ -650,67 +661,69 @@
                 {% endif %}
             </div>
             <div class="product-main-info">
+                {% if active_deal %}
+                <span class="deal-id-compact">Сделка #{{ active_deal.id }}</span>
+                {% endif %}
                 <div class="product-title">{{ product.product_name }}</div>
                 <div class="product-price">{{ product.product_price }} TON</div>
-                {% if active_deal %}
-                <div class="deal-actions-compact" id="dealActionsCompact">
-                    <div class="deal-id-compact">Сделка #{{ active_deal.id }}</div>
-                    
-                    <!-- Сделка за рубли -->
-                    {% if active_deal.currency == 'rub' %}
-                        {% if active_deal.current_user_role == 'seller' and not active_deal.rub_payment_confirmed %}
-                            <div class="deal-action-buttons">
-                                <button class="deal-btn-compact confirm confirm-rub-payment-chat" data-deal-id="{{ active_deal.id }}">
-                                    Подтвердить получение рублей
-                                </button>
-                                <div class="deal-note-compact">Ожидание подтверждения оплаты</div>
-                            </div>
-                        {% elif active_deal.current_user_role == 'seller' and active_deal.rub_payment_confirmed %}
-                            <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
-                        {% elif active_deal.current_user_role == 'buyer' and not active_deal.rub_payment_confirmed %}
-                            <div class="deal-note-compact">Ожидайте подтверждения оплаты от продавца</div>
-                        {% elif active_deal.current_user_role == 'buyer' and active_deal.rub_payment_confirmed %}
-                            <div class="deal-action-buttons">
-                                <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
-                                    Подтвердить получение товара
-                                </button>
-                            </div>
-                        {% endif %}
-                    
-                    <!-- Сделка за TON (не бронь) -->
-                    {% elif active_deal.currency == 'ton' and not active_deal.is_reserved %}
-                        {% if active_deal.current_user_role == 'buyer' %}
-                            <div class="deal-action-buttons">
-                                <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
-                                    Подтвердить получение товара
-                                </button>
-                            </div>
-                        {% else %}
-                            <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
-                        {% endif %}
-                    
-                    <!-- Бронь TON -->
-                    {% elif active_deal.currency == 'ton' and active_deal.is_reserved %}
-                        {% if active_deal.current_user_role == 'buyer' %}
-                            <div class="deal-action-buttons">
-                                <button class="deal-btn-compact confirm complete-reservation-chat" data-deal-id="{{ active_deal.id }}">
-                                    Выкупить товар
-                                </button>
-                                <div class="reservation-info-compact">
-                                    Внесено: {{ active_deal.reservation_amount }} TON
-                                </div>
-                            </div>
-                        {% else %}
-                            <div class="deal-note-compact">Ожидание выкупа товара покупателем</div>
-                            <div class="reservation-info-compact">
-                                Внесено брони: {{ active_deal.reservation_amount }} TON
-                            </div>
-                        {% endif %}
-                    {% endif %}
-                </div>
-                {% endif %}
             </div>
         </div>
+        
+        {% if active_deal %}
+        <div class="deal-actions-compact" id="dealActionsCompact">
+            <!-- Сделка за рубли -->
+            {% if active_deal.currency == 'rub' %}
+                {% if active_deal.current_user_role == 'seller' and not active_deal.rub_payment_confirmed %}
+                    <div class="deal-action-buttons">
+                        <button class="deal-btn-compact confirm confirm-rub-payment-chat" data-deal-id="{{ active_deal.id }}">
+                            Подтвердить получение рублей
+                        </button>
+                        <div class="deal-note-compact">Ожидание подтверждения оплаты</div>
+                    </div>
+                {% elif active_deal.current_user_role == 'seller' and active_deal.rub_payment_confirmed %}
+                    <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
+                {% elif active_deal.current_user_role == 'buyer' and not active_deal.rub_payment_confirmed %}
+                    <div class="deal-note-compact">Ожидайте подтверждения оплаты от продавца</div>
+                {% elif active_deal.current_user_role == 'buyer' and active_deal.rub_payment_confirmed %}
+                    <div class="deal-action-buttons">
+                        <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
+                            Подтвердить получение товара
+                        </button>
+                    </div>
+                {% endif %}
+            
+            <!-- Сделка за TON (не бронь) -->
+            {% elif active_deal.currency == 'ton' and not active_deal.is_reserved %}
+                {% if active_deal.current_user_role == 'buyer' %}
+                    <div class="deal-action-buttons">
+                        <button class="deal-btn-compact confirm confirm-deal-chat" data-deal-id="{{ active_deal.id }}">
+                            Подтвердить получение товара
+                        </button>
+                    </div>
+                {% else %}
+                    <div class="deal-note-compact">Ожидайте подтверждение получения товара от покупателя</div>
+                {% endif %}
+            
+            <!-- Бронь TON -->
+            {% elif active_deal.currency == 'ton' and active_deal.is_reserved %}
+                {% if active_deal.current_user_role == 'buyer' %}
+                    <div class="deal-action-buttons">
+                        <button class="deal-btn-compact confirm complete-reservation-chat" data-deal-id="{{ active_deal.id }}">
+                            Выкупить товар
+                        </button>
+                        <div class="reservation-info-compact">
+                            Внесено: {{ active_deal.reservation_amount }} TON
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="deal-note-compact">Ожидание выкупа товара покупателем</div>
+                    <div class="reservation-info-compact">
+                        Внесено брони: {{ active_deal.reservation_amount }} TON
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
     
     <div class="chat-messages" id="chatMessages">
@@ -785,20 +798,29 @@
     function formatMessageDate(messageDate) {
         const now = new Date();
         const messageTime = new Date(messageDate);
-        const diffMs = now - messageTime;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         
-        if (diffDays === 0) {
+        // Проверяем, сегодня ли отправлено сообщение
+        const isToday = now.toDateString() === messageTime.toDateString();
+        
+        if (isToday) {
+            // Если сегодня - показываем только время
             return messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
-        else if (diffDays === 1) {
-            return `вчера ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-        }
-        else if (diffDays < 365) {
-            return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-        }
         else {
-            return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            // Если не сегодня - показываем дату и время
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const isYesterday = yesterday.toDateString() === messageTime.toDateString();
+            
+            if (isYesterday) {
+                return `вчера ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+            else if (now.getFullYear() === messageTime.getFullYear()) {
+                return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+            else {
+                return `${messageTime.toLocaleDateString([], {day: 'numeric', month: 'short', year: 'numeric'})} ${messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
         }
     }
 
