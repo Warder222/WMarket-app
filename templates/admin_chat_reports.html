@@ -1157,8 +1157,8 @@
                     <div class="item-time">{{ deal.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
                 </div>
                 <div class="deal-info">
-                    <div><strong>Продавец:</strong> <a href="/profile/{{ deal.seller_id }}" class="user-link">{{ deal.seller_first_name }}</a></div>
-                    <div><strong>Покупатель:</strong> <a href="/profile/{{ deal.buyer_id }}" class="user-link">{{ deal.buyer_first_name }}</a></div>
+                    <div><strong>Продавец:</strong> <a href="/profile/{{ deal.seller_id }}" class="user-link">{{ deal.seller_first_name }} (@{{ deal.seller_username }})</a></div>
+                    <div><strong>Покупатель:</strong> <a href="/profile/{{ deal.buyer_id }}" class="user-link">{{ deal.buyer_first_name }} (@{{ deal.buyer_username }})</a></div>
                     
                     <!-- Исправленное отображение суммы -->
                     {% if deal.currency == 'rub' %}

@@ -33,6 +33,7 @@ async def get_user_info_new(tg_id):
             user_info = {
                 "tg_id": user.tg_id,
                 "first_name": user.first_name,
+                "username": user.username,
                 "photo_url": user.photo_url,
                 "plus_rep": user.plus_rep,
                 "minus_rep": user.minus_rep,
@@ -678,8 +679,10 @@ async def get_pending_deals():
                 "product_name": deal.product_name,
                 "seller_id": deal.seller_id,
                 "seller_first_name": seller_info["first_name"],
+                "seller_username": seller_info["username"],
                 "buyer_id": deal.buyer_id,
                 "buyer_first_name": buyer_info["first_name"],
+                "buyer_username": buyer_info["username"],
                 "currency": deal.currency,
                 "amount": deal.amount,
                 "rub_amount": deal.rub_amount,
