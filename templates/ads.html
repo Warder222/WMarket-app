@@ -96,19 +96,41 @@
             fill: currentColor;
         }
 
+        .ad-description-container {
+            margin: 20px 0;
+            border: 2px solid var(--primary-color);
+            border-radius: 12px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            animation: pulseBorder 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseBorder {
+            0%, 100% {
+                border-color: var(--primary-color);
+                box-shadow: 0 0 0 0 rgba(63, 136, 248, 0.4);
+            }
+            50% {
+                border-color: #1a73e8;
+                box-shadow: 0 0 0 4px rgba(63, 136, 248, 0.2);
+            }
+        }
+
         .ad-description-title {
             font-size: 24px;
             font-weight: 900;
-            margin: 10px 0 12px 0;
+            margin: 0 0 12px 0;
             text-align: left;
+            color: var(--primary-color);
         }
 
         .ad-description {
             font-size: 16px;
             line-height: 1.5;
-            margin-bottom: 24px;
             white-space: pre-line;
             text-align: left;
+            margin: 0;
         }
 
         .ad-actions {
@@ -1156,8 +1178,10 @@
             </button>
         {% endif %}
         
-        <h3 class="ad-description-title">Описание</h3>
-        <div class="ad-description">{{ product_info["product_description"] }}</div>
+        <div class="ad-description-container">
+            <h3 class="ad-description-title">Описание</h3>
+            <div class="ad-description">{{ product_info["product_description"] }}</div>
+        </div>
 
         <div id="reservationModal" class="modal" style="display: none;">
             <div class="reservation-modal-content">
