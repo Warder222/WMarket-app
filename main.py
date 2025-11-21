@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi_socketio import SocketManager
 
 from src.bot import start_bot
+from src.database.database import init_categories
 from src.endpoints._endpoints_config import wmarket_router, wmarket_api_router
 
 app = FastAPI()
@@ -26,7 +27,10 @@ app.add_middleware(
 
 socket_manager = SocketManager(app=app)
 
+
 async def run_app():
+    await init_categories()
+
     config = uvicorn.Config("main:app", host="0.0.0.0", port=8000)
     server = uvicorn.Server(config)
     bot_task = asyncio.create_task(start_bot())
@@ -39,6 +43,7 @@ async def run_app():
         await bot_task
     except asyncio.CancelledError:
         pass
+
 
 if __name__ == "__main__":
     asyncio.run(run_app())

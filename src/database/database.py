@@ -1,4 +1,7 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, func, UniqueConstraint
+import os
+
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, func, \
+    UniqueConstraint, select, insert
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -60,6 +63,7 @@ class Product(Base):
 
 class Fav(Base):
     __tablename__ = "favs"
+
     id = Column(Integer, autoincrement=True, primary_key=True)
     tg_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"))
     product_id = Column(Integer, ForeignKey("products.id", ondelete='CASCADE'))
@@ -188,3 +192,71 @@ class AdminRole(Base):
     user_id = Column(BigInteger, ForeignKey("users.tg_id", ondelete="CASCADE"), unique=True)
     role = Column(String)
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+async def init_categories():
+    async with async_session_maker() as session:
+        try:
+            # Читаем категории из not_dig_cats.txt (digital=False)
+            not_dig_file = os.path.join(os.path.dirname(__file__), '..', '..', 'not_dig_cats.txt')
+            if os.path.exists(not_dig_file):
+                with open(not_dig_file, 'r', encoding='utf-8') as f:
+                    not_dig_categories = [line.strip() for line in f if line.strip()]
+            else:
+                print(f"Файл {not_dig_file} не найден")
+                not_dig_categories = []
+
+            # Читаем категории из dig_cats.txt (digital=True)
+            dig_file = os.path.join(os.path.dirname(__file__), '..', '..', 'dig_cats.txt')
+            if os.path.exists(dig_file):
+                with open(dig_file, 'r', encoding='utf-8') as f:
+                    dig_categories = [line.strip() for line in f if line.strip()]
+            else:
+                print(f"Файл {dig_file} не найден")
+                dig_categories = []
+
+            # Получаем существующие категории из БД
+            existing_categories_result = await session.execute(
+                select(Category.category_name)
+            )
+            existing_categories = {cat[0] for cat in existing_categories_result.all()}
+
+            # Добавляем нецифровые категории
+            new_not_dig_categories = []
+            for category_name in not_dig_categories:
+                if category_name not in existing_categories:
+                    new_not_dig_categories.append({
+                        'category_name': category_name,
+                        'digital': False
+                    })
+
+            # Добавляем цифровые категории
+            new_dig_categories = []
+            for category_name in dig_categories:
+                if category_name not in existing_categories:
+                    new_dig_categories.append({
+                        'category_name': category_name,
+                        'digital': True
+                    })
+
+            # Вставляем новые категории
+            if new_not_dig_categories:
+                await session.execute(
+                    insert(Category),
+                    new_not_dig_categories
+                )
+                print(f"Добавлено {len(new_not_dig_categories)} нецифровых категорий")
+
+            if new_dig_categories:
+                await session.execute(
+                    insert(Category),
+                    new_dig_categories
+                )
+                print(f"Добавлено {len(new_dig_categories)} цифровых категорий")
+
+            await session.commit()
+            print("Инициализация категорий завершена")
+
+        except Exception as e:
+            await session.rollback()
+            print(f"Ошибка при инициализации категорий: {e}")

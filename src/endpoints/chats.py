@@ -98,7 +98,15 @@ async def chats(request: Request, session_token=Cookie(default=None)):
                                 Deal.status == 'active'
                             )
                         )
-                        has_active_deal = deal_result.scalar_one_or_none() is not None
+
+                        deal_exists = await session.execute(
+                            select(func.count(Deal.id))
+                            .where(
+                                Deal.product_id == product.id,
+                                Deal.status == 'active'
+                            )
+                        )
+                        has_active_deal = deal_exists.scalar() > 0
 
                     chats_with_info.append({
                         "id": chat.id,
